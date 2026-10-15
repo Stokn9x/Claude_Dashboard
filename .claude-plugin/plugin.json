@@ -1,6 +1,6 @@
 {
   "name": "agent-kontor",
-  "version": "0.7.2",
+  "version": "0.7.3",
   "description": "Et pixel-kontor set ovenfra, hvor Claude og dens subagenter arbejder live",
   "author": {
     "name": "Casper",

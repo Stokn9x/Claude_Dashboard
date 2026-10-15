@@ -6,7 +6,9 @@
 // ── Geometry: must match hooks/register.tsx, which times the same walks ──
 const W = 480
 const H = 508
-const S = 3 // canvas pixels per scene unit
+// Canvas pixels per scene unit: set by fit() from the window and the screen's
+// pixel density, so the office fills the space and stays sharp at any size.
+let S = 3
 const SPEED = 90
 const HANDOVER = 2.6
 const SEATS = 6
@@ -110,10 +112,26 @@ const SIDE_WALK = [SIDE_STEP, SIDE_STAND, SIDE_STEP, SIDE_STAND]
 
 // ── Canvas ───────────────────────────────────────────────────────────────
 const canvas = document.getElementById('office')
-canvas.width = W * S
-canvas.height = H * S
+const stage = document.getElementById('stage')
 const ctx = canvas.getContext('2d')
-ctx.imageSmoothingEnabled = false
+
+// The office as large as its space allows, whole and in proportion. The scene
+// keeps its own units (W × H), so a bigger office later only changes those.
+const fit = () => {
+  const room = stage.getBoundingClientRect()
+  const scale = Math.max(0.5, Math.min(room.width / W, room.height / H))
+  const dpr = window.devicePixelRatio || 1
+  const next = scale * dpr
+  canvas.style.width = `${Math.floor(W * scale)}px`
+  canvas.style.height = `${Math.floor(H * scale)}px`
+  if (Math.abs(next - S) < 0.01 && canvas.width === Math.round(W * S)) return
+  S = next
+  canvas.width = Math.round(W * S)
+  canvas.height = Math.round(H * S)
+  background.width = canvas.width
+  background.height = canvas.height
+  backgroundKey = ''
+}
 
 const rect = (x, y, w, h, fill) => {
   ctx.fillStyle = fill
@@ -295,8 +313,6 @@ const plant = (x, y, big = false) => {
 const WALL = '#3E4852'
 const WALL_TOP = '#5A6672'
 const background = document.createElement('canvas')
-background.width = W * S
-background.height = H * S
 let backgroundKey = ''
 
 const drawBuilding = (project, hour) => {
@@ -520,6 +536,8 @@ const draw = () => {
   const hour = new Date().getHours()
   drawBuilding(s?.project ?? '', hour)
   ctx.setTransform(1, 0, 0, 1, 0, 0)
+  ctx.imageSmoothingEnabled = false
+  ctx.clearRect(0, 0, canvas.width, canvas.height)
   ctx.drawImage(background, 0, 0)
   ctx.setTransform(S, 0, 0, S, 0, 0)
 
@@ -621,6 +639,11 @@ const draw = () => {
 
   requestAnimationFrame(draw)
 }
+document.documentElement.style.setProperty('--office', String(W / H))
+fit()
+new ResizeObserver(fit).observe(stage)
+// Dragged to a screen with another pixel density: draw sharp for that one.
+window.matchMedia(`(resolution: ${window.devicePixelRatio}dppx)`).addEventListener('change', fit)
 requestAnimationFrame(draw)
 
 // ── The page around the picture ──────────────────────────────────────────

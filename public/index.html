@@ -18,26 +18,47 @@
       :root { --bg: #15191E; --ink: #E7ECF0; --soft: #8D98A3; --line: #2A323B; --chip: #1F262D; }
     }
     * { box-sizing: border-box; }
-    html, body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.4 'Segoe UI', system-ui, -apple-system, sans-serif; }
-    header { display: flex; align-items: center; gap: 12px; padding: 12px 16px; flex-wrap: wrap; }
+    html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); font: 14px/1.4 'Segoe UI', system-ui, -apple-system, sans-serif; }
+    body { display: flex; flex-direction: column; }
+    header { display: flex; align-items: center; gap: 12px; padding: 10px 16px; flex-wrap: wrap; flex: none; }
     h1 { font-size: 16px; margin: 0 8px 0 0; }
     .tabs { display: flex; gap: 6px; flex-wrap: wrap; flex: 1; }
     .tab { border: 1px solid var(--line); background: var(--chip); color: var(--ink); border-radius: 999px; padding: 4px 12px; cursor: pointer; font: inherit; display: flex; align-items: center; gap: 6px; }
     .tab[aria-pressed="true"] { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
-    .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex: none; }
     .status { color: var(--soft); font-size: 12px; }
     .status.lost { color: var(--alert); }
-    main { padding: 0 16px 16px; display: grid; gap: 14px; justify-items: center; }
-    canvas { width: min(100%, 980px); height: auto; image-rendering: pixelated; border-radius: 12px; display: block; }
-    .alert { width: min(100%, 980px); border: 1px solid var(--alert); color: var(--alert); border-radius: 10px; padding: 8px 12px; }
+
+    /* The office takes all the room the window has; the list sits beside it
+       when there is width to spare, and under it when there is not. --office
+       is the office's width over its height, which app.js sets from the scene;
+       the page is never wider than the office at full height plus the list,
+       so the two stay together on a wide screen. */
+    :root { --office: 0.945; --side: 260px; --top: 64px; }
+    main {
+      flex: 1; min-height: 0; width: 100%; margin: 0 auto; display: grid; gap: 16px; padding: 0 16px 16px;
+      grid-template-columns: minmax(0, 1fr) var(--side);
+      max-width: calc((100vh - var(--top) - 16px) * var(--office) + var(--side) + 48px);
+    }
+    .stage { min-width: 0; min-height: 0; display: flex; align-items: flex-start; justify-content: flex-end; }
+    canvas { display: block; border-radius: 12px; image-rendering: pixelated; }
+    aside { min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
+    @media (max-width: 720px) {
+      main { max-width: none; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto; align-content: start; overflow-y: auto; }
+      .stage { aspect-ratio: var(--office); max-height: 78vh; justify-content: center; }
+      aside { overflow: visible; }
+    }
+
+    .alert { border: 1px solid var(--alert); color: var(--alert); border-radius: 10px; padding: 8px 12px; }
     .alert:empty { display: none; }
-    ul.people { list-style: none; margin: 0; padding: 0; width: min(100%, 980px); display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+    ul.people { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+    @media (max-width: 720px) { ul.people { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); } }
     ul.people li { display: grid; grid-template-columns: 14px 1fr; gap: 2px 8px; align-items: start; }
     ul.people .dot { margin-top: 6px; }
     .name { font-weight: 600; }
     .what { grid-column: 2; }
     .note { grid-column: 2; color: var(--soft); font-size: 12px; }
-    .empty { color: var(--soft); text-align: center; padding: 40px 16px; }
+    .empty { color: var(--soft); padding: 8px 0; }
   </style>
 </head>
 <body>
@@ -47,9 +68,13 @@
     <span class="status" id="status">Forbinder…</span>
   </header>
   <main>
-    <canvas id="office" width="1440" height="1524" aria-label="Kontoret set ovenfra"></canvas>
-    <div class="alert" id="alert" role="status"></div>
-    <ul class="people" id="people"></ul>
+    <div class="stage" id="stage">
+      <canvas id="office" aria-label="Kontoret set ovenfra"></canvas>
+    </div>
+    <aside>
+      <div class="alert" id="alert" role="status"></div>
+      <ul class="people" id="people"></ul>
+    </aside>
   </main>
   <script src="/app.js"></script>
 </body>

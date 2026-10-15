@@ -14,6 +14,7 @@ Status: ✅ lavet · 🟡 delvist · ⬜ ikke lavet · ➖ ikke længere relevan
 | 0.6 | Fejringer (konfetti, regnsky, balloner) og dialog (Claude siger tak, småsnak i køkkenet) |
 | 0.7.0 | Kontoret tegnes i browseren af en lokal Node-server, i 60 billeder i sekundet uden hak, med en fane for hver session |
 | 0.7.2 | Knappen "🏢 Åbn kontor" over chatboksen starter serveren og åbner kontoret i din browser |
+| 0.7.3 | Kontoret fylder vinduet i både bredde og højde, er skarpt på alle skærme, og listen står ved siden af |
 
 ## 🔧 Fejl og ting der driller
 
@@ -64,6 +65,7 @@ Status: ✅ lavet · 🟡 delvist · ⬜ ikke lavet · ➖ ikke længere relevan
 | 31 | **Fuldskærm og "tv-tilstand"** til en ekstra skærm: større figurer, ingen liste. | S | ⬜ |
 | 32 | **Dagsstatistik på siden:** linjer, pris og antal hjælpere i dag og i ugen, gemt af serveren. | M | ⬜ |
 | 33 | **Flere kontorer:** ét rum pr. projekt, man kan gå mellem, i stedet for faner. | L | ⬜ |
+| 35 | **Et større kontor:** flere skriveborde, flere rum, mødelokale. Siden skalerer selv; grundplanen (`W`, `H`, pladser og ruter) skal ændres ens i `public/app.js` og `hooks/register.tsx`, som timer gåturene. | M | ⬜ |
 | 34 | **Del kontoret med teamet igen,** fx via Supabase, nu hvor tegningen ikke længere ligger i panelet. | L | ⬜ |
 
 ## 🧹 Oprydning
