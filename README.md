@@ -1,6 +1,6 @@
 # Agent-kontor 🏢
 
-Et pixel-kontor set ovenfra, i din browser eller i appens browser-panel. Claude sidder ved det store skrivebord i hjørnekontoret, og når den sender subagenter afsted, kommer de ind ad døren, sætter sig i teamrummet og går over til Claude med resultatet, når de er færdige.
+Et pixel-kontor set ovenfra, i din browser. Tryk på **🏢 Åbn kontor** over chatboksen. Claude sidder ved det store skrivebord i hjørnekontoret, og når den sender subagenter afsted, kommer de ind ad døren, sætter sig i teamrummet og går over til Claude med resultatet, når de er færdige.
 
 - **Seks skriveborde i teamrummet.** Hver hjælper får et navn og sit eget udseende, og flere end seks venter ved døren.
 - **Talebobler med det, de laver lige nu:** "Læser api.ts", "Skriver README.md", "Kører npm test". Skærmen på skrivebordet viser det også: kode, terminal, en side tekst eller en browser.
@@ -9,15 +9,17 @@ Et pixel-kontor set ovenfra, i din browser eller i appens browser-panel. Claude 
 - **Fejringer:** konfetti når testene er grønne (`npm test`, `pytest`, `jest`, `vitest`, `cargo test` …), en regnsky når de fejler, og balloner ved `git commit` og `gh pr create`.
 - **Tak:** når en hjælper afleverer, siger Claude tak ved navn.
 - **Alle dine sessioner** har en fane øverst på siden. Kontoret viser den, der arbejder, indtil du selv vælger en fane, og de andre sessioner sidder i projektrummet nederst.
-- Under kontoret står linjer kode, pris og hvor meget af 5-timers-grænsen, sessionen har brugt. Panelet i Claude viser den samme liste som tekst, med knapper til at åbne kontoret.
+- Under kontoret står linjer kode, pris og hvor meget af 5-timers-grænsen, sessionen har brugt. Skriv `/kontor panel` for at se den samme liste som tekst i et panel i Claude.
 
 ## Sådan hænger det sammen
 
-Hver session skriver en lille statusfil i `~/.claude/agent-kontor/sessions/`. Den første session starter en lille server på `http://127.0.0.1:4747`, som læser filerne og sender ændringer live til siden. Siden tegner og animerer alt selv i 60 billeder i sekundet, så intet blinker eller hakker. Serveren lukker selv, når ingen har brugt den i 30 minutter.
+Hver session skriver en lille statusfil i `~/.claude/agent-kontor/sessions/`. Første gang du trykker på **🏢 Åbn kontor**, starter en lille server på `http://127.0.0.1:4747`, som læser filerne og sender ændringer live til siden. Siden tegner og animerer alt selv i 60 billeder i sekundet, så intet blinker eller hakker. Serveren lukker selv, når ingen har brugt den i 30 minutter.
 
 Kontoret er kun dit: intet login, serveren svarer kun din egen computer, og intet forlader den. Statusfilerne indeholder projektnavnet, hvad Claude og hjælperne laver lige nu (fx `Læser api.ts`), hjælpernes opgavetitler og sessionens tal. En kommando vises med programmet (`Kører npm test`), aldrig med argumenter eller miljøvariabler.
 
 Kræver [Node.js](https://nodejs.org) 18 eller nyere.
+
+Alle udvidelser, lavet og planlagt, står i [UDVIDELSER.md](UDVIDELSER.md).
 
 ## Se det fyldt
 
@@ -55,7 +57,8 @@ if ($claude) { & $claude plugin marketplace update agent-kontor; & $claude plugi
 
 | Kommando | Gør |
 | --- | --- |
-| `/kontor` | Åbner kontoret i appens browser-panel (eller din browser, hvis panelet ikke findes) |
+| `/kontor` | Starter serveren og åbner kontoret i din browser, ligesom knappen over chatboksen |
+| `/kontor panel` | Viser hvem der laver hvad som tekst i et panel |
 | `/kontor demo` | Fylder kontoret med seks hjælpere, så du kan se det i gang |
 
 Fejler kontoret, mærker Claude intet: alt det kører ved siden af og kan aldrig stoppe et værktøjskald.

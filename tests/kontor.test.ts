@@ -50,7 +50,7 @@ for (const surface of ['terminal', 'desktop'] as const) {
     await $.turn.complete(turn)
     const drawn = JSON.stringify(await ui.drawn())
     expect(drawn).toContain('Holder pause')
-    expect(drawn).toContain('"label":"Åbn kontoret"')
+    expect(drawn).toContain('"label":"Åbn kontor"')
   })
 
   test(`${surface}: only a dialog put to me reads as waiting, not an ask in Auto mode`, async ($, on) => {
@@ -232,7 +232,7 @@ test('green tests throw confetti for a while, a plain command does not', async (
   expect(file.last()?.party).toBeNull()
 })
 
-test('the first session starts the office server, and /kontor opens it in the system browser without the app pane', async ($, on) => {
+test('/kontor starts the office server once and opens it in the browser', async ($, on) => {
   const clock = engine(on)
   let isUp = false
   const runs: string[][] = []
@@ -249,6 +249,7 @@ test('the first session starts the office server, and /kontor opens it in the sy
 
   await $.session.start(start())
   await clock.advance(0)
+  expect(runs).toEqual([])
   const reply = await $.command.run({ command: 'kontor', args: '' } as never)
 
   const server = runs.find(argv => argv.includes('--detach'))
@@ -259,24 +260,29 @@ test('the first session starts the office server, and /kontor opens it in the sy
   expect(JSON.stringify(reply)).toContain('http://127.0.0.1:4747')
 })
 
-test('/kontor opens the office in the app browser pane when there is one', async ($, on) => {
+test('the button above the chat box starts the server and opens the office in the browser', async ($, on) => {
   engine(on)
+  let isUp = false
   const runs: string[][] = []
-  const panes: unknown[] = []
-  on('http.fetch', () => ({ value: { status: 200, ok: true, headers: {}, text: JSON.stringify({ ok: true, app: 'agent-kontor' }) } }) as never)
+  on('env.get', (_, e) => ({ value: e.name === 'OS' ? 'Windows_NT' : undefined }) as never)
+  on('http.fetch', () => {
+    if (!isUp) throw new Error('ECONNREFUSED')
+    return { value: { status: 200, ok: true, headers: {}, text: JSON.stringify({ ok: true, app: 'agent-kontor' }) } } as never
+  })
   on('process.run', (_, e) => {
     runs.push([...e.argv])
+    if (e.argv.includes('--detach')) isUp = true
     return { value: { exitCode: 0, stdout: '', stderr: '' } } as never
-  })
-  on('mcp.call', (_, e) => {
-    panes.push([e.server, e.tool, e.args])
-    return { value: { content: [], isError: false } } as never
   })
 
   await $.session.start(start())
-  const reply = await $.command.run({ command: 'kontor', args: '' } as never)
+  // Nothing is started until it is asked for.
+  expect(runs).toEqual([])
 
-  expect(panes).toContainEqual(['Claude_Browser', 'preview_start', { url: 'http://127.0.0.1:4747' }])
-  expect(runs.some(argv => argv[0] === 'explorer.exe')).toBe(false)
-  expect(JSON.stringify(reply)).toContain('browser-panelet')
+  const band = await $.ui.mount({ plugin: 'agent-kontor', surface: 'desktop', component: 'AbovePrompt', props: { hasSurvey: false, isWorking: false, maxRows: 10 } as never })
+  expect((await band.find({ key: 'kontor' }))?.text).toContain('Åbn kontor')
+  await band.press({ key: 'kontor' })
+
+  expect(runs.find(argv => argv.includes('--detach'))?.[1]).toMatch(/\/server\/server\.mjs$/)
+  expect(runs).toContainEqual(['explorer.exe', 'http://127.0.0.1:4747'])
 })

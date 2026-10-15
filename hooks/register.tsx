@@ -283,7 +283,7 @@ const ADDRESS = `http://127.0.0.1:${PORT}`
 const WRITE_MS = 500
 const HEARTBEAT_MS = 30_000
 const READ_MS = 3000
-const SERVER_CHECK_MS = 60_000
+const NO_SERVER = 'Kontorets server kunne ikke starte. Den kræver Node.js 18 eller nyere.'
 const STALE_MS = 120_000
 let lastWritten = ''
 let lastWriteAt = 0
@@ -363,8 +363,9 @@ const isServerUp = async ($: $) => {
   }
 }
 
-// One server for every session on the computer: the first to find none
-// starts it, in the background, and it stops by itself when nobody needs it.
+// One server for every session on the computer: the first "Åbn kontor" to
+// find none starts it, in the background, and it stops by itself when nobody
+// needs it.
 let starting: Promise<boolean> | null = null
 const ensureServer = ($: $) => {
   starting ??= startServer($).finally(() => {
@@ -384,29 +385,16 @@ const startServer = async ($: $) => {
   return false
 }
 
-// Where the office opens: the desktop app's own browser pane, beside the
-// chat, or the person's own browser where there is none or they ask for it.
-type Opened = 'pane' | 'browser' | null
-
-// The desktop app's browser pane: its MCP server opens a tab at a URL.
-const openInPane = async ($: $) => {
-  const result = await $.mcp.call('Claude_Browser', 'preview_start', { url: ADDRESS }).catch(() => null)
-  return !!result && !result.isError
-}
-
-const openInBrowser = async ($: $) => {
+// Starts the server if it is not running, and opens the office in the
+// person's own browser.
+const openOffice = async ($: $) => {
+  const isUp = await ensureServer($)
+  if (!isUp) return false
   const os = await $.env.get("OS")
   const argv = os === 'Windows_NT' ? ['explorer.exe', ADDRESS] : [(await $.env.get("XDG_CURRENT_DESKTOP")) ? 'xdg-open' : 'open', ADDRESS]
   // explorer.exe answers 1 even when it opened the page.
   await $.process.run(argv, { timeoutMs: 10_000 }).catch(() => null)
-}
-
-const openOffice = async ($: $, where: 'pane' | 'browser' = 'pane'): Promise<Opened> => {
-  const isUp = await ensureServer($)
-  if (!isUp) return null
-  if (where === 'pane' && (await openInPane($))) return 'pane'
-  await openInBrowser($)
-  return 'browser'
+  return true
 }
 
 // ─── Hooks ──────────────────────────────────────────────────────────────
@@ -417,28 +405,23 @@ export const register: Register = on => {
   const spawned = new Map<string, { agentId: string; isBackground: boolean }>()
 
   on('session.start', async ($, e, next) => {
-    await $.command.register({ name: 'kontor', description: 'Åbn kontoret i browseren, eller se det fyldt med /kontor demo', argumentHint: '[demo]' })
+    await $.command.register({ name: 'kontor', description: 'Åbn kontoret i browseren, se det fyldt med /kontor demo, eller listen med /kontor panel', argumentHint: '[demo|panel]' })
     const now = await $.clock.now()
     const key = `s${Math.random().toString(36).slice(2, 10)}${Math.random().toString(36).slice(2, 6)}`
     await update($, office, o => ({ ...o, sessionKey: o.sessionKey || key, project: base(e.cwd) || 'Kontoret', startedAt: o.startedAt || now, main: pause, subs: [] }))
-    void $.ui.open({ id: PANE, title: '🏢 Kontor' })
     $.clock.every(WRITE_MS, () => void quietly(writeStatus($)))
     $.clock.every(READ_MS, () => void quietly(readOthers($)))
-    $.clock.every(SERVER_CHECK_MS, () => void quietly(ensureServer($)))
-    void quietly(ensureServer($))
     return next(e)
   })
 
   on('command.run', { command: 'kontor' }, async ($, e) => {
-    await $.ui.open({ id: PANE, title: '🏢 Kontor', focus: true })
-    const opened = await openOffice($)
-    const where =
-      opened === 'pane'
-        ? 'Kontoret er åbent i browser-panelet.'
-        : opened === 'browser'
-          ? `Kontoret er åbent i din browser på ${ADDRESS}.`
-          : 'Kontorets server kunne ikke starte. Den kræver Node.js 18 eller nyere.'
-    if (e.args.trim() === 'demo') {
+    const arg = e.args.trim()
+    if (arg === 'panel') {
+      await $.ui.open({ id: PANE, title: '🏢 Kontor', focus: true })
+      return { text: 'Listen over hvem der laver hvad står i panelet.' }
+    }
+    const where = (await openOffice($)) ? `Kontoret er åbent i din browser på ${ADDRESS}.` : NO_SERVER
+    if (arg === 'demo') {
       await runDemo($)
       return { text: `${where} Seks hjælpere er på vej ind.` }
     }
@@ -528,6 +511,26 @@ export const register: Register = on => {
     return ran
   })
 
+  // A button above the chat box: starts the server and opens the office.
+  on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
+    if (e.props.hasSurvey) return next(e)
+    try {
+      const { Box, Button, Text } = $.ui.resolve(e)
+      const o = await readOffice($)
+      const helpers = o.subs.length
+      const note =
+        o.main.state === 'waiting' ? 'Claude venter på dig' : helpers ? `${helpers} ${helpers === 1 ? 'hjælper' : 'hjælpere'} i kontoret` : null
+      return (
+        <Box flexDirection="row" gap={1}>
+          <Button key="kontor" label="🏢 Åbn kontor" onPress={() => void quietly(openOffice($))} />
+          {note ? <Text color={o.main.state === 'waiting' ? '#E5484D' : undefined} dimColor={o.main.state !== 'waiting'}>{note}</Text> : null}
+        </Box>
+      )
+    } catch {
+      return next(e)
+    }
+  })
+
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
     try {
       const { Box, Text, Button } = $.ui.resolve(e)
@@ -571,12 +574,11 @@ export const register: Register = on => {
       return (
         <Box flexDirection="column" gap={1} paddingX={1} paddingY={1}>
           <Box flexDirection="column" paddingX={1}>
-            <Text bold>Kontoret tegnes i et browser-panel</Text>
-            <Text dimColor wrap="wrap">{`Det åbner i browser-panelet ved siden af chatten, eller på ${ADDRESS} i din egen browser. Alle dine sessioner sidder i samme kontor.`}</Text>
+            <Text bold>Kontoret tegnes i din browser</Text>
+            <Text dimColor wrap="wrap">{`Det ligger på ${ADDRESS}. Alle dine sessioner sidder i samme kontor.`}</Text>
           </Box>
           <Box flexDirection="row" gap={2} paddingX={1}>
-            <Button label="Åbn kontoret" onPress={() => void quietly(openOffice($, 'pane'))} />
-            <Button label="Åbn i din browser" onPress={() => void quietly(openOffice($, 'browser'))} />
+            <Button label="Åbn kontor" onPress={() => void quietly(openOffice($))} />
             <Button label="Kopiér adresse" onPress={press => void quietly($.ui.copy({ text: ADDRESS, surface: press.surface }))} />
           </Box>
           {o.main.state === 'waiting' ? (
