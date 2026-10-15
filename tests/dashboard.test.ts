@@ -73,11 +73,12 @@ for (const surface of ['terminal', 'desktop'] as const) {
     expect(drawn).toContain('$1.23')
     if (surface === 'desktop') {
       expect(drawn).toContain('KONTEKST')
-      expect(drawn).toContain('2 filer ændret')
-      expect(drawn).toContain('Cache-hit 82%')
+      expect(drawn).toContain('84k/200k')
+      expect(drawn).toContain('5 TIMER')
+      expect(drawn).toContain('86%')
+      expect(drawn).toContain('2 filer')
       expect(drawn).toContain('42 min')
-      expect(drawn).toContain('Edit 2')
-      expect(drawn).toContain('claude-opus-5-5')
+      expect(drawn).toContain('1 tur · 3.4k ud')
     } else {
       expect(drawn).toContain('5 timer')
       expect(drawn).toContain('2 filer')

@@ -86,7 +86,7 @@ const money = (usd: number | null) => (usd === null ? '–' : usd < 100 ? `$${us
 const duration = (ms: number) => {
   const minutes = Math.max(0, Math.floor(ms / 60_000))
   if (minutes < 60) return `${minutes} min`
-  return `${Math.floor(minutes / 60)} t ${minutes % 60} min`
+  return `${Math.floor(minutes / 60)} t ${minutes % 60} m`
 }
 
 const limitName = (kind: string) =>
@@ -97,16 +97,6 @@ const resetTime = (iso: string | null) => {
   const d = new Date(iso)
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
 }
-
-const cacheHit = (s: Stats) => {
-  const total = s.tokensIn + s.cacheRead + s.cacheWrite
-  return total === 0 ? null : Math.round((s.cacheRead / total) * 100)
-}
-
-const topTools = (s: Stats, count: number) =>
-  Object.entries(s.tools)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, count)
 
 // ─── Look ───────────────────────────────────────────────────────────────
 
@@ -127,125 +117,82 @@ const levelColor = (pct: number | null) => (pct === null ? accent : pct >= 95 ? 
 
 const esc = (text: string) => text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 
+// One row of six small cells: about as tall as two lines of text.
 const W = 640
-const GAP = 10
-const TILE_W = (W - GAP * 2) / 3
-const TILE_H = 92
+const H = 54
+const CELLS = 6
+const CELL_GAP = 8
+const CELL_W = (W - CELL_GAP * (CELLS - 1)) / CELLS
 
-const tile = (col: number, row: number, label: string, inner: string) => {
-  const x = col * (TILE_W + GAP)
-  const y = row * (TILE_H + GAP)
-
-  return `<g transform="translate(${x} ${y})">
-    <rect width="${TILE_W}" height="${TILE_H}" rx="14" fill="#FFFFFF" stroke="${skyLine}"/>
-    <text x="16" y="24" font-family="${FONT}" font-size="10.5" font-weight="700" letter-spacing="1.6" fill="${softInk}">${esc(label)}</text>
+const cell = (index: number, label: string, inner: string) => `<g transform="translate(${index * (CELL_W + CELL_GAP)} 0)">
+    <rect width="${CELL_W}" height="${H}" rx="12" fill="#FFFFFF" stroke="${skyLine}"/>
+    <text x="12" y="17" font-family="${FONT}" font-size="9" font-weight="700" letter-spacing="1.3" fill="${softInk}">${esc(label)}</text>
     ${inner}
   </g>`
-}
 
-const big = (x: number, y: number, text: string, color = ink, size = 24) =>
+const value = (x: number, y: number, text: string, color = ink, size = 17) =>
   `<text x="${x}" y="${y}" font-family="${FONT}" font-size="${size}" font-weight="700" fill="${color}">${esc(text)}</text>`
 
-const small = (x: number, y: number, text: string, color = softInk, anchor = 'start', size = 12) =>
-  `<text x="${x}" y="${y}" text-anchor="${anchor}" font-family="${FONT}" font-size="${size}" fill="${color}">${esc(text)}</text>`
+const note = (x: number, y: number, text: string, color = softInk) =>
+  `<text x="${x}" y="${y}" font-family="${FONT}" font-size="10" fill="${color}">${esc(text)}</text>`
 
-const ring = (cx: number, cy: number, r: number, pct: number | null) => {
+const miniRing = (cx: number, cy: number, r: number, pct: number | null) => {
   const c = 2 * Math.PI * r
   const p = Math.max(0, Math.min(100, pct ?? 0))
 
-  return `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${track}" stroke-width="8"/>
-    <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${levelColor(pct)}" stroke-width="8" stroke-linecap="round"
-      stroke-dasharray="${((p / 100) * c).toFixed(1)} ${c.toFixed(1)}" transform="rotate(-90 ${cx} ${cy})"/>
-    <text x="${cx}" y="${cy + 5}" text-anchor="middle" font-family="${FONT}" font-size="14" font-weight="700" fill="${ink}">${pct === null ? '–' : `${Math.round(p)}%`}</text>`
+  return `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${track}" stroke-width="4"/>
+    <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${levelColor(pct)}" stroke-width="4" stroke-linecap="round"
+      stroke-dasharray="${((p / 100) * c).toFixed(1)} ${c.toFixed(1)}" transform="rotate(-90 ${cx} ${cy})"/>`
 }
 
-const bar = (x: number, y: number, w: number, pct: number) => {
+const miniBar = (x: number, y: number, w: number, pct: number) => {
   const p = Math.max(0, Math.min(100, pct))
 
-  return `<rect x="${x}" y="${y}" width="${w}" height="7" rx="3.5" fill="${track}"/>
-    <rect x="${x}" y="${y}" width="${Math.max(4, (p / 100) * w).toFixed(1)}" height="7" rx="3.5" fill="${levelColor(p)}"/>`
+  return `<rect x="${x}" y="${y}" width="${w}" height="4" rx="2" fill="${track}"/>
+    <rect x="${x}" y="${y}" width="${Math.max(3, (p / 100) * w).toFixed(1)}" height="4" rx="2" fill="${levelColor(p)}"/>`
 }
 
-const sparkline = (x: number, y: number, w: number, h: number, values: number[]) => {
-  if (values.length < 2) return ''
-  const max = Math.max(...values, 1)
-  const step = w / (values.length - 1)
-  const points = values.map((v, i) => `${(x + i * step).toFixed(1)},${(y + h - (v / max) * h).toFixed(1)}`)
-
-  return `<polyline points="${x},${y + h} ${points.join(' ')} ${x + w},${y + h}" fill="${accent}" opacity="0.12" stroke="none"/>
-    <polyline points="${points.join(' ')}" fill="none" stroke="${accent}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`
-}
+const limitCell = (index: number, l: Limit | undefined, label: string) =>
+  cell(
+    index,
+    label,
+    l
+      ? `${value(12, 37, `${Math.round(l.percentUsed)}%`, levelColor(l.percentUsed))}
+         ${l.resetsAt ? note(CELL_W - 10, 36, `↻ ${resetTime(l.resetsAt)}`).replace('<text ', '<text text-anchor="end" ') : ''}
+         ${miniBar(12, 44, CELL_W - 24, l.percentUsed)}`
+      : `${value(12, 37, '–', softInk)}${note(12, 48, 'efter første svar')}`,
+  )
 
 const dashboardSvg = (u: Usage | null, s: Stats, elapsedMs: number) => {
   const pct = u?.contextPercent ?? null
-  const limits: Limit[] = (u?.limits ?? []).slice(0, 2)
-  const hit = cacheHit(s)
-  const tools = Object.values(s.tools).reduce((a, b) => a + b, 0)
-  const top = topTools(s, 3)
-    .map(([name, n]) => `${name} ${n}`)
-    .join(' · ')
+  const fiveHour = u?.limits.find(l => l.kind === 'five_hour')
+  const sevenDay = u?.limits.find(l => l.kind === 'seven_day')
+  const added = `+${short(s.linesAdded)}`
 
-  const context = tile(
-    0,
+  const context = cell(
     0,
     'KONTEKST',
-    `${ring(46, 56, 22, pct)}
-     ${big(84, 58, u?.contextTokens === null || u?.contextTokens === undefined ? '–' : short(u.contextTokens), ink, 22)}
-     ${small(84, 76, `af ${short(u?.contextWindow ?? 0)} tokens`)}`,
+    `${miniRing(CELL_W - 22, 32, 11, pct)}
+     ${value(12, 37, pct === null ? '–' : `${Math.round(pct)}%`, levelColor(pct))}
+     ${note(12, 48, `${short(u?.contextTokens ?? 0)}/${short(u?.contextWindow ?? 0)}`)}`,
   )
-
-  const limitRows = limits.length
-    ? limits
-        .map((l, i) => {
-          const y = 38 + i * 27
-          return `${small(16, y + 7, limitName(l.kind), ink)}
-            ${bar(70, y, TILE_W - 130, l.percentUsed)}
-            ${small(TILE_W - 16, y + 7, `${Math.round(l.percentUsed)}%`, ink, 'end')}
-            ${l.resetsAt ? small(70, y + 18, `nulstilles ${resetTime(l.resetsAt)}`, softInk, 'start', 10.5) : ''}`
-        })
-        .join('')
-    : `${small(16, 54, 'Ingen grænser rapporteret')}${small(16, 72, 'endnu i denne session')}`
-  const rate = tile(1, 0, 'FORBRUGSGRÆNSER', limitRows)
-
-  const cost = tile(
-    2,
-    0,
-    'PRIS',
-    `${big(16, 60, money(u?.costUsd ?? null))}
-     ${small(16, 80, hit === null ? 'Ingen svar endnu' : `Cache-hit ${hit}%`)}`,
-  )
-
-  const code = tile(
-    0,
-    1,
+  const cost = cell(3, 'PRIS', `${value(12, 37, money(u?.costUsd ?? null))}${note(12, 48, 'hele sessionen')}`)
+  const code = cell(
+    4,
     'KODE',
-    `${big(16, 60, `+${short(s.linesAdded)}`, plus)}
-     <text x="${16 + 14 * (`+${short(s.linesAdded)}`.length + 1)}" y="60" font-family="${FONT}" font-size="24" font-weight="700" fill="${minus}">−${esc(short(s.linesRemoved))}</text>
-     ${small(16, 80, `${s.files.length} ${s.files.length === 1 ? 'fil' : 'filer'} ændret`)}`,
+    `${value(12, 37, added, plus, 15)}
+     <text x="${12 + added.length * 9 + 6}" y="37" font-family="${FONT}" font-size="15" font-weight="700" fill="${minus}">−${esc(short(s.linesRemoved))}</text>
+     ${note(12, 48, `${s.files.length} ${s.files.length === 1 ? 'fil' : 'filer'}`)}`,
   )
-
-  const tokens = tile(
-    1,
-    1,
-    'TOKENS',
-    `${big(16, 58, `${short(s.tokensOut)} ud`, ink, 20)}
-     ${small(16, 78, `${short(s.tokensIn + s.cacheRead + s.cacheWrite)} ind`)}
-     ${sparkline(TILE_W - 96, 40, 80, 38, s.perTurn)}`,
-  )
-
-  const session = tile(
-    2,
-    1,
+  const session = cell(
+    5,
     'SESSION',
-    `${big(16, 52, duration(elapsedMs), ink, 20)}
-     ${small(16, 70, `${s.turns} ${s.turns === 1 ? 'tur' : 'ture'} · ${tools} værktøjer`)}
-     ${top ? small(16, 85, top.length > 30 ? `${top.slice(0, 29)}…` : top, accent, 'start', 11) : ''}`,
+    `${value(12, 37, duration(elapsedMs), ink, 15)}
+     ${note(12, 48, `${s.turns} ${s.turns === 1 ? 'tur' : 'ture'} · ${short(s.tokensOut)} ud`)}`,
   )
 
-  const h = TILE_H * 2 + GAP
-
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${h}" width="${W}" height="${h}">
-  ${context}${rate}${cost}${code}${tokens}${session}
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}">
+  ${context}${limitCell(1, fiveHour, '5 TIMER')}${limitCell(2, sevenDay, '7 DAGE')}${cost}${code}${session}
 </svg>`
 }
 
@@ -361,16 +308,11 @@ export const register: Register = on => {
       }
 
       return (
-        <Box key="dash" flexDirection="column" borderStyle="round" borderColor={skyLine} backgroundColor={sky} paddingX={2} paddingY={1} gap={1}>
-          <Box flexDirection="row" alignItems="center">
-            <Text color={accent} bold>
-              📊 Session
-            </Text>
-            <Text color={softInk}>{s.model ? `  ·  ${s.model}` : ''}</Text>
-            <Box flexGrow={1} />
-            <Button key="dash-close" label="▴ Skjul" plain dimColor onPress={toggle} />
+        <Box key="dash" flexDirection="row" alignItems="center" gap={1}>
+          <Box flexGrow={1} flexShrink={1}>
+            <Svg source={dashboardSvg(u, s, elapsed)} alt={`Session: ${summary}`} />
           </Box>
-          <Svg source={dashboardSvg(u, s, elapsed)} alt={`Session: ${summary}`} />
+          <Button key="dash-close" label="▴" plain dimColor onPress={toggle} />
         </Box>
       )
     }

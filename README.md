@@ -2,16 +2,15 @@
 
 Et dashboard lige over prompten i Claude, så du altid kan se, hvor du står:
 
-| Flise | Viser |
+| Felt | Viser |
 | --- | --- |
-| **Kontekst** | Hvor fuld kontekstvinduet er (ring med %) og antal tokens |
-| **Forbrugsgrænser** | 5-timers- og 7-dages-grænsen med % og hvornår de nulstilles (orange over 80 %, rød over 95 %) |
-| **Pris** | Hvad sessionen har kostet indtil nu, og hvor meget prompt-cachen sparer |
+| **Kontekst** | Hvor fuld kontekstvinduet er (% og ring) og antal tokens |
+| **5 timer / 7 dage** | Forbrugsgrænserne med % og hvornår de nulstilles (orange over 80 %, rød over 95 %) |
+| **Pris** | Hvad sessionen har kostet indtil nu |
 | **Kode** | Linjer tilføjet og fjernet af Claudes ændringer, og hvor mange filer |
-| **Tokens** | Tokens ud og ind, med en graf over de seneste ture |
-| **Session** | Varighed, antal ture og værktøjer, og de mest brugte værktøjer |
+| **Session** | Varighed, antal ture og tokens ud |
 
-Dashboardet kan foldes sammen til én linje (`▴ Skjul` / `▾ Vis`), eller slås til og fra med `/dashboard`.
+Det hele ligger i én lav række, så det ikke tager plads fra samtalen. Rækken kan foldes sammen til én linje (`▴` / `▾ Vis`), eller slås til og fra med `/dashboard`.
 
 ## Installér
 
