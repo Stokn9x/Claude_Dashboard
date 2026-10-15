@@ -108,3 +108,38 @@ for (const surface of ['terminal', 'desktop'] as const) {
     }
   })
 }
+
+for (const surface of ['terminal', 'desktop'] as const) {
+  test(`${surface}: a background subagent stays at its desk until it stops`, async ($, on) => {
+    const clock = engine(on, async e => {
+      if (e.tool === 'Agent') {
+        await $.agent.spawn({ tool_use_id: e.tool_use_id, prompt: 'p', description: 'Læs README', subagentType: 'Explore', parentModel: 'm', background: true } as never)
+      }
+    })
+    on('classic.SubagentStop', () => ({}) as never)
+    await $.session.start(start())
+    const ui = await $.ui.mount({ plugin: 'agent-kontor', surface, component: 'Pane', requestId: 'kontor', props: paneProps })
+
+    // The Agent call is back at once, but the helper is still at work.
+    await $.tool.call({ tool: 'Agent', prompt: 'p', description: 'Læs README', tool_use_id: 'b1', run_in_background: true } as never)
+    await clock.advance(9000)
+    expect(JSON.stringify(await ui.drawn())).toContain('1 af 1 hjælpere arbejder')
+
+    await $.classic.SubagentStop({ agent_id: 'sub-b1', agent_type: 'Explore', stop_hook_active: false, agent_transcript_path: '' } as never)
+    expect(JSON.stringify(await ui.drawn())).toContain('Afleverer: Læs README')
+  })
+}
+
+test('desktop: the picture does not change while nothing in the office does', async ($, on) => {
+  const clock = engine(on)
+  await $.session.start(start())
+  const ui = await $.ui.mount({ plugin: 'agent-kontor', surface: 'desktop', component: 'Pane', requestId: 'kontor', props: paneProps })
+  await $.turn.start({ text: 'hej', turnId: 't1' } as never)
+  await clock.advance(1000)
+
+  const source = (tree: unknown) => /"source":"(.*?)","alt"/.exec(JSON.stringify(tree))?.[1] ?? ''
+  const first = source(await ui.drawn())
+  await clock.advance(5000)
+  expect(first.length).toBeGreaterThan(1000)
+  expect(source(await ui.drawn())).toBe(first)
+})

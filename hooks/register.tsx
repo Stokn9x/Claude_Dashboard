@@ -33,6 +33,12 @@ const office = atom(
   } as Office,
 )
 
+// What the picture was last drawn from, and when. The picture follows the
+// office at most every PAINT_MS and only when something visible moved: each
+// redraw reloads it in the app, which blinks.
+const PAINT_MS = 800
+const frame = atom({ plugin: 'agent-kontor', key: 'frame' } as const, { office: null as Office | null, at: 0 })
+
 type $ = EngineInterface
 
 // ─── What an agent is doing ─────────────────────────────────────────────
@@ -119,7 +125,7 @@ const setActivity = async ($: $, agentId: string | undefined, activity: Activity
   // A subagent the spawn hook did not see gets a desk now.
   await update($, office, o =>
     o.subs.some(s => s.id === agentId)
-      ? { ...o, subs: o.subs.map(s => (s.id === agentId ? { ...s, activity } : s)) }
+      ? { ...o, subs: o.subs.map(s => (s.id === agentId && (s.phase === 'arriving' || s.phase === 'working') ? { ...s, activity } : s)) }
       : { ...o, subs: [...o.subs, newSub(agentId, 'Hjælper', activity, 'working', now, o.subs)] },
   )
 }
@@ -141,7 +147,7 @@ const deliver = async ($: $, id: string) => {
   await update($, office, o => ({
     ...o,
     subs: o.subs.map(s => {
-      if (s.id !== id) return s
+      if (s.id !== id || (s.phase !== 'arriving' && s.phase !== 'working')) return s
       seat = s.seat
       return { ...s, phase: 'delivering' as Phase, since: now, activity: { state: 'working' as AgentState, detail: `Afleverer: ${s.task}` } }
     }),
@@ -157,7 +163,7 @@ const deliver = async ($: $, id: string) => {
       (async () => {
         const later = await $.clock.now()
         await update($, office, o => ({ ...o, subs: o.subs.map(s => (s.id === id ? { ...s, phase: 'leaving' as Phase, since: later } : s)) }))
-        $.clock.after(walkMs(leavePath()), gone)
+        $.clock.after(walkMs(leavePath(seat as number)), gone)
       })(),
     )
   })
@@ -385,6 +391,7 @@ const seatAt = (seat: number) => ({ cx: 92 + (seat % 3) * 148, dy: 202 + Math.fl
 const DOOR = { x: 424, y: 382 }
 const MAIN = { cx: 128, dy: 78 }
 const HANDOFF = { x: 214, y: 104 }
+const handoffFor = (seat: number) => ({ x: 206 + (seat % 3) * 13, y: 96 + Math.floor(seat / 3) * 16 })
 const KITCHEN_SEAT = { x: 318, y: 112 }
 
 const screens: Record<AgentState, string> = {
@@ -472,9 +479,13 @@ const arrivePath = (seat: number) => {
 const deliverPath = (seat: number) => {
   const { cx, dy } = seatAt(seat)
   const lane = dy - 52
-  return [{ x: cx, y: dy - 6 }, { x: cx, y: lane }, { x: cx + 74, y: lane }, { x: cx + 74, y: 148 }, { x: 214, y: 148 }, HANDOFF]
+  const spot = handoffFor(seat)
+  return [{ x: cx, y: dy - 6 }, { x: cx, y: lane }, { x: cx + 74, y: lane }, { x: cx + 74, y: 148 }, { x: 214, y: 148 }, { x: 214, y: spot.y }, spot]
 }
-const leavePath = () => [HANDOFF, { x: 214, y: 148 }, { x: DOOR.x, y: 148 }, DOOR]
+const leavePath = (seat: number) => {
+  const spot = handoffFor(seat)
+  return [spot, { x: 214, y: spot.y }, { x: 214, y: 148 }, { x: DOOR.x, y: 148 }, DOOR]
+}
 
 type Point = { x: number; y: number }
 
@@ -617,7 +628,7 @@ const officeSvg = (o: Office, now: number, hour: number): Scene => {
         ? walker(s, arrivePath(s.seat), now, 'front')
         : s.phase === 'delivering'
           ? walker(s, deliverPath(s.seat), now, 'left', bubble(0, -46, s.activity.detail))
-          : walker(s, leavePath(), now, null),
+          : walker(s, leavePath(s.seat), now, null),
     )
     .join('')
 
@@ -661,17 +672,29 @@ const phaseText: Record<Phase, string> = {
   leaving: 'Går igen',
 }
 
+// Copies the office into the frame when something the picture shows has moved.
+const refreshFrame = async ($: $) => {
+  const o = await read($, office)
+  const f = await read($, frame)
+  const visible = (x: Office | null) => (x ? JSON.stringify({ main: x.main, subs: x.subs, project: x.project }) : '')
+  if (visible(o) === visible(f.office)) return
+  const at = await $.clock.now()
+  await update($, frame, () => ({ office: o, at }))
+}
+
 // ─── Hooks ──────────────────────────────────────────────────────────────
 
 export const register: Register = on => {
-  // spawn tool_use_id → the subagent's id, to see it out when its call ends.
-  const spawned = new Map<string, string>()
+  // spawn tool_use_id → the subagent, to see it out when its call ends. A
+  // background one's call returns at once, so it waits for SubagentStop.
+  const spawned = new Map<string, { agentId: string; isBackground: boolean }>()
 
   on('session.start', async ($, e, next) => {
     await $.command.register({ name: 'kontor', description: 'Åbn kontoret, eller se det fyldt med /kontor demo', argumentHint: '[demo]' })
     const now = await $.clock.now()
     await update($, office, o => ({ ...o, project: base(e.cwd) || 'Kontoret', startedAt: o.startedAt || now, main: pause, subs: [] }))
     void $.ui.open({ id: PANE, title: '🏢 Kontor' })
+    $.clock.every(PAINT_MS, () => void quietly(refreshFrame($)))
     return next(e)
   })
 
@@ -712,10 +735,22 @@ export const register: Register = on => {
     return next(e)
   })
 
+  // The subagent's own loop has ended: its work is done, whatever its call did.
+  on('classic.SubagentStop', async ($, e, next) => {
+    await quietly(deliver($, e.agent_id))
+    return next(e)
+  })
+
+  // (2) No event says "approved"; a denial does, and so does the next step.
+  on('classic.PermissionDenied', async ($, e, next) => {
+    await quietly(setActivity($, (e as { agent_id?: string }).agent_id, thinking))
+    return next(e)
+  })
+
   on('agent.spawn', async ($, e, next) => {
     const r = await next(e)
     if ('agentId' in r && r.agentId) {
-      spawned.set(e.tool_use_id, r.agentId)
+      spawned.set(e.tool_use_id, { agentId: r.agentId, isBackground: e.background })
       await quietly(arrive($, r.agentId, e.description || 'En opgave', { state: 'working', detail: e.description || 'Går i gang' }))
     }
     return r
@@ -728,7 +763,7 @@ export const register: Register = on => {
     const sub = spawned.get(e.tool_use_id)
     if (sub) {
       spawned.delete(e.tool_use_id)
-      await quietly(deliver($, sub))
+      if (!sub.isBackground) await quietly(deliver($, sub.agentId))
     }
     if (!('deny' in ran && ran.deny) && 'result' in ran && ran.result && !ran.isError && (e.tool === 'Edit' || e.tool === 'Write')) {
       const r = ran.result as { structuredPatch?: Patch; staged?: boolean; type?: string; content?: string; originalFile?: string | null }
@@ -751,10 +786,11 @@ export const register: Register = on => {
       const Svg = 'Svg' in kit ? kit.Svg : null
       const o = await read($, office)
       const now = await $.clock.now()
-      const hour = new Date(now).getHours()
 
       const paneWidth = Math.min(1100, Math.round(e.props.bodyColumns * 8.4))
-      const scene = officeSvg(o, now, hour)
+      const f = await read($, frame)
+      // Until the first paint, draw the office as it is.
+      const scene = officeSvg(f.office ?? o, f.office ? f.at : now, new Date(f.office ? f.at : now).getHours())
       const working = o.subs.filter(s => s.phase === 'working').length
       const alt = `Kontoret: Claude ${o.main.detail.toLowerCase()}, ${o.subs.length} hjælpere`
 
@@ -803,7 +839,7 @@ export const register: Register = on => {
             </Box>
           ) : null}
           <Box flexDirection="column" gap={1}>
-            {row('main', 'Claude', o.main.detail, o.main.state, figures.length ? figures.join('   ') : null)}
+            {row('main', 'Claude', o.main.detail, o.main.state, figures.length ? figures.join(', ') : null)}
             {subRows}
           </Box>
           <Box flexDirection="row" gap={1}>
