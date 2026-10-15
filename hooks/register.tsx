@@ -320,7 +320,7 @@ const seatAt = (seat: number) => ({ cx: 92 + (seat % 3) * 148, dy: 202 + Math.fl
 const DOOR = { x: 424, y: 382 }
 const MAIN = { cx: 128, dy: 78 }
 const HANDOFF = { x: 214, y: 104 }
-const KITCHEN_SEAT = { x: 346, y: 100 }
+const KITCHEN_SEAT = { x: 318, y: 112 }
 
 const screens: Record<AgentState, string> = {
   working: '#5E6B7A',
