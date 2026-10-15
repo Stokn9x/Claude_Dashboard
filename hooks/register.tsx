@@ -847,13 +847,31 @@ const leaveOffice = async ($: $) => {
 }
 
 // Copies the office into the frame when something the picture shows has moved.
+// Two kinds of change: the shape of the office (who is where, in what state,
+// a party) repaints at once; only new words in a bubble wait for TEXT_MS, so
+// a run of tool calls does not reload the picture on every one.
+const TEXT_MS = 3000
+
 const refreshFrame = async ($: $) => {
   const o = await readOffice($)
   const f = await read($, frame)
-  const visible = (x: Office | null) => (x ? JSON.stringify({ main: x.main, subs: x.subs, project: x.project, party: fresh(x).party, others: fresh(x).others.map(y => [y.key, y.project, y.main, y.helpers]) }) : '')
-  if (visible(o) === visible(f.office)) return
-  const at = await $.clock.now()
-  await update($, frame, () => ({ office: o, at }))
+  const shape = (x: Office | null) => {
+    if (!x) return ''
+    const y = fresh(x)
+    return JSON.stringify({
+      main: y.main.state,
+      subs: y.subs.map(s => [s.id, s.seat, s.phase, s.since, s.activity.state]),
+      project: y.project,
+      party: y.party,
+      others: y.others.map(z => [z.key, z.project, z.main.state, z.helpers]),
+    })
+  }
+  const words = (x: Office | null) => (x ? JSON.stringify([fresh(x).main.detail, fresh(x).subs.map(s => s.activity.detail), fresh(x).others.map(z => z.main.detail)]) : '')
+  const now = await $.clock.now()
+  const isNewShape = shape(o) !== shape(f.office)
+  const isNewWords = words(o) !== words(f.office)
+  if (!isNewShape && !(isNewWords && now - f.at >= TEXT_MS)) return
+  await update($, frame, () => ({ office: o, at: now }))
 }
 
 // ─── Hooks ──────────────────────────────────────────────────────────────

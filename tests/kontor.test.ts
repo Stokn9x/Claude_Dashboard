@@ -214,3 +214,24 @@ test('desktop: Claude thanks a helper by name when it hands over its result', as
   await clock.advance(900)
   expect(JSON.stringify(await ui.drawn())).toMatch(/Tak, [A-ZÆØÅ][a-zæøå]+!/)
 })
+
+test('desktop: new words in a bubble wait a moment, a new state does not', async ($, on) => {
+  const clock = engine(on)
+  await $.session.start(start())
+  const ui = await $.ui.mount({ plugin: 'agent-kontor', surface: 'desktop', component: 'Pane', requestId: 'kontor', props: paneProps })
+  const source = async () => /"source":"(.*?)","alt"/.exec(JSON.stringify(await ui.drawn()))?.[1] ?? ''
+
+  await $.turn.start({ text: 'hej', turnId: 't1' } as never)
+  await clock.advance(5000)
+  const before = await source()
+
+  // Only the words change ("Tænker" to "Læser a.ts" and back): the picture waits.
+  await $.tool.call({ tool: 'Read', file_path: 'C:/x/a.ts', tool_use_id: 'r1' } as never)
+  await clock.advance(900)
+  expect(await source()).toBe(before)
+
+  // A permission dialog changes the state: drawn at once.
+  await $.classic.PermissionRequest({ tool_name: 'Bash', tool_input: {} } as never)
+  await clock.advance(900)
+  expect(await source()).toContain('Venter på din godkendelse')
+})
