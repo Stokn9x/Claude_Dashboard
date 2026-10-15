@@ -384,15 +384,29 @@ const startServer = async ($: $) => {
   return false
 }
 
-// The person's own browser, with the office in it.
-const openOffice = async ($: $) => {
-  const isUp = await ensureServer($)
-  if (!isUp) return false
+// Where the office opens: the desktop app's own browser pane, beside the
+// chat, or the person's own browser where there is none or they ask for it.
+type Opened = 'pane' | 'browser' | null
+
+// The desktop app's browser pane: its MCP server opens a tab at a URL.
+const openInPane = async ($: $) => {
+  const result = await $.mcp.call('Claude_Browser', 'preview_start', { url: ADDRESS }).catch(() => null)
+  return !!result && !result.isError
+}
+
+const openInBrowser = async ($: $) => {
   const os = await $.env.get("OS")
   const argv = os === 'Windows_NT' ? ['explorer.exe', ADDRESS] : [(await $.env.get("XDG_CURRENT_DESKTOP")) ? 'xdg-open' : 'open', ADDRESS]
   // explorer.exe answers 1 even when it opened the page.
   await $.process.run(argv, { timeoutMs: 10_000 }).catch(() => null)
-  return true
+}
+
+const openOffice = async ($: $, where: 'pane' | 'browser' = 'pane'): Promise<Opened> => {
+  const isUp = await ensureServer($)
+  if (!isUp) return null
+  if (where === 'pane' && (await openInPane($))) return 'pane'
+  await openInBrowser($)
+  return 'browser'
 }
 
 // ─── Hooks ──────────────────────────────────────────────────────────────
@@ -417,8 +431,13 @@ export const register: Register = on => {
 
   on('command.run', { command: 'kontor' }, async ($, e) => {
     await $.ui.open({ id: PANE, title: '🏢 Kontor', focus: true })
-    const isOpen = await openOffice($)
-    const where = isOpen ? `Kontoret er åbent på ${ADDRESS}.` : 'Kontorets server kunne ikke starte. Den kræver Node.js 18 eller nyere.'
+    const opened = await openOffice($)
+    const where =
+      opened === 'pane'
+        ? 'Kontoret er åbent i browser-panelet.'
+        : opened === 'browser'
+          ? `Kontoret er åbent i din browser på ${ADDRESS}.`
+          : 'Kontorets server kunne ikke starte. Den kræver Node.js 18 eller nyere.'
     if (e.args.trim() === 'demo') {
       await runDemo($)
       return { text: `${where} Seks hjælpere er på vej ind.` }
@@ -552,11 +571,12 @@ export const register: Register = on => {
       return (
         <Box flexDirection="column" gap={1} paddingX={1} paddingY={1}>
           <Box flexDirection="column" paddingX={1}>
-            <Text bold>Kontoret tegnes i browseren</Text>
-            <Text dimColor wrap="wrap">{`Åbn ${ADDRESS} i din browser eller i appens browser-panel. Alle dine sessioner sidder i samme kontor.`}</Text>
+            <Text bold>Kontoret tegnes i et browser-panel</Text>
+            <Text dimColor wrap="wrap">{`Det åbner i browser-panelet ved siden af chatten, eller på ${ADDRESS} i din egen browser. Alle dine sessioner sidder i samme kontor.`}</Text>
           </Box>
           <Box flexDirection="row" gap={2} paddingX={1}>
-            <Button label="Åbn kontoret" onPress={() => void quietly(openOffice($))} />
+            <Button label="Åbn kontoret" onPress={() => void quietly(openOffice($, 'pane'))} />
+            <Button label="Åbn i din browser" onPress={() => void quietly(openOffice($, 'browser'))} />
             <Button label="Kopiér adresse" onPress={press => void quietly($.ui.copy({ text: ADDRESS, surface: press.surface }))} />
           </Box>
           {o.main.state === 'waiting' ? (

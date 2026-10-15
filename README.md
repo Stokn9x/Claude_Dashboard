@@ -55,7 +55,7 @@ if ($claude) { & $claude plugin marketplace update agent-kontor; & $claude plugi
 
 | Kommando | Gør |
 | --- | --- |
-| `/kontor` | Åbner kontoret i din browser |
+| `/kontor` | Åbner kontoret i appens browser-panel (eller din browser, hvis panelet ikke findes) |
 | `/kontor demo` | Fylder kontoret med seks hjælpere, så du kan se det i gang |
 
 Fejler kontoret, mærker Claude intet: alt det kører ved siden af og kan aldrig stoppe et værktøjskald.

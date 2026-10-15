@@ -232,7 +232,7 @@ test('green tests throw confetti for a while, a plain command does not', async (
   expect(file.last()?.party).toBeNull()
 })
 
-test('the first session starts the office server, and /kontor opens it in the browser', async ($, on) => {
+test('the first session starts the office server, and /kontor opens it in the system browser without the app pane', async ($, on) => {
   const clock = engine(on)
   let isUp = false
   const runs: string[][] = []
@@ -257,4 +257,26 @@ test('the first session starts the office server, and /kontor opens it in the br
   expect(runs).toContainEqual(['explorer.exe', 'http://127.0.0.1:4747'])
   expect(runs.filter(argv => argv.includes('--detach')).length).toBe(1)
   expect(JSON.stringify(reply)).toContain('http://127.0.0.1:4747')
+})
+
+test('/kontor opens the office in the app browser pane when there is one', async ($, on) => {
+  engine(on)
+  const runs: string[][] = []
+  const panes: unknown[] = []
+  on('http.fetch', () => ({ value: { status: 200, ok: true, headers: {}, text: JSON.stringify({ ok: true, app: 'agent-kontor' }) } }) as never)
+  on('process.run', (_, e) => {
+    runs.push([...e.argv])
+    return { value: { exitCode: 0, stdout: '', stderr: '' } } as never
+  })
+  on('mcp.call', (_, e) => {
+    panes.push([e.server, e.tool, e.args])
+    return { value: { content: [], isError: false } } as never
+  })
+
+  await $.session.start(start())
+  const reply = await $.command.run({ command: 'kontor', args: '' } as never)
+
+  expect(panes).toContainEqual(['Claude_Browser', 'preview_start', { url: 'http://127.0.0.1:4747' }])
+  expect(runs.some(argv => argv[0] === 'explorer.exe')).toBe(false)
+  expect(JSON.stringify(reply)).toContain('browser-panelet')
 })
