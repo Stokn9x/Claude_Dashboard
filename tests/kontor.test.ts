@@ -143,3 +143,39 @@ test('desktop: the picture does not change while nothing in the office does', as
   expect(first.length).toBeGreaterThan(1000)
   expect(source(await ui.drawn())).toBe(first)
 })
+
+for (const surface of ['terminal', 'desktop'] as const) {
+  test(`${surface}: my other sessions on this computer join the office`, async ($, on) => {
+    const clock = engine(on)
+    const now = Date.UTC(2026, 9, 15, 10)
+    const dir = 'C:/Users/test/.claude/agent-kontor/sessions'
+    const files = new Map<string, string>([
+      [`${dir}/sother1.json`, JSON.stringify({ key: 'sother1', project: 'crm', main: { state: 'running', detail: 'Kører npm test' }, helpers: 2, updatedAt: now })],
+      [`${dir}/sdone.json`, JSON.stringify({ key: 'sdone', ended: true, updatedAt: 0 })],
+      [`${dir}/sold.json`, JSON.stringify({ key: 'sold', project: 'gammel', main: { state: 'idle', detail: 'Holder pause' }, helpers: 0, updatedAt: now - 600_000 })],
+    ])
+    on('env.get', (_, e) => ({ value: e.name === 'USERPROFILE' ? ['C:', 'Users', 'test'].join(String.fromCharCode(92)) : undefined }) as never)
+    // The engine hands hooks the native path; compare with forward slashes.
+    const norm = (p: string) => p.split(String.fromCharCode(92)).join('/')
+    on('fs.write', (_, e) => {
+      files.set(norm(e.path), e.text)
+      return { value: undefined } as never
+    })
+    on('fs.list', (_, e) => ({ value: [...files.keys()].filter(p => p.startsWith(norm(e.path))).map(p => ({ name: p.split('/').pop(), kind: 'file', size: 1, mtimeMs: 0, isLink: false })) }) as never)
+    on('fs.read', (_, e) => ({ value: files.get(norm(e.path)) ?? '' }) as never)
+
+    await $.session.start(start('C:/kode/agent-kontor'))
+    const ui = await $.ui.mount({ plugin: 'agent-kontor', surface, component: 'Pane', requestId: 'kontor', props: paneProps })
+    await clock.advance(3500)
+    const drawn = JSON.stringify(await ui.drawn())
+
+    expect(drawn).toContain('Claude i crm')
+    expect(drawn).toContain('Kører npm test')
+    expect(drawn).toContain('2 hjælpere')
+    expect(drawn).not.toContain('gammel')
+
+    // This session wrote its own status beside them.
+    const mine = [...files.entries()].find(([p, text]) => !/sother1|sdone|sold/.test(p) && text.includes('agent-kontor'))
+    expect(mine?.[0]).toMatch(/^C:\/Users\/test\/\.claude\/agent-kontor\/sessions\/s[a-z0-9]+\.json$/)
+  })
+}

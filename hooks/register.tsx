@@ -1,7 +1,7 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register, RenderElement } from 'claude-code'
 
-import type { Activity, AgentState, Office, Phase, Sub } from '../types'
+import type { Activity, AgentState, Office, Other, Phase, Sub } from '../types'
 
 // A pixel office for this session alone, seen from above: Claude at the big
 // desk, its subagents at the six desks of the team room. Nothing leaves the
@@ -20,6 +20,8 @@ const pause: Activity = { state: 'idle', detail: 'Holder pause' }
 const office = atom(
   { plugin: 'agent-kontor', key: 'office' } as const,
   {
+    sessionKey: '',
+    others: [],
     project: '',
     startedAt: 0,
     main: pause,
@@ -378,7 +380,7 @@ const person = (x: number, y: number, look: Look, pose: Pose = {}) => {
 // ─── The floor plan ─────────────────────────────────────────────────────
 
 const W = 480
-const H = 384
+const H = 508
 const FONT = 'Segoe UI, system-ui, -apple-system, sans-serif'
 const esc = (text: string) => text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 const clip = (text: string, max: number) => (text.length > max ? `${text.slice(0, max - 1)}…` : text)
@@ -388,7 +390,7 @@ const WALL_TOP = '#5A6672'
 
 // Team desks: three across, two rows.
 const seatAt = (seat: number) => ({ cx: 92 + (seat % 3) * 148, dy: 202 + Math.floor(seat / 3) * 102 })
-const DOOR = { x: 424, y: 382 }
+const DOOR = { x: 478, y: 256 }
 const MAIN = { cx: 128, dy: 78 }
 const HANDOFF = { x: 214, y: 104 }
 const handoffFor = (seat: number) => ({ x: 206 + (seat % 3) * 13, y: 96 + Math.floor(seat / 3) * 16 })
@@ -484,7 +486,7 @@ const deliverPath = (seat: number) => {
 }
 const leavePath = (seat: number) => {
   const spot = handoffFor(seat)
-  return [spot, { x: 214, y: spot.y }, { x: 214, y: 148 }, { x: DOOR.x, y: 148 }, DOOR]
+  return [spot, { x: 214, y: spot.y }, { x: 214, y: 148 }, { x: 446, y: 148 }, { x: 446, y: 256 }, DOOR]
 }
 
 type Point = { x: number; y: number }
@@ -540,12 +542,16 @@ const rooms = (hour: number, project: string) => {
     <rect x="6" y="16" width="240" height="116" fill="#DCC194"/>${planks}${seams}
     <rect x="252" y="16" width="222" height="116" fill="#F3F5F6"/>${tiles}
     <rect x="6" y="138" width="468" height="240" fill="#CBD9C7"/>${carpet}
+    <rect x="6" y="384" width="468" height="${H - 390}" fill="#D6DCE6"/>
+    ${Array.from({ length: 5 }, (_, r) => `<rect x="6" y="${384 + r * 24}" width="468" height="1" fill="#C7CED9"/>`).join('')}
+    <text x="16" y="${H - 12}" font-family="${FONT}" font-size="8.5" font-weight="700" fill="#5B6672">Dine andre sessioner</text>
     <rect x="0" y="0" width="${W}" height="16" fill="${WALL}"/><rect x="0" y="0" width="${W}" height="6" fill="${WALL_TOP}"/>${windows}
     <rect x="0" y="0" width="6" height="${H}" fill="${WALL}"/><rect x="${W - 6}" y="0" width="6" height="${H}" fill="${WALL}"/>
     <rect x="246" y="16" width="6" height="74" fill="${WALL}"/><rect x="246" y="122" width="6" height="16" fill="${WALL}"/>
     <rect x="0" y="132" width="196" height="6" fill="${WALL}"/><rect x="236" y="132" width="64" height="6" fill="${WALL}"/><rect x="340" y="132" width="${W - 340}" height="6" fill="${WALL}"/>
-    <rect x="0" y="378" width="404" height="6" fill="${WALL}"/><rect x="444" y="378" width="${W - 444}" height="6" fill="${WALL}"/>
-    <rect x="404" y="376" width="40" height="8" fill="#8C6B4A"/><rect x="408" y="366" width="32" height="10" rx="2" fill="#6E5A44"/>
+    <rect x="0" y="378" width="214" height="6" fill="${WALL}"/><rect x="262" y="378" width="${W - 262}" height="6" fill="${WALL}"/><rect x="214" y="378" width="48" height="6" fill="#C3CCD6"/>
+    <rect x="0" y="${H - 6}" width="${W}" height="6" fill="${WALL}"/>
+    <rect x="${W - 6}" y="236" width="6" height="40" fill="#8C6B4A"/><rect x="${W - 18}" y="242" width="12" height="28" rx="2" fill="#6E5A44"/>
     <rect x="246" y="90" width="6" height="32" fill="#CDB892"/><rect x="196" y="132" width="40" height="6" fill="#CDB892"/><rect x="300" y="132" width="40" height="6" fill="#D5DAD2"/>
     <rect x="${W / 2 - 60}" y="3" width="120" height="11" rx="2" fill="#20262E"/>
     <text x="${W / 2}" y="11.5" text-anchor="middle" font-family="${FONT}" font-size="8" font-weight="700" fill="#E9EEF2">${esc(clip(project || 'Kontoret', 26))}</text>`
@@ -587,6 +593,26 @@ const furniture = () => `
   <rect x="452" y="334" width="16" height="24" fill="${OUTLINE}"/><rect x="453" y="335" width="14" height="10" fill="#9CC4EC"/><rect x="453" y="346" width="14" height="11" fill="#E9EEF2"/>`
 
 type Scene = { source: string; width: number; height: number }
+
+// The project room: the other sessions' Claudes, one desk each.
+const projectRoom = (others: Other[]) => {
+  const desks = Array.from({ length: 4 }, (_, i) => {
+    const cx = 72 + i * 112
+    const dy = 440
+    const other = others[i]
+    if (!other) return `${chairSprite(cx, dy)}${deskSprite(cx, dy, 80, null)}`
+    const look: Look = { ...claudeLook, shirt: (shirts[hashOf(other.key) % shirts.length] as [string, string])[0], shirtShade: (shirts[hashOf(other.key) % shirts.length] as [string, string])[1] }
+    const isAway = other.main.state === 'idle'
+    const sitter = isAway ? '' : person(cx, dy + 4, look, { seated: true, handUp: other.main.state === 'waiting' })
+    const typing = isAway ? '' : hands(cx, dy, look, other.main.state !== 'waiting')
+    return `${chairSprite(cx, dy)}${sitter}${deskSprite(cx, dy, 80, isAway ? null : other.main.state)}${typing}
+      ${tag(cx, dy + 30, clip(other.project, 16), '#C8643B')}
+      ${isAway ? tag(cx, dy - 22, 'Holder pause', '#8A94A0') : bubble(cx, dy - 30, other.main.detail, other.main.state === 'waiting')}
+      ${other.helpers > 0 ? tag(cx + 30, dy + 44, `+${other.helpers}`, '#4A5868') : ''}`
+  }).join('')
+  const more = others.length > 4 ? tag(W - 50, 396, `+${others.length - 4} sessioner`, '#4A5868') : ''
+  return desks + more
+}
 
 const officeSvg = (o: Office, now: number, hour: number): Scene => {
   const main = o.main
@@ -645,6 +671,7 @@ const officeSvg = (o: Office, now: number, hour: number): Scene => {
     ${isOut ? claude : ''}
     ${mainTag}
     ${desks}
+    ${projectRoom(o.others)}
     ${walkers}
     ${mainBubble}${bubbles}${queue}
   </g>
@@ -672,11 +699,64 @@ const phaseText: Record<Phase, string> = {
   leaving: 'Går igen',
 }
 
+// Every session on this computer writes a small status file and reads the
+// others', so all of them share one office. Nothing leaves the computer.
+const SYNC_MS = 3000
+const STALE_MS = 120_000
+let lastWritten = ''
+let lastWriteAt = 0
+
+const sessionsDir = async ($: $) => {
+  const home = (await $.env.get("USERPROFILE")) ?? (await $.env.get("HOME"))
+  // Forward slashes only: the engine does not read a Windows path's
+  // backslashes as separators.
+  const slashed = home?.split(String.fromCharCode(92)).join('/')
+  return slashed ? `${slashed}/.claude/agent-kontor/sessions` : null
+}
+
+const syncSessions = async ($: $) => {
+  const dir = await sessionsDir($)
+  const o = await read($, office)
+  if (!dir || !o.sessionKey) return
+  const now = await $.clock.now()
+
+  const mine = JSON.stringify({ key: o.sessionKey, project: o.project, main: o.main, helpers: o.subs.length })
+  if (mine !== lastWritten || now - lastWriteAt > 30_000) {
+    await $.fs.write(`${dir}/${o.sessionKey}.json`, JSON.stringify({ ...JSON.parse(mine), updatedAt: now }))
+    lastWritten = mine
+    lastWriteAt = now
+  }
+
+  const entries = await $.fs.list(dir).catch(() => [])
+  const others: Other[] = []
+  for (const entry of entries) {
+    if (!entry.name.endsWith('.json') || entry.name === `${o.sessionKey}.json`) continue
+    const text = await $.fs.read(`${dir}/${entry.name}`).catch(() => '')
+    try {
+      const other = JSON.parse(typeof text === 'string' ? text : '') as Other & { ended?: boolean }
+      if (!other.ended && now - other.updatedAt < STALE_MS && other.main?.state) {
+        others.push({ key: other.key, project: other.project, main: other.main, helpers: other.helpers ?? 0, updatedAt: other.updatedAt })
+      }
+    } catch {
+      // A file half-written by another session: next round.
+    }
+  }
+  others.sort((a, b) => a.key.localeCompare(b.key))
+  const shown = (list: Other[]) => JSON.stringify(list.map(x => [x.key, x.project, x.main, x.helpers]))
+  if (shown(others) !== shown(o.others)) await update($, office, x => ({ ...x, others }))
+}
+
+const leaveOffice = async ($: $) => {
+  const dir = await sessionsDir($)
+  const o = await read($, office)
+  if (dir && o.sessionKey) await $.fs.write(`${dir}/${o.sessionKey}.json`, JSON.stringify({ key: o.sessionKey, ended: true, updatedAt: 0 }))
+}
+
 // Copies the office into the frame when something the picture shows has moved.
 const refreshFrame = async ($: $) => {
   const o = await read($, office)
   const f = await read($, frame)
-  const visible = (x: Office | null) => (x ? JSON.stringify({ main: x.main, subs: x.subs, project: x.project }) : '')
+  const visible = (x: Office | null) => (x ? JSON.stringify({ main: x.main, subs: x.subs, project: x.project, others: x.others.map(y => [y.key, y.project, y.main, y.helpers]) }) : '')
   if (visible(o) === visible(f.office)) return
   const at = await $.clock.now()
   await update($, frame, () => ({ office: o, at }))
@@ -692,9 +772,12 @@ export const register: Register = on => {
   on('session.start', async ($, e, next) => {
     await $.command.register({ name: 'kontor', description: 'Åbn kontoret, eller se det fyldt med /kontor demo', argumentHint: '[demo]' })
     const now = await $.clock.now()
-    await update($, office, o => ({ ...o, project: base(e.cwd) || 'Kontoret', startedAt: o.startedAt || now, main: pause, subs: [] }))
+    const key = `s${Math.random().toString(36).slice(2, 10)}${Math.random().toString(36).slice(2, 6)}`
+    await update($, office, o => ({ ...o, sessionKey: o.sessionKey || key, project: base(e.cwd) || 'Kontoret', startedAt: o.startedAt || now, main: pause, subs: [] }))
     void $.ui.open({ id: PANE, title: '🏢 Kontor' })
     $.clock.every(PAINT_MS, () => void quietly(refreshFrame($)))
+    $.clock.every(SYNC_MS, () => void quietly(syncSessions($)))
+    void quietly(syncSessions($))
     return next(e)
   })
 
@@ -705,6 +788,11 @@ export const register: Register = on => {
       return { text: 'Seks hjælpere er på vej ind i kontoret.' }
     }
     return { text: 'Kontoret er åbent. Prøv /kontor demo for at se det fyldt.' }
+  })
+
+  on('session.end', async ($, e, next) => {
+    await quietly(leaveOffice($))
+    return next(e)
   })
 
   on('turn.start', async ($, e, next) => {
@@ -841,6 +929,9 @@ export const register: Register = on => {
           <Box flexDirection="column" gap={1}>
             {row('main', 'Claude', o.main.detail, o.main.state, figures.length ? figures.join(', ') : null)}
             {subRows}
+            {o.others.map(x =>
+              row(`o-${x.key}`, `Claude i ${x.project}`, x.main.detail, x.main.state, x.helpers ? `${x.helpers} ${x.helpers === 1 ? 'hjælper' : 'hjælpere'}` : null),
+            )}
           </Box>
           <Box flexDirection="row" gap={1}>
             <Text dimColor wrap="wrap">

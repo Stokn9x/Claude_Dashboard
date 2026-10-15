@@ -16,7 +16,18 @@ export type Sub = {
   activity: Activity
 }
 
+// Another Claude session on this computer, as its own status file says.
+export type Other = {
+  key: string
+  project: string
+  main: Activity
+  helpers: number
+  updatedAt: number
+}
+
 export type Office = {
+  sessionKey: string
+  others: Other[]
   project: string
   startedAt: number
   main: Activity
