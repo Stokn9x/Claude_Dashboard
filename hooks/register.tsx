@@ -9,9 +9,10 @@ import type { Activity, AgentState, Office, Phase, Sub } from '../types'
 
 const PANE = 'kontor'
 const SEATS = 6
-const ARRIVE_MS = 2600
-const DELIVER_MS = 3800
-const LEAVE_MS = 3200
+// Walking pace, in scene units a second, and how long a helper stands at
+// Claude's desk with its result.
+const SPEED = 90
+const HANDOVER_MS = 2600
 
 const thinking: Activity = { state: 'working', detail: 'Tænker' }
 const pause: Activity = { state: 'idle', detail: 'Holder pause' }
@@ -125,33 +126,38 @@ const setActivity = async ($: $, agentId: string | undefined, activity: Activity
 
 const arrive = async ($: $, id: string, task: string, activity: Activity) => {
   const now = await $.clock.now()
-  await update($, office, o => (o.subs.some(s => s.id === id) ? o : { ...o, subs: [...o.subs, newSub(id, task, activity, 'arriving', now, o.subs)] }))
-  $.clock.after(ARRIVE_MS, () => {
-    void quietly(update($, office, o => ({ ...o, subs: o.subs.map(s => (s.id === id && s.phase === 'arriving' ? { ...s, phase: 'working' as Phase } : s)) })))
-  })
+  const after = await update($, office, o => (o.subs.some(s => s.id === id) ? o : { ...o, subs: [...o.subs, newSub(id, task, activity, 'arriving', now, o.subs)] }))
+  const seat = after.subs.find(s => s.id === id)?.seat ?? -1
+  const sitDown = () => void quietly(update($, office, o => ({ ...o, subs: o.subs.map(s => (s.id === id && s.phase === 'arriving' ? { ...s, phase: 'working' as Phase } : s)) })))
+  // A helper with no free desk waits by the door; it does not walk.
+  if (seat < 0) return sitDown()
+  $.clock.after(walkMs(arrivePath(seat)), sitDown)
 }
 
-// Done: walk the result over to Claude, then out of the door.
+// Done: walk the result over to Claude, hand it over, then out of the door.
 const deliver = async ($: $, id: string) => {
   const now = await $.clock.now()
-  let isHere = false
+  let seat: number | null = null
   await update($, office, o => ({
     ...o,
     subs: o.subs.map(s => {
       if (s.id !== id) return s
-      isHere = true
+      seat = s.seat
       return { ...s, phase: 'delivering' as Phase, since: now, activity: { state: 'working' as AgentState, detail: `Afleverer: ${s.task}` } }
     }),
   }))
-  if (!isHere) return
-  $.clock.after(DELIVER_MS, () => {
+  if (seat === null) return
+  const gone = () => void quietly(update($, office, x => ({ ...x, subs: x.subs.filter(s => s.id !== id) })))
+  if (seat < 0) {
+    $.clock.after(HANDOVER_MS, gone)
+    return
+  }
+  $.clock.after(walkMs(deliverPath(seat)) + HANDOVER_MS, () => {
     void quietly(
       (async () => {
         const later = await $.clock.now()
         await update($, office, o => ({ ...o, subs: o.subs.map(s => (s.id === id ? { ...s, phase: 'leaving' as Phase, since: later } : s)) }))
-        $.clock.after(LEAVE_MS, () => {
-          void quietly(update($, office, x => ({ ...x, subs: x.subs.filter(s => s.id !== id) })))
-        })
+        $.clock.after(walkMs(leavePath()), gone)
       })(),
     )
   })
@@ -188,7 +194,7 @@ const runDemo = async ($: $) => {
     $.clock.after(i * 700, () => void quietly(arrive($, id, task, activity)))
     $.clock.after(14_000 + i * 2600, () => void quietly(deliver($, id)))
   })
-  $.clock.after(14_000 + demoTasks.length * 2600 + DELIVER_MS + LEAVE_MS, () => void quietly(setMain($, pause)))
+  $.clock.after(14_000 + demoTasks.length * 2600 + 16_000, () => void quietly(setMain($, pause)))
 }
 
 // ─── Pixels ─────────────────────────────────────────────────────────────
@@ -209,8 +215,47 @@ const BODY = [
   'otttttttTo',
   'osttttttso',
 ]
+// The same person from behind, and in profile facing right (mirrored for left).
+const BACK = [
+  '..oooooo..',
+  '.ohhhhhho.',
+  'ohhHhhhhho',
+  'ohhhhhhhho',
+  'ohhhhhhhho',
+  '.ohhhhhho.',
+  '.otttttTo.',
+  'otttttttTo',
+  'otttttttTo',
+  'osttttttso',
+]
+const SIDE = [
+  '..ooooo...',
+  '.ohhhhhoo.',
+  'ohHhhhhhho',
+  'ohhhsssso.',
+  'ohhsseso..',
+  '.ohsssso..',
+  '..otttTo..',
+  '.ottttTo..',
+  '.ottttTo..',
+  '..osttso..',
+]
+
 const LEGS_A = ['.oppppppo.', '.opo..opo.', '.obo..obo.', '.oo....oo.']
-const LEGS_B = ['.oppppppo.', '..opoopo..', '..oboobo..', '..oo..oo..']
+// Walking, four frames: a step, passing, the other step, passing.
+const FRONT_WALK = [
+  ['.oppppppo.', '.opo..opo.', '.obo..oo..', '.oo.......'],
+  LEGS_A,
+  ['.oppppppo.', '.opo..opo.', '..oo..obo.', '.......oo.'],
+  LEGS_A,
+]
+const SIDE_STAND = ['..opppo...', '..oppo....', '..obbo....', '..oooo....']
+const SIDE_WALK = [
+  ['..opppo...', '.op..po...', 'ob....bo..', 'oo....oo..'],
+  SIDE_STAND,
+  ['..opppo...', '.op..po...', 'ob....bo..', 'oo....oo..'],
+  SIDE_STAND,
+]
 
 type Look = { hair: string; hairLight: string; skin: string; shirt: string; shirtShade: string }
 
@@ -271,7 +316,32 @@ const paint = (rows: string[], look: Look, x: number, y: number) => {
   return out
 }
 
-type Pose = { seated?: boolean; walking?: boolean; typing?: boolean; handUp?: boolean; mug?: boolean }
+type Pose = { seated?: boolean; handUp?: boolean; mug?: boolean }
+
+type Facing = 'front' | 'back' | 'left' | 'right'
+
+const STEP_S = 0.52
+
+// A whole person on their feet at (0, 0), facing a way, walking or still.
+const figure = (look: Look, facing: Facing, isWalking: boolean) => {
+  const body = facing === 'back' ? BACK : facing === 'front' ? BODY : SIDE
+  const isSide = facing === 'left' || facing === 'right'
+  const frames = isWalking ? (isSide ? SIDE_WALK : FRONT_WALK) : [isSide ? SIDE_STAND : LEGS_A]
+  const top = -(body.length + 4) * P
+  const left = -5 * P
+  const drawn = frames
+    .map((legs, i) => {
+      // Up a pixel on the passing frames: the bob of a step.
+      const lift = isWalking && i % 2 === 1 ? -P : 0
+      const art = paint(body, look, left, top + lift) + paint(legs, look, left, top + body.length * P)
+      if (!isWalking) return art
+      const values = frames.map((_, k) => (k === i ? 1 : 0)).join(';')
+      return `<g opacity="${i === 0 ? 1 : 0}">${art}<animate attributeName="opacity" values="${values}" dur="${STEP_S}s" calcMode="discrete" repeatCount="indefinite"/></g>`
+    })
+    .join('')
+
+  return facing === 'left' ? `<g transform="scale(-1 1)">${drawn}</g>` : drawn
+}
 
 // Feet at (x, y): the sprite stands on that point.
 const person = (x: number, y: number, look: Look, pose: Pose = {}) => {
@@ -280,13 +350,7 @@ const person = (x: number, y: number, look: Look, pose: Pose = {}) => {
   const top = y - rows * P
   let out = paint(BODY, look, left, top)
 
-  if (!pose.seated) {
-    const legsTop = top + BODY.length * P
-    out += pose.walking
-      ? `<g>${paint(LEGS_A, look, left, legsTop)}<animate attributeName="opacity" values="1;0" dur="0.36s" calcMode="discrete" repeatCount="indefinite"/></g>
-         <g opacity="0">${paint(LEGS_B, look, left, legsTop)}<animate attributeName="opacity" values="0;1" dur="0.36s" calcMode="discrete" repeatCount="indefinite"/></g>`
-      : paint(LEGS_A, look, left, legsTop)
-  }
+  if (!pose.seated) out += paint(LEGS_A, look, left, top + BODY.length * P)
   if (pose.handUp) {
     out += `<g><rect x="${left + 10 * P}" y="${top + 0 * P}" width="${2 * P}" height="${8 * P}" fill="${OUTLINE}"/>
       <rect x="${left + 10 * P}" y="${top + 1 * P}" width="${P}" height="${2 * P}" fill="${look.skin}"/>
@@ -411,17 +475,39 @@ const deliverPath = (seat: number) => {
 }
 const leavePath = () => [HANDOFF, { x: 214, y: 148 }, { x: DOOR.x, y: 148 }, DOOR]
 
-const walker = (sub: Sub, points: { x: number; y: number }[], now: number, dur: number) => {
+type Point = { x: number; y: number }
+
+const legSeconds = (a: Point, b: Point) => Math.hypot(b.x - a.x, b.y - a.y) / SPEED
+const walkMs = (points: Point[]) => Math.round(points.slice(1).reduce((t, p, i) => t + legSeconds(points[i] as Point, p), 0) * 1000) + 150
+const facingOf = (a: Point, b: Point): Facing =>
+  Math.abs(b.x - a.x) > Math.abs(b.y - a.y) ? (b.x > a.x ? 'right' : 'left') : b.y > a.y ? 'front' : 'back'
+const sec = (n: number) => `${n.toFixed(2)}s`
+
+// A walk drawn as its straight legs: each leg shows only while it is walked,
+// faces its own way, and starts where the clock says the walk has got to.
+const walker = (sub: Sub, points: Point[], now: number, endFacing: Facing | null, atEnd = '') => {
   const elapsed = (now - sub.since) / 1000
   const look = lookFor(sub.id)
-  const begin = elapsed >= 0 ? `-${elapsed.toFixed(2)}s` : `${(-elapsed).toFixed(2)}s`
-  const appear = elapsed < 0 ? `<set attributeName="opacity" to="1" begin="${(-elapsed).toFixed(2)}s"/>` : ''
-  return `<g opacity="${elapsed < 0 ? 0 : 1}">${appear}
-    <animateMotion path="${path(points)}" dur="${(dur / 1000).toFixed(2)}s" begin="${begin}" fill="freeze"/>
-    ${person(0, 0, look, { walking: true })}
-    ${tag(0, 3, sub.name, '#4A5868')}
-    ${sub.phase === 'delivering' ? bubble(0, -46, sub.activity.detail) : ''}
-  </g>`
+  const label = tag(0, 3, sub.name, '#4A5868')
+  let t = 0
+  let out = ''
+  for (let i = 0; i + 1 < points.length; i++) {
+    const a = points[i] as Point
+    const b = points[i + 1] as Point
+    const d = legSeconds(a, b)
+    if (d <= 0) continue
+    const begin = t - elapsed
+    t += d
+    if (begin + d < 0) continue
+    out += `<g opacity="0"><set attributeName="opacity" to="1" begin="${sec(begin)}" end="${sec(begin + d)}"/>
+      <g><animateMotion path="M${a.x} ${a.y} L${b.x} ${b.y}" dur="${sec(d)}" begin="${sec(begin)}" fill="freeze"/>${figure(look, facingOf(a, b), true)}${label}</g></g>`
+  }
+  if (endFacing) {
+    const last = points[points.length - 1] as Point
+    out += `<g opacity="0"><set attributeName="opacity" to="1" begin="${sec(t - elapsed)}"/>
+      <g transform="translate(${last.x} ${last.y})">${figure(look, endFacing, false)}${label}${atEnd}</g></g>`
+  }
+  return out
 }
 
 const rooms = (hour: number, project: string) => {
@@ -527,10 +613,10 @@ const officeSvg = (o: Office, now: number, hour: number): Scene => {
   const walkers = walking
     .map(s =>
       s.phase === 'arriving'
-        ? walker(s, arrivePath(s.seat), now, ARRIVE_MS)
+        ? walker(s, arrivePath(s.seat), now, 'front')
         : s.phase === 'delivering'
-          ? walker(s, deliverPath(s.seat), now, 2200)
-          : walker(s, leavePath(), now, LEAVE_MS),
+          ? walker(s, deliverPath(s.seat), now, 'left', bubble(0, -46, s.activity.detail))
+          : walker(s, leavePath(), now, null),
     )
     .join('')
 

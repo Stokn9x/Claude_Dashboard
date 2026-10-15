@@ -84,10 +84,12 @@ for (const surface of ['terminal', 'desktop'] as const) {
     const after = JSON.stringify(await ui.drawn())
     expect(after).toContain('Afleverer: Kortlæg API’et')
 
-    await clock.advance(4000)
+    // The walk to Claude's desk and the handover take their time…
+    await clock.advance(6500)
     expect(JSON.stringify(await ui.drawn())).toContain('Går igen: Kortlæg API’et')
 
-    await clock.advance(4000)
+    // …and so does the walk out of the door.
+    await clock.advance(7000)
     expect(JSON.stringify(await ui.drawn())).toContain('Ingen hjælpere i kontoret')
   })
 
@@ -97,7 +99,7 @@ for (const surface of ['terminal', 'desktop'] as const) {
     const ui = await $.ui.mount({ plugin: 'agent-kontor', surface, component: 'Pane', requestId: 'kontor', props: paneProps })
 
     await $.command.run({ command: 'kontor', args: 'demo' } as never)
-    await clock.advance(7000)
+    await clock.advance(11000)
     const drawn = JSON.stringify(await ui.drawn())
 
     expect(drawn).toContain('6 af 6 hjælpere arbejder')
