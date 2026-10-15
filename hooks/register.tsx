@@ -17,23 +17,26 @@ const HANDOVER_MS = 2600
 const thinking: Activity = { state: 'working', detail: 'Tænker' }
 const pause: Activity = { state: 'idle', detail: 'Holder pause' }
 
-const office = atom(
-  { plugin: 'agent-kontor', key: 'office' } as const,
-  {
-    sessionKey: '',
-    others: [],
-    project: '',
-    startedAt: 0,
-    main: pause,
-    subs: [],
-    model: '',
-    tokensOut: 0,
-    costUsd: null,
-    linesAdded: 0,
-    linesRemoved: 0,
-    fiveHour: null,
-  } as Office,
-)
+const emptyOffice: Office = {
+  sessionKey: '',
+  others: [],
+  project: '',
+  startedAt: 0,
+  main: pause,
+  subs: [],
+  model: '',
+  tokensOut: 0,
+  costUsd: null,
+  linesAdded: 0,
+  linesRemoved: 0,
+  fiveHour: null,
+}
+const office = atom({ plugin: 'agent-kontor', key: 'office' } as const, emptyOffice)
+
+// State outlives a reload of the plugin: an office saved by an older version
+// lacks the newer fields. Read it through this, never as it lies.
+const fresh = (o: Partial<Office> | null | undefined): Office => ({ ...emptyOffice, ...(o ?? {}) })
+const readOffice = async ($: EngineInterface) => fresh(await read($, office))
 
 // What the picture was last drawn from, and when. The picture follows the
 // office at most every PAINT_MS and only when something visible moved: each
@@ -716,7 +719,7 @@ const sessionsDir = async ($: $) => {
 
 const syncSessions = async ($: $) => {
   const dir = await sessionsDir($)
-  const o = await read($, office)
+  const o = await readOffice($)
   if (!dir || !o.sessionKey) return
   const now = await $.clock.now()
 
@@ -748,15 +751,15 @@ const syncSessions = async ($: $) => {
 
 const leaveOffice = async ($: $) => {
   const dir = await sessionsDir($)
-  const o = await read($, office)
+  const o = await readOffice($)
   if (dir && o.sessionKey) await $.fs.write(`${dir}/${o.sessionKey}.json`, JSON.stringify({ key: o.sessionKey, ended: true, updatedAt: 0 }))
 }
 
 // Copies the office into the frame when something the picture shows has moved.
 const refreshFrame = async ($: $) => {
-  const o = await read($, office)
+  const o = await readOffice($)
   const f = await read($, frame)
-  const visible = (x: Office | null) => (x ? JSON.stringify({ main: x.main, subs: x.subs, project: x.project, others: x.others.map(y => [y.key, y.project, y.main, y.helpers]) }) : '')
+  const visible = (x: Office | null) => (x ? JSON.stringify({ main: x.main, subs: x.subs, project: x.project, others: fresh(x).others.map(y => [y.key, y.project, y.main, y.helpers]) }) : '')
   if (visible(o) === visible(f.office)) return
   const at = await $.clock.now()
   await update($, frame, () => ({ office: o, at }))
@@ -872,13 +875,13 @@ export const register: Register = on => {
       const kit = $.ui.resolve(e)
       const { Box, Text } = kit
       const Svg = 'Svg' in kit ? kit.Svg : null
-      const o = await read($, office)
+      const o = await readOffice($)
       const now = await $.clock.now()
 
       const paneWidth = Math.min(1100, Math.round(e.props.bodyColumns * 8.4))
       const f = await read($, frame)
       // Until the first paint, draw the office as it is.
-      const scene = officeSvg(f.office ?? o, f.office ? f.at : now, new Date(f.office ? f.at : now).getHours())
+      const scene = officeSvg(fresh(f.office ?? o), f.office ? f.at : now, new Date(f.office ? f.at : now).getHours())
       const working = o.subs.filter(s => s.phase === 'working').length
       const alt = `Kontoret: Claude ${o.main.detail.toLowerCase()}, ${o.subs.length} hjælpere`
 
