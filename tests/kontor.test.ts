@@ -66,6 +66,7 @@ const engine = (on: On, api: ReturnType<typeof fakeSupabase>) => {
   on('turn.start', (_, e) => e as never)
   on('turn.complete', () => ({ text: 'ok' }))
   on('tool.check', () => ({ decision: 'ask' }) as never)
+  on('classic.PermissionRequest', () => ({}) as never)
   on('tool.call', (_, e) =>
     e.tool === 'Edit'
       ? ({ result: { filePath: 'C:/p/a.ts', structuredPatch: [{ lines: ['+a', '+b', '-c'] }] } } as never)
@@ -117,7 +118,13 @@ for (const surface of ['terminal', 'desktop'] as const) {
     expect(JSON.stringify(api.reports)).not.toContain('hemmelig')
     expect(JSON.stringify(api.reports)).not.toContain('abc')
 
+    // An `ask` alone is the mode's to decide (Auto mode's classifier): not waiting.
     await $.tool.check({ tool: 'Bash', command: 'rm x', tool_use_id: 'u3' } as never)
+    await wait()
+    expect(lastFor(api.reports, id)?.state).not.toBe('waiting')
+
+    // Only a dialog put to the person is.
+    await $.classic.PermissionRequest({ tool_name: 'Bash', tool_input: { command: 'rm x' } } as never)
     await wait()
     expect(lastFor(api.reports, id)).toMatchObject({ state: 'waiting', detail: 'Venter på din godkendelse' })
 

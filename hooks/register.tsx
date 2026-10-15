@@ -725,12 +725,12 @@ export const register: Register = on => {
     return next(e)
   })
 
-  on('tool.check', async ($, e, next) => {
-    const verdict = await next(e)
-    if ('decision' in verdict && verdict.decision === 'ask') {
-      await quietly(setActivity($, e.agentId, { state: 'waiting', detail: 'Venter på din godkendelse' }))
-    }
-    return verdict
+  // Raised only when a permission dialog is put to the person. A tool check
+  // that answers `ask` is not enough: in Auto mode the classifier decides it.
+  on('classic.PermissionRequest', async ($, e, next) => {
+    const agentId = (e as { agent_id?: string }).agent_id
+    await quietly(setActivity($, agentId, { state: 'waiting', detail: 'Venter på din godkendelse' }))
+    return next(e)
   })
 
   on('agent.spawn', async ($, e, next) => {
