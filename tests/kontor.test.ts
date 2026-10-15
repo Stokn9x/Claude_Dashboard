@@ -152,15 +152,14 @@ for (const surface of ['terminal', 'desktop'] as const) {
     const ui = await $.ui.mount({ plugin: 'agent-kontor', surface, component: 'Pane', requestId: 'kontor', props: paneProps })
     const drawn = JSON.stringify(await ui.drawn())
 
-    expect(drawn).toContain('Bertram · crm')
-    expect(drawn).toContain('Venter på dig')
-    expect(drawn).toContain('1 subagent')
-    expect(drawn).toContain('Casper · team-chat')
-    expect(drawn).toContain('+12 −3')
-    expect(drawn.lastIndexOf('Bertram · crm')).toBeLessThan(drawn.lastIndexOf('Casper · team-chat'))
+    expect(drawn).toContain('Bertrams agent på crm: Venter på din godkendelse')
+    expect(drawn).toContain('1 hjælper')
+    expect(drawn).toContain('Casper (dig)')
+    expect(drawn).toContain('+12 −3 linjer')
+    expect(drawn.lastIndexOf('Bertram')).toBeLessThan(drawn.lastIndexOf('Casper (dig)'))
     if (surface === 'desktop') expect(drawn).toContain('"type":"Svg"')
 
-    await ui.press({ key: 'pill-invite-btn' })
+    await ui.press({ key: 'tab-invite-btn' })
     expect(await ui.find({ text: /TEAM-2026/ })).toBeDefined()
   })
 }

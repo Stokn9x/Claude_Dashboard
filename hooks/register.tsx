@@ -98,6 +98,7 @@ const activityFor = (tool: string, args: Record<string, unknown>): Activity => {
     case 'AskUserQuestion':
       return { state: 'waiting', detail: 'Har et spørgsmål til dig' }
     default:
+      if (/^mcp__ccd_|^(TodoWrite|ToolSearch|Skill)$/.test(tool)) return { state: 'working', detail: 'Tænker' }
       return { state: 'working', detail: `Bruger ${tool.startsWith('mcp__') ? (tool.split('__').pop() ?? tool) : tool}` }
   }
 }
@@ -369,14 +370,21 @@ const leaveOffice = async ($: $) => {
 
 // ─── Look ───────────────────────────────────────────────────────────────
 
-const accent = '#1E7FC9'
+const accent = '#2F86D6'
+const alert = '#E5484D'
 const ink = '#14212E'
 const softInk = '#5B6B7A'
-const cloud = '#EEF2F6'
-const sky = '#F2F8FD'
-const skyLine = '#CFE3F5'
-const plus = '#1E9E6A'
-const minus = '#D64545'
+
+// One colour per state, mid-tone so it reads on a light pane and a dark one.
+const stateColor: Record<AgentState, string> = {
+  working: '#8A94A0',
+  reading: '#2BA39A',
+  editing: '#3B8FE0',
+  running: '#D9932B',
+  browsing: '#7B6BDE',
+  waiting: '#E5484D',
+  idle: '#8A94A0',
+}
 const FONT = 'Segoe UI, system-ui, -apple-system, sans-serif'
 
 const shirts = ['#1E7FC9', '#17A398', '#E8643F', '#8E7BE6', '#C98A00', '#E0567A', '#3D8B5A', '#B0563B']
@@ -518,16 +526,16 @@ const desk = (col: number, row: number, top: number, d: Desk) => {
   const state: AgentState = a?.state ?? 'idle'
   const cx = x + DESK_W / 2
 
-  const rug = `<rect x="${x + 10}" y="${y + 12}" width="${DESK_W - 20}" height="${DESK_H - 22}" rx="10" fill="${look.shirt}" opacity="0.08"/>`
+  const rug = `<rect x="${x + 10}" y="${y + 12}" width="${DESK_W - 20}" height="${DESK_H - 22}" rx="10" fill="${look.shirt}" opacity="0.10"/>`
   const chair = `<rect x="${cx - 26}" y="${y + 34}" width="52" height="40" rx="8" fill="#3A4656"/><rect x="${cx - 22}" y="${y + 38}" width="44" height="32" rx="6" fill="#4A5868"/>`
   const person = isHere ? sprite(cx - 16, y + 30, look, { seated: true, armUp: state === 'waiting', typing: state === 'editing' || state === 'working' || state === 'running' }) : ''
-  const deskTop = `<rect x="${cx - 60}" y="${y + 64}" width="120" height="10" rx="2" fill="#B07A4F"/><rect x="${cx - 60}" y="${y + 74}" width="120" height="22" fill="#8B5E3C"/>
-    <rect x="${cx - 54}" y="${y + 96}" width="8" height="14" fill="#6E472B"/><rect x="${cx + 46}" y="${y + 96}" width="8" height="14" fill="#6E472B"/>`
+  const deskTop = `<rect x="${cx - 60}" y="${y + 64}" width="120" height="10" rx="2" fill="#E2C49A"/><rect x="${cx - 60}" y="${y + 74}" width="120" height="22" fill="#C9A273"/>
+    <rect x="${cx - 54}" y="${y + 96}" width="8" height="14" fill="#A88257"/><rect x="${cx + 46}" y="${y + 96}" width="8" height="14" fill="#A88257"/>`
   const monitor = `<rect x="${cx + 14}" y="${y + 30}" width="44" height="34" rx="3" fill="#2B2F36"/>
     ${screenFor(cx + 17, y + 33, 38, 26, a ? state : 'idle')}
     <rect x="${cx + 32}" y="${y + 64}" width="8" height="3" fill="#2B2F36"/>`
-  const plant = col % 2 === 0 ? `<rect x="${cx - 54}" y="${y + 52}" width="12" height="12" fill="#C0703A"/><circle cx="${cx - 48}" cy="${y + 47}" r="8" fill="#3D8B5A"/><circle cx="${cx - 53}" cy="${y + 50}" r="5" fill="#4FA36B"/>` : `<rect x="${cx - 52}" y="${y + 56}" width="16" height="8" rx="2" fill="#F2F2F2"/><rect x="${cx - 50}" y="${y + 52}" width="12" height="4" fill="#E8643F"/>`
-  const label = a ? `${d.person.name} · ${a.project || 'ingen mappe'}` : d.person.name
+  const plant = col % 2 === 0 ? `<rect x="${cx - 54}" y="${y + 52}" width="12" height="12" fill="#C0703A"/><circle cx="${cx - 48}" cy="${y + 47}" r="8" fill="#3D8B5A"/><circle cx="${cx - 53}" cy="${y + 50}" r="5" fill="#4FA36B"/>` : `<rect x="${cx - 50}" y="${y + 60}" width="12" height="4" fill="#3A4046"/><rect x="${cx - 46}" y="${y + 46}" width="3" height="14" fill="#3A4046"/><path d="M${cx - 54} ${y + 46} L${cx - 38} ${y + 46} L${cx - 42} ${y + 38} L${cx - 50} ${y + 38} Z" fill="#F2C94C"/>`
+  const label = a ? `${d.person.name} på ${a.project || 'en mappe'}` : d.person.name
   const sub = a ? (a.state === 'idle' ? 'Pause ☕' : a.detail || stateLabel[a.state]) : 'Ikke online'
   const plate = `<text x="${cx}" y="${y + 126}" text-anchor="middle" font-family="${FONT}" font-size="12" font-weight="700" fill="${a ? ink : '#9AA6B2'}">${esc(clip(label, 30))}</text>
     <text x="${cx}" y="${y + 141}" text-anchor="middle" font-family="${FONT}" font-size="11" fill="${state === 'waiting' ? '#E0567A' : softInk}">${esc(clip(sub, 32))}</text>`
@@ -549,27 +557,46 @@ const desk = (col: number, row: number, top: number, d: Desk) => {
   return `${rug}${chair}${person}${deskTop}${monitor}${plant}${plate}${talk}${helpers}`
 }
 
-const lounge = (top: number, idle: { person: Person; agent: Agent }[]) => {
+const lounge = (top: number, width: number, idle: { person: Person; agent: Agent }[]) => {
   const h = 120
   const people = idle
-    .slice(0, 8)
+    .slice(0, Math.max(1, Math.floor((width - 230) / 52)))
     .map((d, i) => {
-      const x = 200 + i * 52
+      const x = 150 + i * 52
       return `${sprite(x, top + 40, lookOf(d.person.user_id), { cup: true })}
-        <text x="${x + 16}" y="${top + 108}" text-anchor="middle" font-family="${FONT}" font-size="10.5" font-weight="600" fill="${ink}">${esc(clip(d.person.name, 9))}</text>`
+        <text x="${x + 16}" y="${top + 108}" text-anchor="middle" font-family="${FONT}" font-size="11" font-weight="700" fill="${ink}">${esc(clip(d.person.name, 9))}</text>`
     })
     .join('')
 
-  return `<rect x="0" y="${top}" width="${W}" height="${h}" fill="#E9DFD0"/>
-    <rect x="0" y="${top}" width="${W}" height="4" fill="#D8CBB6"/>
-    <text x="16" y="${top + 22}" font-family="${FONT}" font-size="11" font-weight="700" letter-spacing="1.5" fill="#8A7A64">KØKKEN &amp; LOUNGE</text>
-    <rect x="20" y="${top + 52}" width="110" height="34" rx="8" fill="#5B6FA8"/><rect x="20" y="${top + 40}" width="110" height="18" rx="8" fill="#6E83BD"/>
-    <rect x="16" y="${top + 50}" width="12" height="38" rx="5" fill="#4E6196"/><rect x="122" y="${top + 50}" width="12" height="38" rx="5" fill="#4E6196"/>
-    <rect x="${W - 70}" y="${top + 36}" width="44" height="56" rx="4" fill="#3A4046"/><rect x="${W - 64}" y="${top + 44}" width="32" height="14" fill="#9AD0F5"/>
-    <circle cx="${W - 48}" cy="${top + 70}" r="5" fill="#E8643F"/><rect x="${W - 56}" y="${top + 80}" width="16" height="8" fill="#FFFFFF"/>
+  return `<rect x="0" y="${top}" width="${width}" height="${h}" fill="#E5D3B5"/>
+    <rect x="0" y="${top}" width="${width}" height="4" fill="#CDB892"/>
+    <text x="16" y="${top + 22}" font-family="${FONT}" font-size="11" font-weight="700" fill="#7A6748">Køkkenet</text>
+    <rect x="20" y="${top + 52}" width="110" height="34" rx="8" fill="#2F6F73"/><rect x="20" y="${top + 40}" width="110" height="18" rx="8" fill="#3E8589"/>
+    <rect x="16" y="${top + 50}" width="12" height="38" rx="5" fill="#285E62"/><rect x="122" y="${top + 50}" width="12" height="38" rx="5" fill="#285E62"/>
+    <rect x="${width - 70}" y="${top + 36}" width="44" height="56" rx="4" fill="#3A4046"/><rect x="${width - 64}" y="${top + 44}" width="32" height="14" fill="#9AD0F5"/>
+    <circle cx="${width - 48}" cy="${top + 70}" r="5" fill="#E8643F"/><rect x="${width - 56}" y="${top + 80}" width="16" height="8" fill="#FFFFFF"/>
     ${people}`
 }
 
+const wall = (width: number, hour: number, sign: string) => {
+  const isNight = hour < 7 || hour >= 19
+  const windowSky = isNight ? '#0E1B33' : hour < 9 || hour >= 17 ? '#F6B88A' : '#9BD3F5'
+  const signW = 168
+  const paneW = Math.max(60, (width - signW) / 2 - 36)
+  const windows = [18, width - 18 - paneW]
+    .map(wx => `<rect x="${wx}" y="14" width="${paneW}" height="54" rx="4" fill="#FFFFFF"/><rect x="${wx + 6}" y="20" width="${paneW - 12}" height="42" fill="${windowSky}"/>
+      <rect x="${wx + paneW / 2 - 2}" y="20" width="4" height="42" fill="#FFFFFF"/>
+      ${isNight
+        ? `<rect x="${wx + 18}" y="28" width="2" height="2" fill="#FFFFFF"/><rect x="${wx + paneW - 30}" y="36" width="2" height="2" fill="#FFFFFF"/><circle cx="${wx + paneW - 22}" cy="30" r="6" fill="#F4F1DE"/>`
+        : `<circle cx="${wx + 26}" cy="38" r="8" fill="#FFFFFF" opacity="0.85"/><circle cx="${wx + 37}" cy="36" r="10" fill="#FFFFFF" opacity="0.85"/>`}`)
+    .join('')
+
+  return `<rect width="${width}" height="86" fill="${isNight ? '#263040' : '#F1F4F2'}"/>${windows}
+    <rect x="${width / 2 - signW / 2}" y="16" width="${signW}" height="50" rx="6" fill="#2B2F36"/>${sign}
+    <rect x="0" y="80" width="${width}" height="6" fill="${isNight ? '#1B2230' : '#D5DCD7'}"/>`
+}
+
+// The office drawn as wide as it needs: one desk zooms in, a full floor zooms out.
 const officeSvg = (office: Office, people: Person[], hour: number) => {
   const desks: Desk[] = []
   const idle: { person: Person; agent: Agent }[] = []
@@ -583,35 +610,65 @@ const officeSvg = (office: Office, people: Person[], hour: number) => {
     }
   }
 
-  const isNight = hour < 7 || hour >= 19
-  const wallH = 86
-  const rows = Math.max(1, Math.ceil(desks.length / 3))
-  const floorTop = wallH
+  const cols = Math.min(3, Math.max(1, desks.length))
+  const width = Math.max(2, cols) * DESK_W
+  const left = (width - cols * DESK_W) / 2
+  const rows = Math.max(1, Math.ceil(desks.length / cols))
+  const floorTop = 86
   const loungeTop = floorTop + rows * DESK_H + 6
-  const h = loungeTop + 120
-  const windowSky = isNight ? '#0E1B33' : hour < 9 || hour >= 17 ? '#F6B88A' : '#9BD3F5'
-  const stars = isNight ? [30, 70, 410, 470, 530].map((sx, i) => `<rect x="${sx}" y="${20 + (i % 3) * 8}" width="2" height="2" fill="#FFFFFF"/>`).join('') : ''
-  const windows = [20, 400]
-    .map(wx => `<rect x="${wx}" y="14" width="200" height="54" rx="4" fill="#FFFFFF"/><rect x="${wx + 6}" y="20" width="188" height="42" fill="${windowSky}"/>
-      <rect x="${wx + 98}" y="20" width="4" height="42" fill="#FFFFFF"/>${isNight ? '' : `<circle cx="${wx + 40}" cy="38" r="9" fill="#FFFFFF" opacity="0.8"/><circle cx="${wx + 52}" cy="36" r="11" fill="#FFFFFF" opacity="0.8"/>`}`)
-    .join('')
+  const height = loungeTop + 120
   const working = desks.filter(d => d.agent && d.agent.state !== 'idle').length
-  const sign = `<rect x="244" y="18" width="152" height="46" rx="6" fill="#2B2F36"/>
-    <text x="320" y="38" text-anchor="middle" font-family="${FONT}" font-size="13" font-weight="800" fill="#FFFFFF">${esc(clip(office.name, 18))}</text>
-    <text x="320" y="55" text-anchor="middle" font-family="${FONT}" font-size="10.5" fill="#9AD0F5">${working} ${working === 1 ? 'agent arbejder' : 'agenter arbejder'}</text>`
-  const floorTiles = `<rect x="0" y="${floorTop}" width="${W}" height="${rows * DESK_H + 6}" fill="#F3ECE1"/>
-    ${Array.from({ length: Math.ceil((rows * DESK_H) / 30) }, (_, i) => `<rect x="0" y="${floorTop + i * 30}" width="${W}" height="1" fill="#E6DCCB"/>`).join('')}`
+  const sign = `<text x="${width / 2}" y="38" text-anchor="middle" font-family="${FONT}" font-size="14" font-weight="800" fill="#FFFFFF">${esc(clip(office.name, 18))}</text>
+    <text x="${width / 2}" y="56" text-anchor="middle" font-family="${FONT}" font-size="11" fill="#9AD0F5">${working} ${working === 1 ? 'agent arbejder' : 'agenter arbejder'}</text>`
+  const floorTiles = `<rect x="0" y="${floorTop}" width="${width}" height="${rows * DESK_H + 6}" fill="#DCE4D8"/>
+    ${Array.from({ length: Math.ceil((rows * DESK_H) / 30) }, (_, i) => `<rect x="0" y="${floorTop + i * 30}" width="${width}" height="1" fill="#CBD6C6"/>`).join('')}
+    ${Array.from({ length: Math.ceil(width / 30) }, (_, i) => `<rect x="${i * 30}" y="${floorTop}" width="1" height="${rows * DESK_H + 6}" fill="#CBD6C6"/>`).join('')}`
 
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${h}" width="${W}" height="${h}" shape-rendering="crispEdges">
-  <defs><clipPath id="room"><rect width="${W}" height="${h}" rx="16"/></clipPath></defs>
+  const source = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" shape-rendering="crispEdges">
+  <defs><clipPath id="room"><rect width="${width}" height="${height}" rx="14"/></clipPath></defs>
   <g clip-path="url(#room)">
-    <rect width="${W}" height="${wallH}" fill="${isNight ? '#2A3245' : '#E4EAF1'}"/>${windows}${stars}${sign}
-    <rect x="0" y="${wallH - 6}" width="${W}" height="6" fill="${isNight ? '#1E2534' : '#CBD5E1'}"/>
+    ${wall(width, hour, sign)}
     ${floorTiles}
-    ${desks.map((d, i) => desk(i % 3, Math.floor(i / 3), floorTop, d)).join('')}
-    ${lounge(loungeTop, idle)}
+    <g transform="translate(${left} 0)">${desks.map((d, i) => desk(i % cols, Math.floor(i / cols), floorTop, d)).join('')}</g>
+    ${lounge(loungeTop, width, idle)}
   </g>
 </svg>`
+
+  return { source, width, height }
+}
+
+// The welcome picture: three colleagues at work under the office sign.
+const heroSvg = (title: string, subtitle: string, hour: number) => {
+  const width = 3 * DESK_W
+  const crew: Desk[] = [
+    { person: { user_id: 'hero-a', name: '', agents: [] }, agent: null, subs: [] },
+    { person: { user_id: 'hero-b', name: '', agents: [] }, agent: null, subs: [] },
+    { person: { user_id: 'hero-c', name: '', agents: [] }, agent: null, subs: [] },
+  ]
+  const states: AgentState[] = ['editing', 'waiting', 'running']
+  const fake = (i: number): Agent => ({
+    id: `hero-${i}`, parent_id: null, project: '', state: states[i] ?? 'working', detail: '', model: '', tokens_out: 0, cost_usd: null,
+    lines_added: 0, lines_removed: 0, five_hour: null, seven_day: null, started_at: '', updated_at: '',
+  })
+  const desks = crew.map((d, i) => desk(i, 0, 70, { ...d, agent: fake(i) }))
+    .map(s => s.replace(/<text[^>]*>[^<]*<\/text>\s*<text[^>]*>[^<]*<\/text>/, ''))
+    .join('')
+  const height = 70 + 118
+  const sign = `<text x="${width / 2}" y="40" text-anchor="middle" font-family="${FONT}" font-size="18" font-weight="800" fill="#FFFFFF">${esc(title)}</text>
+    <text x="${width / 2}" y="58" text-anchor="middle" font-family="${FONT}" font-size="11.5" fill="#9AD0F5">${esc(clip(subtitle, 28))}</text>`
+
+  return {
+    source: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" shape-rendering="crispEdges">
+  <defs><clipPath id="hero"><rect width="${width}" height="${height}" rx="14"/></clipPath></defs>
+  <g clip-path="url(#hero)">
+    ${wall(width, hour, sign).replace('height="86"', 'height="70"').replace('y="80"', 'y="64"')}
+    <rect x="0" y="70" width="${width}" height="${height - 70}" fill="#F3ECE1"/>
+    ${desks}
+  </g>
+</svg>`,
+    width,
+    height,
+  }
 }
 
 // ─── Hooks ──────────────────────────────────────────────────────────────
@@ -744,7 +801,7 @@ export const register: Register = on => {
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
     if (e.surface === 'mobile') {
       const { Text } = $.ui.resolve(e)
-      return <Text wrap="wrap">🏢 Kontoret bruger skrivefelter, som mobil-appen ikke har endnu.</Text>
+      return <Text wrap="wrap">Kontoret bruger skrivefelter, som mobil-appen ikke har endnu.</Text>
     }
 
     try {
@@ -753,14 +810,23 @@ export const register: Register = on => {
       const Svg = 'Svg' in kit ? kit.Svg : null
       const v = await read($, screen)
       const f = await read($, floor)
+      const hour = new Date(await $.clock.now()).getHours()
 
-      const card = (key: string, children: RenderElement | RenderElement[], tint: 'sky' | 'error' = 'sky') => (
+      // Pictures fill the pane's width; the pixel art scales up with it.
+      const paneWidth = Math.min(980, Math.round(e.props.bodyColumns * 8.4))
+      const picture = (art: { source: string; width: number; height: number }, alt: string) =>
+        Svg ? (
+          <Svg source={art.source} alt={alt} width={paneWidth} height={Math.round((paneWidth * art.height) / art.width)} isInteractive />
+        ) : null
+
+      // Nothing here paints a surface of its own: borders and the theme's own
+      // text, so the native fields and buttons read the same in light and dark.
+      const panel = (key: string, children: RenderElement | RenderElement[], tone: 'quiet' | 'accent' | 'alert' = 'quiet') => (
         <Box
           key={key}
           flexDirection="column"
           borderStyle="round"
-          borderColor={tint === 'error' ? '#F2B8B5' : skyLine}
-          backgroundColor={tint === 'error' ? '#FDECEA' : sky}
+          borderColor={tone === 'alert' ? alert : tone === 'accent' ? accent : 'inactive'}
           paddingX={2}
           paddingY={1}
           gap={1}
@@ -768,57 +834,52 @@ export const register: Register = on => {
           {children}
         </Box>
       )
-      const title = (key: string, text: string) => (
-        <Text key={key} color={ink} bold>
+      const heading = (key: string, text: string) => (
+        <Text key={key} bold>
           {text}
         </Text>
       )
-      const hint = (key: string, text: string) => (
-        <Text key={key} color={softInk} wrap="wrap">
+      const note = (key: string, text: string) => (
+        <Text key={key} dimColor wrap="wrap">
           {text}
         </Text>
       )
-      const pill = (key: string, label: string, isActive: boolean, onPress: (press: UiPressArgument) => unknown) => (
-        <Box
-          key={key}
-          borderStyle="round"
-          borderColor={isActive ? accent : cloud}
-          backgroundColor={isActive ? accent : cloud}
-          paddingX={2}
-          hover={isActive ? undefined : { borderColor: accent }}
-        >
-          <Button key={`${key}-btn`} label={label} plain onPress={onPress} />
+      const tab = (key: string, label: string, isActive: boolean, onPress: (press: UiPressArgument) => unknown) => (
+        <Box key={key} borderStyle="round" borderColor={isActive ? accent : 'inactive'} borderDimColor={!isActive} paddingX={2} hover={{ borderColor: accent }}>
+          <Button key={`${key}-btn`} label={label} plain dimColor={!isActive} onPress={onPress} />
         </Box>
       )
-      const error = v.error
-        ? card(
-            'error',
-            <Text color="#B3261E" wrap="wrap">
-              {`⚠ ${v.error}`}
-            </Text>,
-            'error',
-          )
-        : null
-      const brand = (sub: string) => (
-        <Box flexDirection="column">
-          <Text color={accent} bold>
-            🏢 Agent-kontor
-          </Text>
-          <Text color={softInk} wrap="wrap">
-            {sub}
+      const error = v.error ? (
+        <Box key="error" borderStyle="round" borderColor={alert} paddingX={2}>
+          <Text color={alert} wrap="wrap">
+            {v.error}
           </Text>
         </Box>
-      )
+      ) : null
+
+      const welcome = (title: string, sub: string) =>
+        picture(heroSvg(title, sub, hour), `${title}. ${sub}`) ?? (
+          <Box flexDirection="column">
+            <Text color={accent} bold>
+              {title}
+            </Text>
+            <Text dimColor>{sub}</Text>
+          </Box>
+        )
 
       if (v.phase === 'setup') {
         return (
           <Box flexDirection="column" gap={1} paddingX={1} paddingY={1}>
-            {brand('Se hele teamets Claude-agenter arbejde i ét pixel-kontor.')}
-            {card('setup', [
-              title('t', 'Hvad skal vi kalde dig?'),
-              hint('d', 'Navnet står på dit skrivebord i kontoret. Kun status deles: hvad agenten laver og en filnavn, aldrig samtalen.'),
-              <Input key="my-name" placeholder="Dit navn" submitLabel={v.isBusy ? 'et øjeblik…' : 'Kom i gang →'} autoFocus onSubmit={value => void setName($, value)} />,
-            ])}
+            {welcome('Agent-kontor', 'Hele teamets agenter, live')}
+            {panel(
+              'setup',
+              [
+                heading('t', 'Hvad skal vi kalde dig?'),
+                note('d', 'Navnet står på dit skrivebord. Kontoret viser kun, hvad dine agenter laver, aldrig hvad I skriver sammen.'),
+                <Input key="my-name" placeholder="Dit navn" submitLabel={v.isBusy ? 'Et øjeblik' : 'Gå ind'} autoFocus onSubmit={value => void setName($, value)} />,
+              ],
+              'accent',
+            )}
             {error}
           </Box>
         )
@@ -827,35 +888,34 @@ export const register: Register = on => {
       const office = f.offices.find(o => o.id === f.officeId)
       const toggle = (mode: Mode) => () => setScreen($, { mode: v.mode === mode ? 'none' : mode, error: null })
 
-      const joinCard = card('join-card', [
-        title('t', 'Forbind til et kontor'),
-        hint('d', 'Indsæt koden, du har fået af en kollega. Dine agenter flytter ind med det samme.'),
-        <Input key="join-code" placeholder="ABCD-EF23" submitLabel={v.isBusy ? 'et øjeblik…' : 'Forbind →'} autoFocus onSubmit={value => void joinOffice($, value)} />,
+      const joinPanel = panel('join-panel', [
+        heading('t', 'Forbind til et kontor'),
+        note('d', 'Brug koden fra en kollega. Dine agenter flytter ind med det samme.'),
+        <Input key="join-code" placeholder="ABCD-EF23" submitLabel={v.isBusy ? 'Et øjeblik' : 'Forbind'} autoFocus onSubmit={value => void joinOffice($, value)} />,
       ])
-      const newCard = card('new-card', [
-        title('t', 'Nyt kontor'),
-        hint('d', 'Du får en kode, som andre kan forbinde med.'),
-        <Input key="new-office" placeholder="Fx Copenhagen Data" submitLabel={v.isBusy ? 'et øjeblik…' : 'Opret →'} onSubmit={value => void createOffice($, value)} />,
+      const newPanel = panel('new-panel', [
+        heading('t', 'Opret et kontor'),
+        note('d', 'Du får en kode, som kollegerne forbinder med.'),
+        <Input key="new-office" placeholder="Fx Copenhagen Data" submitLabel={v.isBusy ? 'Et øjeblik' : 'Opret kontor'} onSubmit={value => void createOffice($, value)} />,
       ])
-      const nameCard = card('name-card', [
-        title('t', 'Skift dit navn'),
-        hint('d', `Lige nu hedder du ${f.name ?? ''}.`),
-        <Input key="rename" placeholder={f.name ?? 'Dit navn'} submitLabel="Gem →" autoFocus onSubmit={value => void setName($, value)} />,
+      const namePanel = panel('name-panel', [
+        heading('t', 'Skift dit navn'),
+        <Input key="rename" placeholder={f.name ?? 'Dit navn'} submitLabel="Gem navn" autoFocus onSubmit={value => void setName($, value)} />,
       ])
       const me = (
         <Box key="me" flexDirection="row" alignItems="center" gap={1}>
-          <Text color={softInk}>{`👤 ${f.name ?? ''}`}</Text>
-          <Button key="rename-toggle" label="✏️" plain dimColor onPress={toggle('name')} />
+          <Text dimColor>{f.name ?? ''}</Text>
+          <Button key="rename-toggle" label="Skift navn" plain dimColor onPress={toggle('name')} />
         </Box>
       )
 
       if (!office) {
         return (
           <Box flexDirection="column" gap={1} paddingX={1} paddingY={1}>
-            {brand(`Hej ${f.name ?? ''}! Forbind til et kontor, eller opret dit eget.`)}
-            {joinCard}
-            {newCard}
-            {v.mode === 'name' ? nameCard : null}
+            {welcome(`Hej ${f.name ?? ''}`, 'Forbind eller opret et kontor')}
+            {joinPanel}
+            {newPanel}
+            {v.mode === 'name' ? namePanel : null}
             {error}
             <Box flexDirection="row" justifyContent="flex-end">
               {me}
@@ -864,103 +924,115 @@ export const register: Register = on => {
         )
       }
 
-      const codeCard = card('code-card', [
-        title('t', `Inviter til ${office.name}`),
-        hint('d', 'Send koden. Kollegaen installerer Agent-kontor og forbinder med den.'),
-        <Box key="code" flexDirection="row" alignItems="center" gap={1} flexWrap="wrap">
-          <Box borderStyle="round" borderColor={accent} paddingX={2}>
-            <Text color={accent} bold>
-              {office.invite_code}
-            </Text>
-          </Box>
-          {pill('copy-code', '📋 Kopiér kode', false, press =>
-            $.ui.copy({ text: office.invite_code, surface: press.surface }).then(() => $.ui.toast('Koden er kopieret')),
-          )}
-          {pill('copy-invite', '✉️ Kopiér invitation', false, press =>
-            $.ui
-              .copy({
-                text: [
-                  `Kom med i kontoret "${office.name}" 🏢`,
-                  '',
-                  `1. Installér Agent-kontor i Claude: https://github.com/${REPO}`,
-                  `2. Skriv /kontor forbind ${office.invite_code}`,
-                ].join('\n'),
-                surface: press.surface,
-              })
-              .then(() => $.ui.toast('Invitationen er kopieret')),
-          )}
-        </Box>,
-        <Button key="leave" label="Forlad kontoret" plain dimColor onPress={() => leaveOffice($)} />,
-      ])
-      const modeCard = v.mode === 'join' ? joinCard : v.mode === 'new' ? newCard : v.mode === 'name' ? nameCard : v.mode === 'code' ? codeCard : null
+      const invitePanel = panel(
+        'invite-panel',
+        [
+          heading('t', `Inviter til ${office.name}`),
+          note('d', 'Kollegaen installerer Agent-kontor og forbinder med koden.'),
+          <Box key="code" flexDirection="row" alignItems="center" gap={1} flexWrap="wrap">
+            <Box borderStyle="round" borderColor={accent} paddingX={2}>
+              <Text color={accent} bold>
+                {office.invite_code}
+              </Text>
+            </Box>
+            {tab('copy-code', 'Kopiér kode', false, press =>
+              $.ui.copy({ text: office.invite_code, surface: press.surface }).then(() => $.ui.toast('Koden er kopieret')),
+            )}
+            {tab('copy-invite', 'Kopiér invitation', false, press =>
+              $.ui
+                .copy({
+                  text: [
+                    `Kom med i kontoret "${office.name}" i Claude.`,
+                    '',
+                    `1. Installér Agent-kontor: https://github.com/${REPO}`,
+                    `2. Skriv /kontor forbind ${office.invite_code}`,
+                  ].join('\n'),
+                  surface: press.surface,
+                })
+                .then(() => $.ui.toast('Invitationen er kopieret')),
+            )}
+          </Box>,
+          <Button key="leave" label="Forlad kontoret" plain dimColor onPress={() => leaveOffice($)} />,
+        ],
+        'accent',
+      )
+      const modePanel = v.mode === 'join' ? joinPanel : v.mode === 'new' ? newPanel : v.mode === 'name' ? namePanel : v.mode === 'code' ? invitePanel : null
 
       const toolbar = (
         <Box flexDirection="row" gap={1} alignItems="center" flexWrap="wrap">
-          {f.offices.map(o => pill(`pill-${o.id}`, o.name, o.id === f.officeId, () => openOffice($, o.id)))}
-          {pill('pill-new', '＋ Nyt', v.mode === 'new', toggle('new'))}
-          {pill('pill-join', '⇥ Forbind', v.mode === 'join', toggle('join'))}
+          {f.offices.map(o => tab(`tab-${o.id}`, o.name, o.id === f.officeId, () => openOffice($, o.id)))}
+          {tab('tab-new', 'Nyt kontor', v.mode === 'new', toggle('new'))}
+          {tab('tab-join', 'Forbind', v.mode === 'join', toggle('join'))}
           <Box flexGrow={1} />
-          {pill('pill-invite', '🔗 Inviter', v.mode === 'code', toggle('code'))}
+          {tab('tab-invite', 'Inviter', v.mode === 'code', toggle('code'))}
         </Box>
       )
 
-      const hour = new Date(await $.clock.now()).getHours()
       const agents = f.people.flatMap(p => p.agents.filter(a => !a.parent_id).map(a => ({ person: p, agent: a })))
       const order: AgentState[] = ['waiting', 'editing', 'running', 'reading', 'browsing', 'working', 'idle']
       agents.sort((x, y) => order.indexOf(x.agent.state) - order.indexOf(y.agent.state))
+      const waiting = agents.filter(a => a.agent.state === 'waiting')
 
-      const roster = agents.map(({ person, agent }) => {
+      // The one loud thing outside the picture: someone's agent needs them.
+      const needsYou =
+        waiting.length > 0 ? (
+          <Box key="needs" flexDirection="column" borderStyle="round" borderColor={alert} paddingX={2}>
+            {waiting.map(({ person, agent }) => (
+              <Text key={`w-${agent.id}`} color={alert} wrap="wrap">
+                {`${person.user_id === f.me ? 'Din agent' : `${person.name}s agent`} på ${agent.project}: ${agent.detail || 'venter på dig'}`}
+              </Text>
+            ))}
+          </Box>
+        ) : null
+
+      const rows = agents.map(({ person, agent }) => {
         const subs = person.agents.filter(s => s.parent_id === agent.id).length
-        const figures = [
-          agent.lines_added || agent.lines_removed ? `+${agent.lines_added} −${agent.lines_removed}` : null,
+        const facts = [
+          agent.lines_added || agent.lines_removed ? `+${agent.lines_added} −${agent.lines_removed} linjer` : null,
           agent.cost_usd !== null ? `$${Number(agent.cost_usd).toFixed(2)}` : null,
-          agent.five_hour !== null ? `5t ${Math.round(Number(agent.five_hour))}%` : null,
-          subs ? `${subs} ${subs === 1 ? 'subagent' : 'subagenter'}` : null,
-        ]
-          .filter(Boolean)
-          .join(' · ')
+          subs ? `${subs} ${subs === 1 ? 'hjælper' : 'hjælpere'}` : null,
+        ].filter(Boolean)
 
         return (
-          <Box key={`a-${agent.id}`} flexDirection="row" alignItems="center" gap={1} borderStyle="round" borderColor={agent.state === 'waiting' ? '#F2B8B5' : cloud} paddingX={1}>
-            <Text>{stateIcon[agent.state]}</Text>
-            <Box flexDirection="column" flexGrow={1} flexShrink={1}>
-              <Text color={ink} bold>
-                {`${person.name} · ${agent.project}`}
-              </Text>
-              <Text color={agent.state === 'waiting' ? '#E0567A' : softInk} wrap="truncate-end">
-                {`${stateLabel[agent.state]}${agent.detail && agent.state !== 'idle' ? ` · ${agent.detail}` : ''}`}
+          <Box key={`a-${agent.id}`} flexDirection="row" gap={2} paddingX={1}>
+            <Box width={2} flexShrink={0}>
+              <Text color={stateColor[agent.state]} bold>
+                ●
               </Text>
             </Box>
-            {figures ? <Text color={softInk}>{figures}</Text> : null}
+            <Box flexDirection="column" flexGrow={1} flexShrink={1}>
+              <Text bold>{person.user_id === f.me ? `${person.name} (dig)` : person.name}</Text>
+              <Text color={stateColor[agent.state]} wrap="truncate-end">
+                {agent.state === 'idle' ? `Holder pause i ${agent.project}` : `${agent.detail || stateLabel[agent.state]} i ${agent.project}`}
+              </Text>
+              {facts.length > 0 ? <Text dimColor>{facts.join('   ')}</Text> : null}
+            </Box>
           </Box>
         )
       })
 
-      const scene = Svg ? (
-        <Svg
-          source={officeSvg(office, f.people, hour)}
-          alt={`${office.name}: ${agents.map(a => `${a.person.name} ${stateLabel[a.agent.state]}`).join(', ') || 'ingen agenter online'}`}
-          isInteractive
-        />
-      ) : null
+      const scene =
+        picture(officeSvg(office, f.people, hour), `${office.name}: ${agents.map(a => `${a.person.name} ${stateLabel[a.agent.state].toLowerCase()}`).join(', ') || 'ingen agenter online'}`) ??
+        null
 
       return (
         <Box flexDirection="column" gap={1} paddingX={1} paddingY={1}>
           {toolbar}
-          {modeCard}
+          {modePanel}
           {scene}
+          {needsYou}
           {error}
-          {roster.length > 0 ? (
-            <Box flexDirection="column" gap={0}>
-              {roster}
+          {rows.length > 0 ? (
+            <Box flexDirection="column" gap={1}>
+              {rows}
             </Box>
           ) : (
-            <Text color={softInk} wrap="wrap">
-              Ingen agenter online lige nu. Når nogen i kontoret starter en Claude-session, sætter deres agent sig ved skrivebordet.
+            <Text dimColor wrap="wrap">
+              Ingen agenter er online. Når nogen i kontoret starter en Claude-session, sætter agenten sig ved et skrivebord.
             </Text>
           )}
           <Box flexDirection="row" alignItems="center" gap={1}>
-            <Text color={softInk}>{`${office.members} ${office.members === 1 ? 'medlem' : 'medlemmer'} · kode ${office.invite_code}`}</Text>
+            <Text dimColor>{`${office.members} ${office.members === 1 ? 'medlem' : 'medlemmer'}, kode ${office.invite_code}`}</Text>
             <Box flexGrow={1} />
             {me}
           </Box>
@@ -970,12 +1042,9 @@ export const register: Register = on => {
       const { Box, Button, Text } = $.ui.resolve(e)
       return (
         <Box flexDirection="column" gap={1} paddingX={1} paddingY={1}>
-          <Text color={accent} bold>
-            🏢 Agent-kontor
-          </Text>
-          <Text wrap="wrap">Kontoret kunne ikke tegnes.</Text>
+          <Text bold>Kontoret kunne ikke tegnes</Text>
           <Text dimColor wrap="wrap">{err instanceof Error ? err.message : String(err)}</Text>
-          <Button key="retry" label="Prøv igen" onPress={() => enter($)} />
+          <Button key="retry" label="Tegn kontoret igen" onPress={() => enter($)} />
         </Box>
       )
     }
