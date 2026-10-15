@@ -1,17 +1,18 @@
 # Agent-kontor 🏢
 
-Et pixel-kontor i et panel ved siden af Claude, hvor hele teamets Claude-agenter arbejder live. Hver session sidder ved sit eget skrivebord, og man kan se med det samme, hvad den laver:
+Et pixel-kontor set ovenfra i et panel ved siden af Claude. Claude sidder ved det store skrivebord i hjørnekontoret, og når den sender subagenter afsted, kommer de ind ad døren, sætter sig i teamrummet og går over til Claude med resultatet, når de er færdige.
 
-| | Figuren | Skærmen |
-| --- | --- | --- |
-| ⌨️ **Skriver kode** | taster | kode, der ruller |
-| 📖 **Læser** | sidder ved skrivebordet | en side tekst |
-| ⏳ **Kører** en kommando | venter | terminal med blinkende markør |
-| 🌐 **På nettet** | sidder ved skrivebordet | en browser |
-| ❗ **Venter på dig** | rækker hånden op, boblen blinker | et rødt spørgsmålstegn |
-| ☕ **Pause** | går ud i køkkenet med en kop kaffe | zZ |
+- **Seks skriveborde i teamrummet.** Hver hjælper får et navn og sit eget udseende, og flere end seks venter ved døren.
+- **Talebobler med det, de laver lige nu:** "Læser api.ts", "Skriver README.md", "Kører npm test". Skærmen på skrivebordet viser det også: kode, terminal, en side tekst eller en browser.
+- **Venter på dig:** figuren rækker hånden op, boblen blinker rødt, og en stribe under kontoret siger hvad den venter på. Det sker kun, når en godkendelsesdialog faktisk vises for dig, ikke når Auto-tilstanden selv afgør det.
+- **Pause:** Claude går ud i køkkenet med en kop kaffe, der damper.
+- Under kontoret står linjer kode, pris og hvor meget af 5-timers-grænsen, sessionen har brugt.
 
-Subagenter står som små grå figurer ved siden af skrivebordet, med deres eget ikon over hovedet. Vinduerne følger tiden på dagen. Under kontoret står en liste med alle agenter, dem der venter først, med linjer kode, pris og forbrugsgrænse.
+Kontoret er kun dit: intet login, ingen server, og intet forlader din computer. En kommando vises med programmet (`Kører npm test`), aldrig med argumenter eller miljøvariabler.
+
+## Se det fyldt
+
+Skriv `/kontor demo`, så kommer seks hjælpere ind, arbejder et stykke tid og afleverer én efter én.
 
 ## Installér
 
@@ -43,34 +44,9 @@ if (-not $claude) { $claude = (Get-Command claude -ErrorAction SilentlyContinue)
 if ($claude) { & $claude plugin marketplace update agent-kontor; & $claude plugin update agent-kontor@agent-kontor; & $claude plugin list } else { "Fandt ingen claude.exe" }
 ```
 
-## Kom i gang
-
-1. Panelet **🏢 Kontor** åbner af sig selv (ellers skriv `/kontor`).
-2. Skriv dit navn.
-3. **Opret et kontor**, og send koden med **🔗 Inviter → Kopiér invitation**, eller **forbind** til et kontor med en kode, du har fået.
-
-Fra da af flytter alle dine Claude-sessioner ind i kontoret, mens de kører.
-
 | Kommando | Gør |
 | --- | --- |
 | `/kontor` | Åbner kontoret |
-| `/kontor TEAM-2026` eller `/kontor forbind TEAM-2026` | Forbinder til et kontor |
-| `/kontor nyt Copenhagen Data` | Opretter et kontor |
-| `/kontor kode` | Viser kontorets kode |
-| `/kontor navn Casper` | Skifter dit navn |
-| `/kontor forlad` | Forlader kontoret |
+| `/kontor demo` | Fylder kontoret med seks hjælpere, så du kan se det i gang |
 
-## Hvad deles?
-
-Kun status, aldrig samtalen:
-
-- hvad agenten laver, og et filnavn (`Skriver register.tsx`), eller programmet i en kommando uden argumenter (`Kører npm test`, aldrig `--token=…` eller miljøvariabler),
-- projektmappens navn, modellen, linjer kode, pris og forbrugsgrænse i procent.
-
-Kun medlemmer af kontoret kan se det, og kun med kontorets kode bliver man medlem (Row Level Security i Supabase). En agent, der ikke har meldt sig i 10 minutter, forsvinder fra kontoret, og alt slettes efter et døgn.
-
-Fejler kontoret, mærker Claude intet: rapporteringen kører i baggrunden og kan aldrig stoppe et værktøjskald.
-
-## Backend
-
-Bygger på samme Supabase-projekt som [Team Chat](https://github.com/Stokn9x/Claude_Chat) (anonyme logins og koder). Kontorets tabeller og funktioner ligger i [`supabase/schema.sql`](supabase/schema.sql).
+Fejler kontoret, mærker Claude intet: alt det kører ved siden af og kan aldrig stoppe et værktøjskald.

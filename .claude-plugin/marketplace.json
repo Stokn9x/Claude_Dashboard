@@ -1,6 +1,14 @@
 {
   "name": "agent-kontor",
-  "description": "Et pixel-kontor i Claude, hvor hele teamets agenter arbejder live",
-  "owner": { "name": "Casper", "email": "cej@copenhagendata.com" },
-  "plugins": [{ "name": "agent-kontor", "source": "./" }]
+  "description": "Et pixel-kontor set ovenfra, hvor Claude og dens subagenter arbejder live",
+  "owner": {
+    "name": "Casper",
+    "email": "cej@copenhagendata.com"
+  },
+  "plugins": [
+    {
+      "name": "agent-kontor",
+      "source": "./"
+    }
+  ]
 }

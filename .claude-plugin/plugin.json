@@ -1,7 +1,10 @@
 {
   "name": "agent-kontor",
-  "version": "0.2.1",
-  "description": "Et pixel-kontor, hvor hele teamets Claude-agenter arbejder live: hvem skriver, læser, kører kode eller venter",
-  "author": { "name": "Casper", "email": "cej@copenhagendata.com" },
+  "version": "0.3.0",
+  "description": "Et pixel-kontor set ovenfra, hvor Claude og dens subagenter arbejder live",
+  "author": {
+    "name": "Casper",
+    "email": "cej@copenhagendata.com"
+  },
   "types": "./types/index.d.ts"
 }
