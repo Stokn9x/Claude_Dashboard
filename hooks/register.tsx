@@ -3,9 +3,11 @@ import type { EngineInterface, Register, RenderElement } from 'claude-code'
 
 import type { Activity, AgentState, Office, Other, Party, Phase, Sub } from '../types'
 
-// A pixel office for this session alone, seen from above: Claude at the big
-// desk, its subagents at the six desks of the team room. Nothing leaves the
-// machine.
+// A pixel office, seen from above: Claude at the big desk, its subagents at
+// the six desks of the team room. This module keeps track of who is where and
+// writes it to a status file; a small server on this computer streams every
+// session's file to a page that draws and animates the office. Nothing leaves
+// the machine.
 
 const PANE = 'kontor'
 const SEATS = 6
@@ -38,12 +40,6 @@ const office = atom({ plugin: 'agent-kontor', key: 'office' } as const, emptyOff
 // lacks the newer fields. Read it through this, never as it lies.
 const fresh = (o: Partial<Office> | null | undefined): Office => ({ ...emptyOffice, ...(o ?? {}) })
 const readOffice = async ($: EngineInterface) => fresh(await read($, office))
-
-// What the picture was last drawn from, and when. The picture follows the
-// office at most every PAINT_MS and only when something visible moved: each
-// redraw reloads it in the app, which blinks.
-const PAINT_MS = 800
-const frame = atom({ plugin: 'agent-kontor', key: 'frame' } as const, { office: null as Office | null, at: 0 })
 
 type $ = EngineInterface
 
@@ -230,553 +226,38 @@ const runDemo = async ($: $) => {
   $.clock.after(14_000 + demoTasks.length * 2600 + 18_000, () => void quietly(setMain($, pause)))
 }
 
-// ─── Pixels ─────────────────────────────────────────────────────────────
+// ─── Walks ──────────────────────────────────────────────────────────────
 
-const P = 3 // one sprite pixel, in scene units
+// The page draws every walk; the office only needs to know how long each one
+// takes, to sit a helper down and see it out of the door. The floor plan is
+// public/app.js's, and the two must agree.
+type Point = { x: number; y: number }
 
-// A person facing us, 10 × 14 pixels. o outline, h hair, H hair light,
-// s skin, e eye, t shirt, T shirt shade, p trousers, b shoes.
-const BODY = [
-  '..oooooo..',
-  '.ohhhhhho.',
-  'ohhHhhhhho',
-  'ohssssssho',
-  'ohsessesho',
-  '.osssssso.',
-  '.otttttTo.',
-  'otttttttTo',
-  'otttttttTo',
-  'osttttttso',
-]
-// The same person from behind, and in profile facing right (mirrored for left).
-const BACK = [
-  '..oooooo..',
-  '.ohhhhhho.',
-  'ohhHhhhhho',
-  'ohhhhhhhho',
-  'ohhhhhhhho',
-  '.ohhhhhho.',
-  '.otttttTo.',
-  'otttttttTo',
-  'otttttttTo',
-  'osttttttso',
-]
-const SIDE = [
-  '..ooooo...',
-  '.ohhhhhoo.',
-  'ohHhhhhhho',
-  'ohhhsssso.',
-  'ohhsseso..',
-  '.ohsssso..',
-  '..otttTo..',
-  '.ottttTo..',
-  '.ottttTo..',
-  '..osttso..',
-]
-
-const LEGS_A = ['.oppppppo.', '.opo..opo.', '.obo..obo.', '.oo....oo.']
-// Walking, four frames: a step, passing, the other step, passing.
-const FRONT_WALK = [
-  ['.oppppppo.', '.opo..opo.', '.obo..oo..', '.oo.......'],
-  LEGS_A,
-  ['.oppppppo.', '.opo..opo.', '..oo..obo.', '.......oo.'],
-  LEGS_A,
-]
-const SIDE_STAND = ['..opppo...', '..oppo....', '..obbo....', '..oooo....']
-const SIDE_WALK = [
-  ['..opppo...', '.op..po...', 'ob....bo..', 'oo....oo..'],
-  SIDE_STAND,
-  ['..opppo...', '.op..po...', 'ob....bo..', 'oo....oo..'],
-  SIDE_STAND,
-]
-
-type Look = { hair: string; hairLight: string; skin: string; shirt: string; shirtShade: string }
-
-const OUTLINE = '#2B2230'
-const skins = ['#F6D5B8', '#EFC39C', '#D9A06B', '#B9784A', '#8A5634']
-const hairs: [string, string][] = [
-  ['#3A2A22', '#5C4436'],
-  ['#7A4B2A', '#9C6A43'],
-  ['#D9B25C', '#F0D48A'],
-  ['#2B2B33', '#4A4A57'],
-  ['#B5523B', '#D27358'],
-  ['#9AA0A8', '#C3C8CE'],
-]
-const shirts: [string, string][] = [
-  ['#3E7CC9', '#2F5F9C'],
-  ['#2E9E8F', '#21776B'],
-  ['#E07A4F', '#B85E38'],
-  ['#8A6FD6', '#6A52AE'],
-  ['#D6A23C', '#AD7F26'],
-  ['#D45D7A', '#AC4560'],
-  ['#4F9A5B', '#3A7644'],
-]
-
-const lookFor = (id: string): Look => {
-  const h = hashOf(id)
-  const [hair, hairLight] = hairs[h % hairs.length] as [string, string]
-  const [shirt, shirtShade] = shirts[(h >>> 3) % shirts.length] as [string, string]
-  return { hair, hairLight, skin: skins[(h >>> 6) % skins.length] as string, shirt, shirtShade }
-}
-
-// Claude wears its own colours.
-const claudeLook: Look = { hair: '#C8643B', hairLight: '#E3875E', skin: '#F6D5B8', shirt: '#2F3A4A', shirtShade: '#222B37' }
-
-const paint = (rows: string[], look: Look, x: number, y: number) => {
-  const colour: Record<string, string> = {
-    o: OUTLINE,
-    h: look.hair,
-    H: look.hairLight,
-    s: look.skin,
-    e: OUTLINE,
-    t: look.shirt,
-    T: look.shirtShade,
-    p: '#3B4A6B',
-    b: OUTLINE,
-  }
-  let out = ''
-  rows.forEach((row, r) => {
-    let c = 0
-    while (c < row.length) {
-      const ch = row[c] as string
-      let end = c
-      while (end < row.length && row[end] === ch) end++
-      const fill = colour[ch]
-      if (fill) out += `<rect x="${x + c * P}" y="${y + r * P}" width="${(end - c) * P}" height="${P}" fill="${fill}"/>`
-      c = end
-    }
-  })
-  return out
-}
-
-type Pose = { seated?: boolean; handUp?: boolean; mug?: boolean }
-
-type Facing = 'front' | 'back' | 'left' | 'right'
-
-const STEP_S = 0.52
-
-// A whole person on their feet at (0, 0), facing a way, walking or still.
-const figure = (look: Look, facing: Facing, isWalking: boolean) => {
-  const body = facing === 'back' ? BACK : facing === 'front' ? BODY : SIDE
-  const isSide = facing === 'left' || facing === 'right'
-  const frames = isWalking ? (isSide ? SIDE_WALK : FRONT_WALK) : [isSide ? SIDE_STAND : LEGS_A]
-  const top = -(body.length + 4) * P
-  const left = -5 * P
-  const drawn = frames
-    .map((legs, i) => {
-      // The bob of a step: down a pixel as a foot lands, over the waist, so
-      // body and legs never part.
-      const lift = isWalking && i % 2 === 0 ? P : 0
-      const art = paint(body, look, left, top + lift) + paint(legs, look, left, top + body.length * P)
-      if (!isWalking) return art
-      const values = frames.map((_, k) => (k === i ? 1 : 0)).join(';')
-      return `<g opacity="${i === 0 ? 1 : 0}">${art}<animate attributeName="opacity" values="${values}" dur="${STEP_S}s" calcMode="discrete" repeatCount="indefinite"/></g>`
-    })
-    .join('')
-
-  return facing === 'left' ? `<g transform="scale(-1 1)">${drawn}</g>` : drawn
-}
-
-// Feet at (x, y): the sprite stands on that point.
-const person = (x: number, y: number, look: Look, pose: Pose = {}) => {
-  const left = x - 5 * P
-  const rows = pose.seated ? BODY.length : BODY.length + LEGS_A.length
-  const top = y - rows * P
-  let out = paint(BODY, look, left, top)
-
-  if (!pose.seated) out += paint(LEGS_A, look, left, top + BODY.length * P)
-  if (pose.handUp) {
-    out += `<g><rect x="${left + 10 * P}" y="${top + 0 * P}" width="${2 * P}" height="${8 * P}" fill="${OUTLINE}"/>
-      <rect x="${left + 10 * P}" y="${top + 1 * P}" width="${P}" height="${2 * P}" fill="${look.skin}"/>
-      <rect x="${left + 10 * P}" y="${top + 3 * P}" width="${P}" height="${4 * P}" fill="${look.shirt}"/>
-      <animateTransform attributeName="transform" type="translate" values="0 0;1 -1;0 0" dur="0.7s" repeatCount="indefinite"/></g>`
-  }
-  if (pose.mug) {
-    const mx = left + 10 * P
-    const my = top + 7 * P
-    out += `<rect x="${mx}" y="${my}" width="${4 * P}" height="${4 * P}" fill="${OUTLINE}"/><rect x="${mx + P}" y="${my + P}" width="${2 * P}" height="${2 * P}" fill="#FFFFFF"/>
-      <rect x="${mx + P}" y="${my + P}" width="${2 * P}" height="${P / 2}" fill="#7A4A2A"/>
-      ${[0, 1].map(i => `<rect x="${mx + P + i * P}" y="${my - 3 * P}" width="${P / 2}" height="${2 * P}" fill="#FFFFFF" opacity="0.7"><animate attributeName="y" values="${my - 2 * P};${my - 6 * P}" dur="${1.4 + i * 0.3}s" repeatCount="indefinite"/><animate attributeName="opacity" values="0.7;0" dur="${1.4 + i * 0.3}s" repeatCount="indefinite"/></rect>`).join('')}`
-  }
-
-  return out
-}
-
-// ─── The floor plan ─────────────────────────────────────────────────────
-
-const W = 480
-const H = 508
-const FONT = 'Segoe UI, system-ui, -apple-system, sans-serif'
-const esc = (text: string) => text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
-const clip = (text: string, max: number) => (text.length > max ? `${text.slice(0, max - 1)}…` : text)
-
-const WALL = '#3E4852'
-const WALL_TOP = '#5A6672'
-
-// Team desks: three across, two rows.
 const seatAt = (seat: number) => ({ cx: 92 + (seat % 3) * 148, dy: 202 + Math.floor(seat / 3) * 102 })
 const DOOR = { x: 478, y: 256 }
-const MAIN = { cx: 128, dy: 78 }
-const HANDOFF = { x: 214, y: 104 }
 const handoffFor = (seat: number) => ({ x: 206 + (seat % 3) * 13, y: 96 + Math.floor(seat / 3) * 16 })
-const KITCHEN_SEAT = { x: 318, y: 112 }
 
-const screens: Record<AgentState, string> = {
-  working: '#5E6B7A',
-  reading: '#E9EEF2',
-  editing: '#1F2A44',
-  running: '#0F1418',
-  browsing: '#D7E9FA',
-  waiting: '#E5484D',
-  idle: '#1B2433',
-}
-
-const screenLines = (x: number, y: number, state: AgentState) => {
-  if (state === 'editing') return `<g>${[0, 1, 2].map(i => `<rect x="${x + 2 + (i % 2) * 2}" y="${y + 2 + i * 3}" width="${8 - i * 2}" height="1.5" fill="${['#7FB4F0', '#E8A33D', '#9BD58B'][i]}"/>`).join('')}<animateTransform attributeName="transform" type="translate" values="0 0;0 -1;0 0" dur="1.2s" calcMode="discrete" repeatCount="indefinite"/></g>`
-  if (state === 'running') return `<rect x="${x + 2}" y="${y + 2}" width="7" height="1.5" fill="#3DDC84"/><rect x="${x + 2}" y="${y + 6}" width="2" height="2" fill="#3DDC84"><animate attributeName="opacity" values="1;0" dur="0.8s" calcMode="discrete" repeatCount="indefinite"/></rect>`
-  if (state === 'reading') return [0, 1, 2].map(i => `<rect x="${x + 2}" y="${y + 2 + i * 3}" width="${10 - (i % 2) * 3}" height="1.5" fill="#AEB8C2"/>`).join('')
-  if (state === 'browsing') return `<rect x="${x}" y="${y}" width="14" height="2.5" fill="#3E7CC9"/><rect x="${x + 2}" y="${y + 4}" width="6" height="4" fill="#9CC4EC"/>`
-  if (state === 'waiting') return `<rect x="${x + 6}" y="${y + 2}" width="2" height="5" fill="#FFFFFF"/><rect x="${x + 6}" y="${y + 8}" width="2" height="2" fill="#FFFFFF"/>`
-  return ''
-}
-
-// The chair's back shows above the sitter's shoulders.
-const chairSprite = (cx: number, dy: number) =>
-  `<rect x="${cx - 21}" y="${dy - 18}" width="42" height="22" rx="5" fill="${OUTLINE}"/><rect x="${cx - 19}" y="${dy - 16}" width="38" height="18" rx="4" fill="#465566"/><rect x="${cx - 17}" y="${dy - 14}" width="34" height="3" rx="1.5" fill="#5A6B7E"/>`
-
-const monitor = (x: number, dy: number, state: AgentState | null) =>
-  `<rect x="${x - 1}" y="${dy + 1}" width="22" height="16" fill="${OUTLINE}"/>
-    <rect x="${x}" y="${dy + 2}" width="20" height="13" fill="${state ? screens[state] : '#141A22'}"/>
-    ${state ? screenLines(x + 2, dy + 4, state) : ''}
-    <rect x="${x + 8}" y="${dy + 17}" width="4" height="3" fill="${OUTLINE}"/>`
-
-const deskSprite = (cx: number, dy: number, w: number, state: AgentState | null, monitors = 1) => {
-  const left = cx - w / 2
-  return `<rect x="${left + 3}" y="${dy + 4}" width="${w}" height="28" rx="2" fill="#000000" opacity="0.13"/>
-    <rect x="${left - 1}" y="${dy - 1}" width="${w + 2}" height="30" rx="2" fill="${OUTLINE}"/>
-    <rect x="${left}" y="${dy}" width="${w}" height="22" fill="#E4C79C"/>
-    <rect x="${left}" y="${dy}" width="${w}" height="2" fill="#F1DBB8"/>
-    <rect x="${left}" y="${dy + 22}" width="${w}" height="6" fill="#B98F5E"/>
-    ${monitor(cx + w / 2 - 28, dy, state)}${monitors > 1 ? monitor(cx - w / 2 + 8, dy, state) : ''}
-    <rect x="${cx - 12}" y="${dy + 12}" width="24" height="7" rx="1" fill="#D3D8DD" stroke="${OUTLINE}" stroke-width="1"/>
-    <rect x="${cx - 9}" y="${dy + 14}" width="18" height="1" fill="#AEB6BF"/><rect x="${cx - 9}" y="${dy + 16}" width="18" height="1" fill="#AEB6BF"/>`
-}
-
-// Hands on the keyboard, drawn over the desk; they tap while the agent works.
-const hands = (cx: number, dy: number, look: Look, isTyping: boolean) =>
-  `<g><rect x="${cx - 11}" y="${dy + 9}" width="7" height="5" fill="${OUTLINE}"/><rect x="${cx - 10}" y="${dy + 10}" width="5" height="3" fill="${look.skin}"/>
-    <rect x="${cx + 4}" y="${dy + 9}" width="7" height="5" fill="${OUTLINE}"/><rect x="${cx + 5}" y="${dy + 10}" width="5" height="3" fill="${look.skin}"/>
-    ${isTyping ? '<animateTransform attributeName="transform" type="translate" values="0 0;0 -1.5;0 0;0 -0.5" dur="0.3s" calcMode="discrete" repeatCount="indefinite"/>' : ''}</g>`
-
-const plant = (x: number, y: number, big = false) => {
-  const r = big ? 9 : 7
-  return `<rect x="${x - 5}" y="${y}" width="10" height="8" fill="#B5683E" stroke="${OUTLINE}" stroke-width="1"/>
-    <circle cx="${x}" cy="${y - 2}" r="${r}" fill="#3E8A55" stroke="${OUTLINE}" stroke-width="1"/>
-    <circle cx="${x - r / 2}" cy="${y - 4}" r="${r / 2}" fill="#56A86B"/><circle cx="${x + r / 3}" cy="${y - r}" r="${r / 3}" fill="#6CC082"/>`
-}
-
-const bubble = (cx: number, bottom: number, text: string, isAlert = false) => {
-  const label = clip(text, 26)
-  const w = Math.round(label.length * 4.9 + 14)
-  const x = Math.round(cx - w / 2)
-  const y = bottom - 16
-  const fill = isAlert ? '#E5484D' : '#FFFFFF'
-  const ink = isAlert ? '#FFFFFF' : OUTLINE
-  return `<g>${isAlert ? '<animate attributeName="opacity" values="1;0.55;1" dur="0.9s" repeatCount="indefinite"/>' : ''}
-    <rect x="${x}" y="${y}" width="${w}" height="14" rx="3" fill="${fill}" stroke="${OUTLINE}" stroke-width="1.5"/>
-    <path d="M${cx - 3} ${y + 13.5} L${cx} ${y + 18} L${cx + 3} ${y + 13.5} Z" fill="${fill}" stroke="${OUTLINE}" stroke-width="1.5" stroke-linejoin="round"/>
-    <rect x="${cx - 2.5}" y="${y + 12}" width="5" height="2" fill="${fill}"/>
-    <text x="${cx}" y="${y + 10}" text-anchor="middle" font-family="${FONT}" font-size="8.5" font-weight="600" fill="${ink}">${esc(label)}</text></g>`
-}
-
-const tag = (cx: number, y: number, text: string, colour = OUTLINE) => {
-  const w = Math.round(text.length * 4.6 + 10)
-  return `<rect x="${cx - w / 2}" y="${y}" width="${w}" height="11" rx="5.5" fill="${colour}" opacity="0.88"/>
-    <text x="${cx}" y="${y + 8}" text-anchor="middle" font-family="${FONT}" font-size="7.5" font-weight="700" fill="#FFFFFF">${esc(text)}</text>`
-}
-
-// Where a walk goes, as points the feet pass through.
-const path = (points: { x: number; y: number }[]) => points.map((p, i) => `${i ? 'L' : 'M'}${p.x} ${p.y}`).join(' ')
-
-const arrivePath = (seat: number) => {
+const arrivePath = (seat: number): Point[] => {
   const { cx, dy } = seatAt(seat)
   const lane = dy - 52
   return [DOOR, { x: DOOR.x, y: 256 }, { x: cx + 74, y: 256 }, { x: cx + 74, y: lane }, { x: cx, y: lane }, { x: cx, y: dy - 6 }]
 }
-const deliverPath = (seat: number) => {
+const deliverPath = (seat: number): Point[] => {
   const { cx, dy } = seatAt(seat)
   const lane = dy - 52
   const spot = handoffFor(seat)
   return [{ x: cx, y: dy - 6 }, { x: cx, y: lane }, { x: cx + 74, y: lane }, { x: cx + 74, y: 148 }, { x: 214, y: 148 }, { x: 214, y: spot.y }, spot]
 }
-const leavePath = (seat: number) => {
+const leavePath = (seat: number): Point[] => {
   const spot = handoffFor(seat)
   return [spot, { x: 214, y: spot.y }, { x: 214, y: 148 }, { x: 446, y: 148 }, { x: 446, y: 256 }, DOOR]
 }
 
-type Point = { x: number; y: number }
-
 const legSeconds = (a: Point, b: Point) => Math.hypot(b.x - a.x, b.y - a.y) / SPEED
 const walkMs = (points: Point[]) => Math.round(points.slice(1).reduce((t, p, i) => t + legSeconds(points[i] as Point, p), 0) * 1000) + 150
-const facingOf = (a: Point, b: Point): Facing =>
-  Math.abs(b.x - a.x) > Math.abs(b.y - a.y) ? (b.x > a.x ? 'right' : 'left') : b.y > a.y ? 'front' : 'back'
-const sec = (n: number) => `${n.toFixed(2)}s`
-
-// A walk drawn as its straight legs: each leg shows only while it is walked,
-// faces its own way, and starts where the clock says the walk has got to.
-const walker = (sub: Sub, points: Point[], now: number, endFacing: Facing | null, atEnd = '') => {
-  const elapsed = (now - sub.since) / 1000
-  const look = lookFor(sub.id)
-  const label = tag(0, 3, sub.name, '#4A5868')
-  let t = 0
-  let out = ''
-  for (let i = 0; i + 1 < points.length; i++) {
-    const a = points[i] as Point
-    const b = points[i + 1] as Point
-    const d = legSeconds(a, b)
-    if (d <= 0) continue
-    const begin = t - elapsed
-    t += d
-    if (begin + d < 0) continue
-    out += `<g opacity="0"><set attributeName="opacity" to="1" begin="${sec(begin)}" end="${sec(begin + d)}"/>
-      <g><animateMotion path="M${a.x} ${a.y} L${b.x} ${b.y}" dur="${sec(d)}" begin="${sec(begin)}" fill="freeze"/>${figure(look, facingOf(a, b), true)}${label}</g></g>`
-  }
-  if (endFacing) {
-    const last = points[points.length - 1] as Point
-    out += `<g opacity="0"><set attributeName="opacity" to="1" begin="${sec(t - elapsed)}"/>
-      <g transform="translate(${last.x} ${last.y})">${figure(look, endFacing, false)}${label}${atEnd}</g></g>`
-  }
-  return out
-}
-
-const rooms = (hour: number, project: string) => {
-  const isNight = hour < 7 || hour >= 19
-  const sky = isNight ? '#16233D' : hour < 9 || hour >= 17 ? '#F4B88A' : '#A9D8F5'
-  const planks = Array.from({ length: 11 }, (_, i) => `<rect x="6" y="${18 + i * 10}" width="240" height="1" fill="#C9AC7E"/>`).join('')
-  const seams = Array.from({ length: 11 }, (_, i) => `<rect x="${20 + ((i * 47) % 210)}" y="${18 + i * 10}" width="1" height="10" fill="#C9AC7E"/>`).join('')
-  const tiles = Array.from({ length: 19 }, (_, c) =>
-    Array.from({ length: 10 }, (_, r) => ((c + r) % 2 === 0 ? `<rect x="${252 + c * 12}" y="${16 + r * 12}" width="12" height="12" fill="#E4E8EB"/>` : '')).join(''),
-  ).join('')
-  const carpet = Array.from({ length: 20 }, (_, c) => `<rect x="${6 + c * 24}" y="138" width="1" height="240" fill="#BCCBB8"/>`).join('') +
-    Array.from({ length: 10 }, (_, r) => `<rect x="6" y="${138 + r * 24}" width="468" height="1" fill="#BCCBB8"/>`).join('')
-  const windows = [30, 120, 290, 390]
-    .map(x => `<rect x="${x}" y="1" width="56" height="5" fill="${sky}"/><rect x="${x + 27}" y="1" width="2" height="5" fill="${WALL_TOP}"/>`)
-    .join('')
-
-  return `<rect width="${W}" height="${H}" fill="${isNight ? '#1C2430' : '#7FB069'}"/>
-    <rect x="6" y="16" width="240" height="116" fill="#DCC194"/>${planks}${seams}
-    <rect x="252" y="16" width="222" height="116" fill="#F3F5F6"/>${tiles}
-    <rect x="6" y="138" width="468" height="240" fill="#CBD9C7"/>${carpet}
-    <rect x="6" y="384" width="468" height="${H - 390}" fill="#D6DCE6"/>
-    ${Array.from({ length: 5 }, (_, r) => `<rect x="6" y="${384 + r * 24}" width="468" height="1" fill="#C7CED9"/>`).join('')}
-    <text x="16" y="${H - 12}" font-family="${FONT}" font-size="8.5" font-weight="700" fill="#5B6672">Dine andre sessioner</text>
-    <rect x="0" y="0" width="${W}" height="16" fill="${WALL}"/><rect x="0" y="0" width="${W}" height="6" fill="${WALL_TOP}"/>${windows}
-    <rect x="0" y="0" width="6" height="${H}" fill="${WALL}"/><rect x="${W - 6}" y="0" width="6" height="${H}" fill="${WALL}"/>
-    <rect x="246" y="16" width="6" height="74" fill="${WALL}"/><rect x="246" y="122" width="6" height="16" fill="${WALL}"/>
-    <rect x="0" y="132" width="196" height="6" fill="${WALL}"/><rect x="236" y="132" width="64" height="6" fill="${WALL}"/><rect x="340" y="132" width="${W - 340}" height="6" fill="${WALL}"/>
-    <rect x="0" y="378" width="214" height="6" fill="${WALL}"/><rect x="262" y="378" width="${W - 262}" height="6" fill="${WALL}"/><rect x="214" y="378" width="48" height="6" fill="#C3CCD6"/>
-    <rect x="0" y="${H - 6}" width="${W}" height="6" fill="${WALL}"/>
-    <rect x="${W - 6}" y="236" width="6" height="40" fill="#8C6B4A"/><rect x="${W - 18}" y="242" width="12" height="28" rx="2" fill="#6E5A44"/>
-    <rect x="246" y="90" width="6" height="32" fill="#CDB892"/><rect x="196" y="132" width="40" height="6" fill="#CDB892"/><rect x="300" y="132" width="40" height="6" fill="#D5DAD2"/>
-    <rect x="${W / 2 - 60}" y="3" width="120" height="11" rx="2" fill="#20262E"/>
-    <text x="${W / 2}" y="11.5" text-anchor="middle" font-family="${FONT}" font-size="8" font-weight="700" fill="#E9EEF2">${esc(clip(project || 'Kontoret', 26))}</text>`
-}
-
-const furniture = () => `
-  <!-- Claude's corner office -->
-  <rect x="52" y="40" width="152" height="86" rx="3" fill="${OUTLINE}" opacity="0.35"/><rect x="54" y="42" width="148" height="82" rx="2" fill="#6F9C8E"/>
-  <rect x="58" y="46" width="140" height="74" rx="2" fill="none" stroke="#9CC2B5" stroke-width="2"/>
-  ${[0, 1].map(k => `<rect x="10" y="${22 + k * 44}" width="12" height="40" fill="${OUTLINE}"/><rect x="11" y="${23 + k * 44}" width="10" height="38" fill="#8B5E3C"/>
-    ${[0, 1, 2, 3, 4].map(i => `<rect x="12" y="${25 + k * 44 + i * 7}" width="8" height="5" fill="${['#D45D7A', '#3E7CC9', '#D6A23C', '#2E9E8F', '#8A6FD6'][(i + k) % 5]}"/>`).join('')}`).join('')}
-  <rect x="196" y="112" width="26" height="18" rx="4" fill="${OUTLINE}"/><rect x="198" y="114" width="22" height="14" rx="3" fill="#C8643B"/><rect x="200" y="116" width="18" height="4" rx="2" fill="#E3875E"/>
-  ${plant(228, 36, true)}${plant(22, 116)}
-  <rect x="200" y="54" width="34" height="18" rx="2" fill="${OUTLINE}"/><rect x="201" y="55" width="32" height="16" fill="#F6F7F8"/>
-  <rect x="204" y="59" width="18" height="1.5" fill="#3E7CC9"/><rect x="204" y="63" width="24" height="1.5" fill="#E07A4F"/><rect x="204" y="67" width="12" height="1.5" fill="#2E9E8F"/>
-
-  <!-- Kitchen -->
-  <rect x="256" y="18" width="150" height="16" fill="${OUTLINE}"/><rect x="257" y="19" width="148" height="14" fill="#F7F7F5"/><rect x="257" y="31" width="148" height="2" fill="#C9CED3"/>
-  <rect x="266" y="20" width="14" height="12" fill="#2B2F36"/><circle cx="273" cy="26" r="2" fill="#E07A4F"/>
-  <rect x="300" y="21" width="22" height="9" rx="2" fill="#B9C3CC" stroke="${OUTLINE}" stroke-width="1"/>
-  <rect x="440" y="18" width="28" height="34" fill="${OUTLINE}"/><rect x="441" y="19" width="26" height="32" fill="#E9EEF2"/><rect x="441" y="33" width="26" height="1" fill="#B9C3CC"/>
-  <rect x="330" y="21" width="20" height="10" fill="#9CB4C6" stroke="${OUTLINE}" stroke-width="1"/><rect x="336" y="23" width="8" height="5" fill="#D7E9FA"/>
-  <circle cx="386" cy="26" r="4" fill="#E9EEF2" stroke="${OUTLINE}" stroke-width="1"/>
-  ${[280, 312, 344, 376].map(x => `<circle cx="${x}" cy="44" r="5" fill="${OUTLINE}"/><circle cx="${x}" cy="44" r="3.8" fill="#C9A273"/>`).join('')}
-  <circle cx="368" cy="92" r="20" fill="${OUTLINE}"/><circle cx="368" cy="92" r="18.5" fill="#C9A273"/><circle cx="368" cy="92" r="15" fill="#D9B88A"/>
-  <circle cx="368" cy="92" r="6" fill="#F7F7F5" stroke="${OUTLINE}" stroke-width="1"/><circle cx="366" cy="90" r="2" fill="#E07A4F"/><circle cx="370" cy="91" r="2" fill="#D6A23C"/><circle cx="368" cy="94" r="2" fill="#56A86B"/>
-  <rect x="378" y="98" width="5" height="5" fill="#FFFFFF" stroke="${OUTLINE}" stroke-width="1"/>
-  ${[[368, 64], [396, 92], [368, 120]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="7" fill="${OUTLINE}"/><circle cx="${x}" cy="${y}" r="5.5" fill="#465566"/>`).join('')}
-  ${plant(462, 120)}
-
-  <!-- Team room -->
-  <rect x="40" y="346" width="2" height="12" fill="${OUTLINE}"/><rect x="88" y="346" width="2" height="12" fill="${OUTLINE}"/>
-  <rect x="34" y="342" width="62" height="8" fill="${OUTLINE}"/><rect x="35" y="343" width="60" height="6" fill="#F6F7F8"/>
-  <rect x="38" y="344" width="14" height="1.5" fill="#3E7CC9"/><rect x="56" y="344" width="20" height="1.5" fill="#E07A4F"/><rect x="80" y="344" width="10" height="1.5" fill="#2E9E8F"/>
-  <rect x="14" y="356" width="30" height="18" fill="${OUTLINE}"/><rect x="15" y="357" width="28" height="16" fill="#D3D8DD"/><rect x="19" y="360" width="20" height="3" fill="#2B2F36"/>
-  ${plant(462, 150, true)}${plant(20, 150)}${plant(380, 368)}
-  <circle cx="300" cy="360" r="9" fill="${OUTLINE}"/><circle cx="300" cy="360" r="7.5" fill="#E07A4F"/>
-  <circle cx="324" cy="364" r="9" fill="${OUTLINE}"/><circle cx="324" cy="364" r="7.5" fill="#3E7CC9"/>
-  <rect x="452" y="334" width="16" height="24" fill="${OUTLINE}"/><rect x="453" y="335" width="14" height="10" fill="#9CC4EC"/><rect x="453" y="346" width="14" height="11" fill="#E9EEF2"/>`
-
-type Scene = { source: string; width: number; height: number }
-
-// A steady scatter: the same party draws the same picture, so it never blinks.
-const scatter = (i: number, span: number) => ((i * 37 + 11) % 97) / 97 * span - span / 2
-
-const confetti = (cx: number, top: number) => {
-  const colours = ['#E5484D', '#3E7CC9', '#D6A23C', '#2E9E8F', '#8A6FD6', '#E07A4F']
-  return Array.from({ length: 28 }, (_, i) => {
-    const x = cx + scatter(i, 110)
-    const dur = 1.3 + (i % 5) * 0.18
-    const delay = (i % 7) * 0.12
-    return `<rect x="${x.toFixed(1)}" y="${top}" width="3" height="${i % 3 === 0 ? 2 : 3}" fill="${colours[i % colours.length]}">
-      <animate attributeName="y" values="${top};${top + 70}" dur="${dur}s" begin="${delay}s" repeatCount="3"/>
-      <animate attributeName="opacity" values="1;1;0" dur="${dur}s" begin="${delay}s" repeatCount="3"/></rect>`
-  }).join('')
-}
-
-const raincloud = (cx: number, top: number) => {
-  const puffs = [[-14, 6, 9], [0, 2, 12], [14, 6, 9], [-6, 10, 9], [8, 10, 9]]
-    .map(([dx, dy, r]) => `<circle cx="${cx + (dx as number)}" cy="${top + (dy as number)}" r="${r}" fill="#8B97A6" stroke="${OUTLINE}" stroke-width="1"/>`)
-    .join('')
-  const drops = Array.from({ length: 9 }, (_, i) => {
-    const x = cx - 18 + i * 4.5
-    return `<rect x="${x}" y="${top + 18}" width="1.5" height="4" fill="#5DA9E9"><animate attributeName="y" values="${top + 16};${top + 44}" dur="0.7s" begin="${(i % 4) * 0.17}s" repeatCount="indefinite"/></rect>`
-  }).join('')
-  return `${drops}${puffs}<rect x="${cx - 18}" y="${top + 10}" width="36" height="6" fill="#8B97A6"/>`
-}
-
-const balloons = (cx: number, top: number) =>
-  ['#E5484D', '#D6A23C', '#3E7CC9'].map((colour, i) => {
-    const x = cx - 22 + i * 22
-    return `<g><animateTransform attributeName="transform" type="translate" values="0 30;0 -10;0 -50" dur="${3 + i * 0.4}s" fill="freeze"/>
-      <path d="M${x} ${top + 14} q -3 8 0 16" stroke="${OUTLINE}" stroke-width="0.8" fill="none"/>
-      <ellipse cx="${x}" cy="${top + 6}" rx="7" ry="9" fill="${colour}" stroke="${OUTLINE}" stroke-width="1"/>
-      <ellipse cx="${x - 2}" cy="${top + 3}" rx="2" ry="3" fill="#FFFFFF" opacity="0.5"/></g>`
-  }).join('')
-
-const partyAt = (o: Office) => {
-  const p = o.party
-  if (!p) return ''
-  const sub = o.subs.find(s => s.id === p.who && s.phase === 'working' && s.seat >= 0)
-  const spot = sub ? seatAt(sub.seat) : MAIN
-  const art = p.kind === 'confetti' ? confetti(spot.cx, spot.dy - 60) : p.kind === 'rain' ? raincloud(spot.cx, spot.dy - 66) : balloons(spot.cx, spot.dy - 40)
-  return `${art}${tag(spot.cx, spot.dy - 76, p.label, p.kind === 'rain' ? '#5B6B7E' : '#2E9E8F')}`
-}
-
-// Claude's small talk in the kitchen, one line every few seconds.
-const smallTalk = (o: Office) => {
-  const lines = ['Kaffepause', o.linesAdded ? `${o.linesAdded} linjer i dag` : 'Klar når du er', 'Godt arbejde, team', 'Hvad nu?']
-  const slot = 3
-  const total = slot * lines.length
-  return lines
-    .map((line, i) => {
-      const values = lines.map((_, k) => (k === i ? 1 : 0)).join(';')
-      return `<g opacity="${i === 0 ? 1 : 0}"><animate attributeName="opacity" values="${values}" dur="${total}s" calcMode="discrete" repeatCount="indefinite"/>${bubble(KITCHEN_SEAT.x, KITCHEN_SEAT.y - 46, line)}</g>`
-    })
-    .join('')
-}
-
-// The project room: the other sessions' Claudes, one desk each.
-const projectRoom = (others: Other[]) => {
-  const desks = Array.from({ length: 4 }, (_, i) => {
-    const cx = 72 + i * 112
-    const dy = 440
-    const other = others[i]
-    if (!other) return `${chairSprite(cx, dy)}${deskSprite(cx, dy, 80, null)}`
-    const look: Look = { ...claudeLook, shirt: (shirts[hashOf(other.key) % shirts.length] as [string, string])[0], shirtShade: (shirts[hashOf(other.key) % shirts.length] as [string, string])[1] }
-    const isAway = other.main.state === 'idle'
-    const sitter = isAway ? '' : person(cx, dy + 4, look, { seated: true, handUp: other.main.state === 'waiting' })
-    const typing = isAway ? '' : hands(cx, dy, look, other.main.state !== 'waiting')
-    return `${chairSprite(cx, dy)}${sitter}${deskSprite(cx, dy, 80, isAway ? null : other.main.state)}${typing}
-      ${tag(cx, dy + 30, clip(other.project, 16), '#C8643B')}
-      ${isAway ? tag(cx, dy - 22, 'Holder pause', '#8A94A0') : bubble(cx, dy - 30, other.main.detail, other.main.state === 'waiting')}
-      ${other.helpers > 0 ? tag(cx + 30, dy + 44, `+${other.helpers}`, '#4A5868') : ''}`
-  }).join('')
-  const more = others.length > 4 ? tag(W - 50, 396, `+${others.length - 4} sessioner`, '#4A5868') : ''
-  return desks + more
-}
-
-const officeSvg = (o: Office, now: number, hour: number): Scene => {
-  const main = o.main
-  const isOut = main.state === 'idle'
-  const mainLook = claudeLook
-
-  // Claude: at the big desk, or with a coffee in the kitchen.
-  const claude = isOut
-    ? `${person(KITCHEN_SEAT.x, KITCHEN_SEAT.y, mainLook, { mug: true })}${tag(KITCHEN_SEAT.x, KITCHEN_SEAT.y + 3, 'Claude', '#C8643B')}`
-    : `${person(MAIN.cx, MAIN.dy + 4, mainLook, { seated: true, handUp: main.state === 'waiting' })}`
-  const mainDesk = deskSprite(MAIN.cx, MAIN.dy, 128, isOut ? null : main.state, 2) + (isOut ? '' : hands(MAIN.cx, MAIN.dy, mainLook, main.state !== 'waiting' && main.state !== 'idle'))
-  const mainBubble = isOut ? '' : bubble(MAIN.cx, MAIN.dy - 30, main.detail, main.state === 'waiting')
-  const mainTag = isOut ? '' : tag(MAIN.cx, MAIN.dy + 30, 'Claude', '#C8643B')
-
-  const seated = o.subs.filter(s => s.seat >= 0 && s.phase === 'working')
-  const walking = o.subs.filter(s => s.seat >= 0 && s.phase !== 'working')
-  const extra = o.subs.filter(s => s.seat < 0).length
-
-  const desks = Array.from({ length: SEATS }, (_, seat) => {
-    const { cx, dy } = seatAt(seat)
-    const sub = seated.find(s => s.seat === seat)
-    const look = sub ? lookFor(sub.id) : null
-    const sitter = sub && look ? person(cx, dy + 4, look, { seated: true, handUp: sub.activity.state === 'waiting' }) : ''
-    const typing = sub && look ? hands(cx, dy, look, sub.activity.state !== 'waiting') : ''
-    return `${chairSprite(cx, dy)}${sitter}${deskSprite(cx, dy, 84, sub ? sub.activity.state : null)}${typing}
-      ${sub ? tag(cx, dy + 30, sub.name, '#4A5868') : ''}`
-  }).join('')
-
-  const bubbles = seated
-    .map(s => {
-      const { cx, dy } = seatAt(s.seat)
-      return bubble(cx, dy - 30, s.activity.detail, s.activity.state === 'waiting')
-    })
-    .join('')
-
-  const walkers = walking
-    .map(s =>
-      s.phase === 'arriving'
-        ? walker(s, arrivePath(s.seat), now, 'front')
-        : s.phase === 'delivering'
-          ? walker(s, deliverPath(s.seat), now, 'left', bubble(0, -46, s.activity.detail))
-          : walker(s, leavePath(s.seat), now, null),
-    )
-    .join('')
-
-  const queue = extra > 0 ? tag(DOOR.x, 350, `+${extra} venter ved døren`, '#C8643B') : ''
-
-  const thanks = walking
-    .filter(s => s.phase === 'delivering')
-    .map(s => {
-      const arrived = walkMs(deliverPath(s.seat)) / 1000 - (now - s.since) / 1000
-      return { begin: arrived, end: arrived + HANDOVER_MS / 1000, name: s.name }
-    })
-  const mainSays = isOut
-    ? ''
-    : `<g>${thanks.map(w => `<set attributeName="opacity" to="0" begin="${sec(w.begin)}" end="${sec(w.end)}"/>`).join('')}${mainBubble}</g>
-      ${thanks.map(w => `<g opacity="0"><set attributeName="opacity" to="1" begin="${sec(w.begin)}" end="${sec(w.end)}"/>${bubble(MAIN.cx, MAIN.dy - 30, `Tak, ${w.name}!`)}</g>`).join('')}`
-
-  const source = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" shape-rendering="crispEdges">
-  <defs><clipPath id="building"><rect width="${W}" height="${H}" rx="10"/></clipPath></defs>
-  <g clip-path="url(#building)">
-    ${rooms(hour, o.project)}
-    ${furniture()}
-    ${chairSprite(MAIN.cx, MAIN.dy)}
-    ${isOut ? '' : claude}
-    ${mainDesk}
-    ${isOut ? claude : ''}
-    ${mainTag}
-    ${desks}
-    ${projectRoom(o.others)}
-    ${walkers}
-    ${mainSays}${isOut ? smallTalk(o) : ''}${bubbles}${queue}
-    ${partyAt(o)}
-  </g>
-</svg>`
-
-  return { source, width: W, height: H }
-}
 
 // ─── Panel ──────────────────────────────────────────────────────────────
 
-const accent = '#2F86D6'
 const stateColor: Record<AgentState, string> = {
   working: '#8A94A0',
   reading: '#2BA39A',
@@ -793,43 +274,70 @@ const phaseText: Record<Phase, string> = {
   leaving: 'Går igen',
 }
 
-// Every session on this computer writes a small status file and reads the
-// others', so all of them share one office. Nothing leaves the computer.
-const SYNC_MS = 3000
+// ─── The office server ──────────────────────────────────────────────────
+
+// Each session writes what it is doing to a small file, and reads the others'
+// for the panel's list. The server reads them all for the page.
+const PORT = 4747
+const ADDRESS = `http://127.0.0.1:${PORT}`
+const WRITE_MS = 500
+const HEARTBEAT_MS = 30_000
+const READ_MS = 3000
+const SERVER_CHECK_MS = 60_000
 const STALE_MS = 120_000
 let lastWritten = ''
 let lastWriteAt = 0
 
+// Forward slashes only: the engine does not read a Windows path's backslashes
+// as separators.
+const slashed = (path: string) => path.split(String.fromCharCode(92)).join('/')
+
 const sessionsDir = async ($: $) => {
   const home = (await $.env.get("USERPROFILE")) ?? (await $.env.get("HOME"))
-  // Forward slashes only: the engine does not read a Windows path's
-  // backslashes as separators.
-  const slashed = home?.split(String.fromCharCode(92)).join('/')
-  return slashed ? `${slashed}/.claude/agent-kontor/sessions` : null
+  return home ? `${slashed(home)}/.claude/agent-kontor/sessions` : null
 }
 
-const syncSessions = async ($: $) => {
+// All the page needs to draw this session; the walks it times itself.
+const statusOf = (o: Office) => ({
+  v: 2,
+  key: o.sessionKey,
+  project: o.project,
+  startedAt: o.startedAt,
+  main: o.main,
+  subs: o.subs,
+  party: o.party,
+  stats: { linesAdded: o.linesAdded, linesRemoved: o.linesRemoved, costUsd: o.costUsd, fiveHour: o.fiveHour, model: o.model },
+})
+
+// Written when it changes, and now and then besides so the server knows the
+// session is still there.
+const writeStatus = async ($: $) => {
   const dir = await sessionsDir($)
   const o = await readOffice($)
   if (!dir || !o.sessionKey) return
   const now = await $.clock.now()
+  const status = statusOf(o)
+  const text = JSON.stringify(status)
+  if (text === lastWritten && now - lastWriteAt < HEARTBEAT_MS) return
+  await $.fs.write(`${dir}/${o.sessionKey}.json`, JSON.stringify({ ...status, updatedAt: now }))
+  lastWritten = text
+  lastWriteAt = now
+}
 
-  const mine = JSON.stringify({ key: o.sessionKey, project: o.project, main: o.main, helpers: o.subs.length })
-  if (mine !== lastWritten || now - lastWriteAt > 30_000) {
-    await $.fs.write(`${dir}/${o.sessionKey}.json`, JSON.stringify({ ...JSON.parse(mine), updatedAt: now }))
-    lastWritten = mine
-    lastWriteAt = now
-  }
-
+const readOthers = async ($: $) => {
+  const dir = await sessionsDir($)
+  const o = await readOffice($)
+  if (!dir || !o.sessionKey) return
+  const now = await $.clock.now()
   const entries = await $.fs.list(dir).catch(() => [])
   const others: Other[] = []
   for (const entry of entries) {
     if (!entry.name.endsWith('.json') || entry.name === `${o.sessionKey}.json`) continue
     const text = await $.fs.read(`${dir}/${entry.name}`).catch(() => '')
     try {
-      const other = JSON.parse(typeof text === 'string' ? text : '') as Other & { ended?: boolean }
-      if (!other.ended && now - other.updatedAt < STALE_MS && other.main?.state) {
-        others.push({ key: other.key, project: other.project, main: other.main, helpers: other.helpers ?? 0, updatedAt: other.updatedAt })
+      const other = JSON.parse(typeof text === 'string' ? text : '') as Partial<Other> & { ended?: boolean; subs?: unknown[] }
+      if (!other.ended && other.key && other.main?.state && now - (other.updatedAt ?? 0) < STALE_MS) {
+        others.push({ key: other.key, project: other.project ?? '', main: other.main, helpers: other.subs?.length ?? other.helpers ?? 0, updatedAt: other.updatedAt ?? 0 })
       }
     } catch {
       // A file half-written by another session: next round.
@@ -846,32 +354,45 @@ const leaveOffice = async ($: $) => {
   if (dir && o.sessionKey) await $.fs.write(`${dir}/${o.sessionKey}.json`, JSON.stringify({ key: o.sessionKey, ended: true, updatedAt: 0 }))
 }
 
-// Copies the office into the frame when something the picture shows has moved.
-// Two kinds of change: the shape of the office (who is where, in what state,
-// a party) repaints at once; only new words in a bubble wait for TEXT_MS, so
-// a run of tool calls does not reload the picture on every one.
-const TEXT_MS = 3000
-
-const refreshFrame = async ($: $) => {
-  const o = await readOffice($)
-  const f = await read($, frame)
-  const shape = (x: Office | null) => {
-    if (!x) return ''
-    const y = fresh(x)
-    return JSON.stringify({
-      main: y.main.state,
-      subs: y.subs.map(s => [s.id, s.seat, s.phase, s.since, s.activity.state]),
-      project: y.project,
-      party: y.party,
-      others: y.others.map(z => [z.key, z.project, z.main.state, z.helpers]),
-    })
+const isServerUp = async ($: $) => {
+  try {
+    const res = await $.http.fetch(`${ADDRESS}/health`)
+    return res.ok && (JSON.parse(res.text) as { app?: string }).app === 'agent-kontor'
+  } catch {
+    return false
   }
-  const words = (x: Office | null) => (x ? JSON.stringify([fresh(x).main.detail, fresh(x).subs.map(s => s.activity.detail), fresh(x).others.map(z => z.main.detail)]) : '')
-  const now = await $.clock.now()
-  const isNewShape = shape(o) !== shape(f.office)
-  const isNewWords = words(o) !== words(f.office)
-  if (!isNewShape && !(isNewWords && now - f.at >= TEXT_MS)) return
-  await update($, frame, () => ({ office: o, at: now }))
+}
+
+// One server for every session on the computer: the first to find none
+// starts it, in the background, and it stops by itself when nobody needs it.
+let starting: Promise<boolean> | null = null
+const ensureServer = ($: $) => {
+  starting ??= startServer($).finally(() => {
+    starting = null
+  })
+  return starting
+}
+
+const startServer = async ($: $) => {
+  if (await isServerUp($)) return true
+  const run = await $.process.run(['node', `${slashed($.plugin.root)}/server/server.mjs`, '--detach'], { timeoutMs: 10_000 }).catch(() => null)
+  if (!run || run.exitCode !== 0) return false
+  for (let i = 0; i < 10; i++) {
+    if (await isServerUp($)) return true
+    await new Promise<void>(done => $.clock.after(200, done))
+  }
+  return false
+}
+
+// The person's own browser, with the office in it.
+const openOffice = async ($: $) => {
+  const isUp = await ensureServer($)
+  if (!isUp) return false
+  const os = await $.env.get("OS")
+  const argv = os === 'Windows_NT' ? ['explorer.exe', ADDRESS] : [(await $.env.get("XDG_CURRENT_DESKTOP")) ? 'xdg-open' : 'open', ADDRESS]
+  // explorer.exe answers 1 even when it opened the page.
+  await $.process.run(argv, { timeoutMs: 10_000 }).catch(() => null)
+  return true
 }
 
 // ─── Hooks ──────────────────────────────────────────────────────────────
@@ -882,24 +403,27 @@ export const register: Register = on => {
   const spawned = new Map<string, { agentId: string; isBackground: boolean }>()
 
   on('session.start', async ($, e, next) => {
-    await $.command.register({ name: 'kontor', description: 'Åbn kontoret, eller se det fyldt med /kontor demo', argumentHint: '[demo]' })
+    await $.command.register({ name: 'kontor', description: 'Åbn kontoret i browseren, eller se det fyldt med /kontor demo', argumentHint: '[demo]' })
     const now = await $.clock.now()
     const key = `s${Math.random().toString(36).slice(2, 10)}${Math.random().toString(36).slice(2, 6)}`
     await update($, office, o => ({ ...o, sessionKey: o.sessionKey || key, project: base(e.cwd) || 'Kontoret', startedAt: o.startedAt || now, main: pause, subs: [] }))
     void $.ui.open({ id: PANE, title: '🏢 Kontor' })
-    $.clock.every(PAINT_MS, () => void quietly(refreshFrame($)))
-    $.clock.every(SYNC_MS, () => void quietly(syncSessions($)))
-    void quietly(syncSessions($))
+    $.clock.every(WRITE_MS, () => void quietly(writeStatus($)))
+    $.clock.every(READ_MS, () => void quietly(readOthers($)))
+    $.clock.every(SERVER_CHECK_MS, () => void quietly(ensureServer($)))
+    void quietly(ensureServer($))
     return next(e)
   })
 
   on('command.run', { command: 'kontor' }, async ($, e) => {
     await $.ui.open({ id: PANE, title: '🏢 Kontor', focus: true })
+    const isOpen = await openOffice($)
+    const where = isOpen ? `Kontoret er åbent på ${ADDRESS}.` : 'Kontorets server kunne ikke starte. Den kræver Node.js 18 eller nyere.'
     if (e.args.trim() === 'demo') {
       await runDemo($)
-      return { text: 'Seks hjælpere er på vej ind i kontoret.' }
+      return { text: `${where} Seks hjælpere er på vej ind.` }
     }
-    return { text: 'Kontoret er åbent. Prøv /kontor demo for at se det fyldt.' }
+    return { text: `${where} Prøv /kontor demo for at se det fyldt.` }
   })
 
   on('session.end', async ($, e, next) => {
@@ -987,18 +511,9 @@ export const register: Register = on => {
 
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
     try {
-      const kit = $.ui.resolve(e)
-      const { Box, Text } = kit
-      const Svg = 'Svg' in kit ? kit.Svg : null
+      const { Box, Text, Button } = $.ui.resolve(e)
       const o = await readOffice($)
-      const now = await $.clock.now()
-
-      const paneWidth = Math.min(1100, Math.round(e.props.bodyColumns * 8.4))
-      const f = await read($, frame)
-      // Until the first paint, draw the office as it is.
-      const scene = officeSvg(fresh(f.office ?? o), f.office ? f.at : now, new Date(f.office ? f.at : now).getHours())
       const working = o.subs.filter(s => s.phase === 'working').length
-      const alt = `Kontoret: Claude ${o.main.detail.toLowerCase()}, ${o.subs.length} hjælpere`
 
       const row = (key: string, name: string, line: string, state: AgentState, note: string | null) => (
         <Box key={key} flexDirection="row" gap={2} paddingX={1}>
@@ -1036,9 +551,14 @@ export const register: Register = on => {
 
       return (
         <Box flexDirection="column" gap={1} paddingX={1} paddingY={1}>
-          {Svg ? (
-            <Svg source={scene.source} alt={alt} width={paneWidth} height={Math.round((paneWidth * scene.height) / scene.width)} isInteractive />
-          ) : null}
+          <Box flexDirection="column" paddingX={1}>
+            <Text bold>Kontoret tegnes i browseren</Text>
+            <Text dimColor wrap="wrap">{`Åbn ${ADDRESS} i din browser eller i appens browser-panel. Alle dine sessioner sidder i samme kontor.`}</Text>
+          </Box>
+          <Box flexDirection="row" gap={2} paddingX={1}>
+            <Button label="Åbn kontoret" onPress={() => void quietly(openOffice($))} />
+            <Button label="Kopiér adresse" onPress={press => void quietly($.ui.copy({ text: ADDRESS, surface: press.surface }))} />
+          </Box>
           {o.main.state === 'waiting' ? (
             <Box borderStyle="round" borderColor="#E5484D" paddingX={2}>
               <Text color="#E5484D" wrap="wrap">{`Claude venter på dig: ${o.main.detail}`}</Text>
@@ -1051,21 +571,20 @@ export const register: Register = on => {
               row(`o-${x.key}`, `Claude i ${x.project}`, x.main.detail, x.main.state, x.helpers ? `${x.helpers} ${x.helpers === 1 ? 'hjælper' : 'hjælpere'}` : null),
             )}
           </Box>
-          <Box flexDirection="row" gap={1}>
+          <Box flexDirection="row" gap={1} paddingX={1}>
             <Text dimColor wrap="wrap">
               {o.subs.length === 0
                 ? 'Ingen hjælpere i kontoret. Når Claude sender subagenter afsted, sætter de sig i teamrummet. Prøv /kontor demo.'
                 : `${working} af ${o.subs.length} hjælpere arbejder`}
             </Text>
           </Box>
-          {!Svg ? <Text color={accent}>Kontorets tegning vises i desktop-appen.</Text> : null}
         </Box>
       )
     } catch (err) {
       const { Box, Text } = $.ui.resolve(e)
       return (
         <Box flexDirection="column" gap={1} paddingX={1} paddingY={1}>
-          <Text bold>Kontoret kunne ikke tegnes</Text>
+          <Text bold>Kontoret kunne ikke vises</Text>
           <Text dimColor wrap="wrap">{err instanceof Error ? err.message : String(err)}</Text>
         </Box>
       ) as RenderElement

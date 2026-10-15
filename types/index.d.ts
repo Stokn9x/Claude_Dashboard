@@ -53,7 +53,6 @@ declare module 'claude-code' {
   interface PluginState {
     'agent-kontor': {
       office: Office
-      frame: { office: Office | null; at: number }
     }
   }
 }

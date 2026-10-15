@@ -50,7 +50,7 @@ for (const surface of ['terminal', 'desktop'] as const) {
     await $.turn.complete(turn)
     const drawn = JSON.stringify(await ui.drawn())
     expect(drawn).toContain('Holder pause')
-    if (surface === 'desktop') expect(drawn).toContain('"type":"Svg"')
+    expect(drawn).toContain('"label":"Åbn kontoret"')
   })
 
   test(`${surface}: only a dialog put to me reads as waiting, not an ask in Auto mode`, async ($, on) => {
@@ -130,20 +130,6 @@ for (const surface of ['terminal', 'desktop'] as const) {
   })
 }
 
-test('desktop: the picture does not change while nothing in the office does', async ($, on) => {
-  const clock = engine(on)
-  await $.session.start(start())
-  const ui = await $.ui.mount({ plugin: 'agent-kontor', surface: 'desktop', component: 'Pane', requestId: 'kontor', props: paneProps })
-  await $.turn.start({ text: 'hej', turnId: 't1' } as never)
-  await clock.advance(1000)
-
-  const source = (tree: unknown) => /"source":"(.*?)","alt"/.exec(JSON.stringify(tree))?.[1] ?? ''
-  const first = source(await ui.drawn())
-  await clock.advance(5000)
-  expect(first.length).toBeGreaterThan(1000)
-  expect(source(await ui.drawn())).toBe(first)
-})
-
 for (const surface of ['terminal', 'desktop'] as const) {
   test(`${surface}: my other sessions on this computer join the office`, async ($, on) => {
     const clock = engine(on)
@@ -180,58 +166,95 @@ for (const surface of ['terminal', 'desktop'] as const) {
   })
 }
 
-for (const surface of ['terminal', 'desktop'] as const) {
-  test(`${surface}: green tests throw confetti for a while, a plain command does not`, async ($, on) => {
-    const clock = engine(on)
-    await $.session.start(start())
-    const ui = await $.ui.mount({ plugin: 'agent-kontor', surface, component: 'Pane', requestId: 'kontor', props: paneProps })
+// The status file this session writes for the office page, as the page reads it.
+type Status = { v: number; key: string; project: string; main: { state: string; detail: string }; subs: { name: string; phase: string; since: number; seat: number }[]; party: { kind: string; label: string } | null; updatedAt: number }
 
-    await $.tool.call({ tool: 'Bash', command: 'npm test', tool_use_id: 't1' } as never)
-    await clock.advance(900)
-    if (surface === 'desktop') expect(JSON.stringify(await ui.drawn())).toContain('Testene er grønne')
-
-    await clock.advance(5000)
-    if (surface === 'desktop') expect(JSON.stringify(await ui.drawn())).not.toContain('Testene er grønne')
-
-    // A plain command is nothing to celebrate.
-    await $.tool.call({ tool: 'Bash', command: 'ls -la', tool_use_id: 't2' } as never)
-    await clock.advance(900)
-    if (surface === 'desktop') expect(JSON.stringify(await ui.drawn())).not.toContain('Testene')
+const statusFile = (on: On) => {
+  const writes: Status[] = []
+  on('env.get', (_, e) => ({ value: e.name === 'USERPROFILE' ? 'C:/Users/test' : undefined }) as never)
+  on('fs.write', (_, e) => {
+    if (e.path.split(String.fromCharCode(92)).join('/').includes('/agent-kontor/sessions/')) writes.push(JSON.parse(e.text) as Status)
+    return { value: undefined } as never
   })
+  on('fs.list', () => ({ value: [] }) as never)
+  return { writes, last: () => writes[writes.length - 1] }
 }
 
-test('desktop: Claude thanks a helper by name when it hands over its result', async ($, on) => {
-  let ui: { drawn: () => Promise<unknown> } = { drawn: async () => null }
+test('the status file holds what the page draws, written when it changes and now and then', async ($, on) => {
+  const clock = engine(on)
+  const file = statusFile(on)
+  await $.session.start(start())
+  await $.turn.start({ text: 'hej', turnId: 't1' } as never)
+  await clock.advance(600)
+  expect(file.last()?.v).toBe(2)
+  expect(file.last()?.project).toBe('agent-kontor')
+  expect(file.last()?.main.detail).toBe('Tænker')
+
+  // Nothing new: nothing written, until the heartbeat says the session is still there.
+  const count = file.writes.length
+  await clock.advance(5000)
+  expect(file.writes.length).toBe(count)
+  await clock.advance(30_000)
+  expect(file.writes.length).toBe(count + 1)
+})
+
+test('a helper on its way to Claude is in the file with when it set off, for the page to time the walk', async ($, on) => {
   const clock = engine(on, async e => {
     if (e.tool === 'Agent') {
       await $.agent.spawn({ tool_use_id: e.tool_use_id, prompt: 'p', description: 'Kortlæg API’et', subagentType: 'Explore', parentModel: 'm', background: false } as never)
     }
   })
+  const file = statusFile(on)
   await $.session.start(start())
-  ui = await $.ui.mount({ plugin: 'agent-kontor', surface: 'desktop', component: 'Pane', requestId: 'kontor', props: paneProps })
-  await $.turn.start({ text: 'hej', turnId: 't1' } as never)
   await $.tool.call({ tool: 'Agent', prompt: 'p', description: 'Kortlæg API’et', tool_use_id: 'a1' } as never)
-  await clock.advance(900)
-  expect(JSON.stringify(await ui.drawn())).toMatch(/Tak, [A-ZÆØÅ][a-zæøå]+!/)
+  await clock.advance(600)
+  const sub = file.last()?.subs[0]
+  expect(sub?.phase).toBe('delivering')
+  expect(sub?.seat).toBe(0)
+  expect(sub?.since).toBe(Date.UTC(2026, 9, 15, 10))
+  expect(sub?.name).toMatch(/^[A-ZÆØÅ][a-zæøå]+$/)
 })
 
-test('desktop: new words in a bubble wait a moment, a new state does not', async ($, on) => {
+test('green tests throw confetti for a while, a plain command does not', async ($, on) => {
   const clock = engine(on)
+  const file = statusFile(on)
   await $.session.start(start())
-  const ui = await $.ui.mount({ plugin: 'agent-kontor', surface: 'desktop', component: 'Pane', requestId: 'kontor', props: paneProps })
-  const source = async () => /"source":"(.*?)","alt"/.exec(JSON.stringify(await ui.drawn()))?.[1] ?? ''
 
-  await $.turn.start({ text: 'hej', turnId: 't1' } as never)
+  await $.tool.call({ tool: 'Bash', command: 'npm test', tool_use_id: 't1' } as never)
+  await clock.advance(600)
+  expect(file.last()?.party).toEqual(expect.objectContaining({ kind: 'confetti', label: 'Testene er grønne' }))
+
   await clock.advance(5000)
-  const before = await source()
+  expect(file.last()?.party).toBeNull()
 
-  // Only the words change ("Tænker" to "Læser a.ts" and back): the picture waits.
-  await $.tool.call({ tool: 'Read', file_path: 'C:/x/a.ts', tool_use_id: 'r1' } as never)
-  await clock.advance(900)
-  expect(await source()).toBe(before)
+  await $.tool.call({ tool: 'Bash', command: 'ls -la', tool_use_id: 't2' } as never)
+  await clock.advance(600)
+  expect(file.last()?.party).toBeNull()
+})
 
-  // A permission dialog changes the state: drawn at once.
-  await $.classic.PermissionRequest({ tool_name: 'Bash', tool_input: {} } as never)
-  await clock.advance(900)
-  expect(await source()).toContain('Venter på din godkendelse')
+test('the first session starts the office server, and /kontor opens it in the browser', async ($, on) => {
+  const clock = engine(on)
+  let isUp = false
+  const runs: string[][] = []
+  on('env.get', (_, e) => ({ value: e.name === 'OS' ? 'Windows_NT' : undefined }) as never)
+  on('http.fetch', () => {
+    if (!isUp) throw new Error('ECONNREFUSED')
+    return { value: { status: 200, ok: true, headers: {}, text: JSON.stringify({ ok: true, app: 'agent-kontor', version: '1.0.0' }) } } as never
+  })
+  on('process.run', (_, e) => {
+    runs.push([...e.argv])
+    if (e.argv.includes('--detach')) isUp = true
+    return { value: { exitCode: 0, stdout: '', stderr: '' } } as never
+  })
+
+  await $.session.start(start())
+  await clock.advance(0)
+  const reply = await $.command.run({ command: 'kontor', args: '' } as never)
+
+  const server = runs.find(argv => argv.includes('--detach'))
+  expect(server?.[0]).toBe('node')
+  expect(server?.[1]).toMatch(/\/server\/server\.mjs$/)
+  expect(runs).toContainEqual(['explorer.exe', 'http://127.0.0.1:4747'])
+  expect(runs.filter(argv => argv.includes('--detach')).length).toBe(1)
+  expect(JSON.stringify(reply)).toContain('http://127.0.0.1:4747')
 })
