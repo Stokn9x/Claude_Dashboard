@@ -1,6 +1,6 @@
 {
-  "name": "session-dashboard",
-  "description": "Et dashboard over prompten i Claude: kontekst, forbrugsgrænser, pris, tokens og linjer kode",
+  "name": "agent-kontor",
+  "description": "Et pixel-kontor i Claude, hvor hele teamets agenter arbejder live",
   "owner": { "name": "Casper", "email": "cej@copenhagendata.com" },
-  "plugins": [{ "name": "session-dashboard", "source": "./" }]
+  "plugins": [{ "name": "agent-kontor", "source": "./" }]
 }

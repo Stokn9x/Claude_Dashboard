@@ -1,7 +1,7 @@
 {
-  "name": "session-dashboard",
-  "version": "0.2.0",
-  "description": "Dashboard over prompten: kontekst, forbrugsgrænser, pris og sessionens tal",
+  "name": "agent-kontor",
+  "version": "0.1.0",
+  "description": "Et pixel-kontor, hvor hele teamets Claude-agenter arbejder live: hvem skriver, læser, kører kode eller venter",
   "author": { "name": "Casper", "email": "cej@copenhagendata.com" },
   "types": "./types/index.d.ts"
 }

@@ -1,16 +1,17 @@
-# Session Dashboard
+# Agent-kontor 🏢
 
-Et dashboard lige over prompten i Claude, så du altid kan se, hvor du står:
+Et pixel-kontor i et panel ved siden af Claude, hvor hele teamets Claude-agenter arbejder live. Hver session sidder ved sit eget skrivebord, og man kan se med det samme, hvad den laver:
 
-| Felt | Viser |
-| --- | --- |
-| **Kontekst** | Hvor fuld kontekstvinduet er (% og ring) og antal tokens |
-| **5 timer / 7 dage** | Forbrugsgrænserne med % og hvornår de nulstilles (orange over 80 %, rød over 95 %) |
-| **Pris** | Hvad sessionen har kostet indtil nu |
-| **Kode** | Linjer tilføjet og fjernet af Claudes ændringer, og hvor mange filer |
-| **Session** | Varighed, antal ture og tokens ud |
+| | Figuren | Skærmen |
+| --- | --- | --- |
+| ⌨️ **Skriver kode** | taster | kode, der ruller |
+| 📖 **Læser** | sidder ved skrivebordet | en side tekst |
+| ⏳ **Kører** en kommando | venter | terminal med blinkende markør |
+| 🌐 **På nettet** | sidder ved skrivebordet | en browser |
+| ❗ **Venter på dig** | rækker hånden op, boblen blinker | et rødt spørgsmålstegn |
+| ☕ **Pause** | går ud i køkkenet med en kop kaffe | zZ |
 
-Det hele ligger i én lav række, så det ikke tager plads fra samtalen. Rækken kan foldes sammen til én linje (`▴` / `▾ Vis`), eller slås til og fra med `/dashboard`.
+Subagenter står som små grå figurer ved siden af skrivebordet, med deres eget ikon over hovedet. Vinduerne følger tiden på dagen. Under kontoret står en liste med alle agenter, dem der venter først, med linjer kode, pris og forbrugsgrænse.
 
 ## Installér
 
@@ -22,7 +23,7 @@ Det hele ligger i én lav række, så det ikke tager plads fra samtalen. Rækken
 $roots = @("$env:APPDATA\Claude\claude-code") + (Get-ChildItem "$env:LOCALAPPDATA\Packages" -Directory -Filter "*Claude*" -ErrorAction SilentlyContinue | ForEach-Object { "$($_.FullName)\LocalCache\Roaming\Claude\claude-code" })
 $claude = $roots | Where-Object { Test-Path $_ } | ForEach-Object { Get-ChildItem $_ -Recurse -Filter claude.exe } | Sort-Object LastWriteTime -Descending | Select-Object -First 1 -ExpandProperty FullName
 if (-not $claude) { $claude = (Get-Command claude -ErrorAction SilentlyContinue).Source }
-if ($claude) { "Fandt: $claude"; & $claude plugin marketplace add Stokn9x/Claude_Dashboard; & $claude plugin install session-dashboard@session-dashboard } else { "Fandt ingen claude.exe" }
+if ($claude) { "Fandt: $claude"; & $claude plugin marketplace add Stokn9x/Claude_Dashboard; & $claude plugin install agent-kontor@agent-kontor } else { "Fandt ingen claude.exe" }
 ```
 
 Start derefter en ny session i Code-fanen.
@@ -30,7 +31,7 @@ Start derefter en ny session i Code-fanen.
 ### Med Claude Code i terminalen
 
 ```
-/plugin install session-dashboard --marketplace Stokn9x/Claude_Dashboard
+/plugin install agent-kontor --marketplace Stokn9x/Claude_Dashboard
 ```
 
 ### Opdatér
@@ -39,11 +40,37 @@ Start derefter en ny session i Code-fanen.
 $roots = @("$env:APPDATA\Claude\claude-code") + (Get-ChildItem "$env:LOCALAPPDATA\Packages" -Directory -Filter "*Claude*" -ErrorAction SilentlyContinue | ForEach-Object { "$($_.FullName)\LocalCache\Roaming\Claude\claude-code" })
 $claude = $roots | Where-Object { Test-Path $_ } | ForEach-Object { Get-ChildItem $_ -Recurse -Filter claude.exe } | Sort-Object LastWriteTime -Descending | Select-Object -First 1 -ExpandProperty FullName
 if (-not $claude) { $claude = (Get-Command claude -ErrorAction SilentlyContinue).Source }
-if ($claude) { & $claude plugin marketplace update session-dashboard; & $claude plugin update session-dashboard@session-dashboard; & $claude plugin list } else { "Fandt ingen claude.exe" }
+if ($claude) { & $claude plugin marketplace update agent-kontor; & $claude plugin update agent-kontor@agent-kontor; & $claude plugin list } else { "Fandt ingen claude.exe" }
 ```
 
-## Hvor kommer tallene fra?
+## Kom i gang
 
-- Kontekst, grænser og pris er de samme tal, som Claudes egen statuslinje og `/cost` bruger. Forbrugsgrænserne vises kun med et Claude-abonnement, og først efter første svar i sessionen.
-- Linjer kode tælles ud fra den diff, Claudes `Edit`- og `Write`-værktøjer returnerer. Ændringer, der fejler eller holdes til godkendelse, tælles ikke med.
-- Alt bliver på din egen maskine. Intet sendes nogen steder hen.
+1. Panelet **🏢 Kontor** åbner af sig selv (ellers skriv `/kontor`).
+2. Skriv dit navn.
+3. **Opret et kontor**, og send koden med **🔗 Inviter → Kopiér invitation**, eller **forbind** til et kontor med en kode, du har fået.
+
+Fra da af flytter alle dine Claude-sessioner ind i kontoret, mens de kører.
+
+| Kommando | Gør |
+| --- | --- |
+| `/kontor` | Åbner kontoret |
+| `/kontor TEAM-2026` eller `/kontor forbind TEAM-2026` | Forbinder til et kontor |
+| `/kontor nyt Copenhagen Data` | Opretter et kontor |
+| `/kontor kode` | Viser kontorets kode |
+| `/kontor navn Casper` | Skifter dit navn |
+| `/kontor forlad` | Forlader kontoret |
+
+## Hvad deles?
+
+Kun status, aldrig samtalen:
+
+- hvad agenten laver, og et filnavn (`Skriver register.tsx`), eller programmet i en kommando uden argumenter (`Kører npm test`, aldrig `--token=…` eller miljøvariabler),
+- projektmappens navn, modellen, linjer kode, pris og forbrugsgrænse i procent.
+
+Kun medlemmer af kontoret kan se det, og kun med kontorets kode bliver man medlem (Row Level Security i Supabase). En agent, der ikke har meldt sig i 10 minutter, forsvinder fra kontoret, og alt slettes efter et døgn.
+
+Fejler kontoret, mærker Claude intet: rapporteringen kører i baggrunden og kan aldrig stoppe et værktøjskald.
+
+## Backend
+
+Bygger på samme Supabase-projekt som [Team Chat](https://github.com/Stokn9x/Claude_Chat) (anonyme logins og koder). Kontorets tabeller og funktioner ligger i [`supabase/schema.sql`](supabase/schema.sql).
