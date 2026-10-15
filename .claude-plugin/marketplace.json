@@ -1,0 +1,6 @@
+{
+  "name": "session-dashboard",
+  "description": "Et dashboard over prompten i Claude: kontekst, forbrugsgrænser, pris, tokens og linjer kode",
+  "owner": { "name": "Casper", "email": "cej@copenhagendata.com" },
+  "plugins": [{ "name": "session-dashboard", "source": "./" }]
+}
