@@ -179,3 +179,38 @@ for (const surface of ['terminal', 'desktop'] as const) {
     expect(mine?.[0]).toMatch(/^C:\/Users\/test\/\.claude\/agent-kontor\/sessions\/s[a-z0-9]+\.json$/)
   })
 }
+
+for (const surface of ['terminal', 'desktop'] as const) {
+  test(`${surface}: green tests throw confetti for a while, a plain command does not`, async ($, on) => {
+    const clock = engine(on)
+    await $.session.start(start())
+    const ui = await $.ui.mount({ plugin: 'agent-kontor', surface, component: 'Pane', requestId: 'kontor', props: paneProps })
+
+    await $.tool.call({ tool: 'Bash', command: 'npm test', tool_use_id: 't1' } as never)
+    await clock.advance(900)
+    if (surface === 'desktop') expect(JSON.stringify(await ui.drawn())).toContain('Testene er grønne')
+
+    await clock.advance(5000)
+    if (surface === 'desktop') expect(JSON.stringify(await ui.drawn())).not.toContain('Testene er grønne')
+
+    // A plain command is nothing to celebrate.
+    await $.tool.call({ tool: 'Bash', command: 'ls -la', tool_use_id: 't2' } as never)
+    await clock.advance(900)
+    if (surface === 'desktop') expect(JSON.stringify(await ui.drawn())).not.toContain('Testene')
+  })
+}
+
+test('desktop: Claude thanks a helper by name when it hands over its result', async ($, on) => {
+  let ui: { drawn: () => Promise<unknown> } = { drawn: async () => null }
+  const clock = engine(on, async e => {
+    if (e.tool === 'Agent') {
+      await $.agent.spawn({ tool_use_id: e.tool_use_id, prompt: 'p', description: 'Kortlæg API’et', subagentType: 'Explore', parentModel: 'm', background: false } as never)
+    }
+  })
+  await $.session.start(start())
+  ui = await $.ui.mount({ plugin: 'agent-kontor', surface: 'desktop', component: 'Pane', requestId: 'kontor', props: paneProps })
+  await $.turn.start({ text: 'hej', turnId: 't1' } as never)
+  await $.tool.call({ tool: 'Agent', prompt: 'p', description: 'Kortlæg API’et', tool_use_id: 'a1' } as never)
+  await clock.advance(900)
+  expect(JSON.stringify(await ui.drawn())).toMatch(/Tak, [A-ZÆØÅ][a-zæøå]+!/)
+})

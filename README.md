@@ -5,7 +5,9 @@ Et pixel-kontor set ovenfra i et panel ved siden af Claude. Claude sidder ved de
 - **Seks skriveborde i teamrummet.** Hver hjælper får et navn og sit eget udseende, og flere end seks venter ved døren.
 - **Talebobler med det, de laver lige nu:** "Læser api.ts", "Skriver README.md", "Kører npm test". Skærmen på skrivebordet viser det også: kode, terminal, en side tekst eller en browser.
 - **Venter på dig:** figuren rækker hånden op, boblen blinker rødt, og en stribe under kontoret siger hvad den venter på. Det sker kun, når en godkendelsesdialog faktisk vises for dig, ikke når Auto-tilstanden selv afgør det.
-- **Pause:** Claude går ud i køkkenet med en kop kaffe, der damper.
+- **Pause:** Claude går ud i køkkenet med en kop kaffe, der damper, og småsnakker.
+- **Fejringer:** konfetti når testene er grønne (`npm test`, `pytest`, `jest`, `vitest`, `cargo test` …), en regnsky når de fejler, og balloner ved `git commit` og `gh pr create`.
+- **Tak:** når en hjælper afleverer, siger Claude tak ved navn.
 - **Dine andre sessioner** sidder i projektrummet nederst, med projektnavn, hvad de laver og hvor mange hjælpere de har. Hver session skriver en lille statusfil i `~/.claude/agent-kontor/sessions/` og læser de andres.
 - Under kontoret står linjer kode, pris og hvor meget af 5-timers-grænsen, sessionen har brugt.
 

@@ -25,8 +25,17 @@ export type Other = {
   updatedAt: number
 }
 
+// A moment worth marking at someone's desk: green tests, red tests, a commit.
+export type Party = {
+  kind: 'confetti' | 'rain' | 'balloons'
+  who: string
+  label: string
+  at: number
+}
+
 export type Office = {
   sessionKey: string
+  party: Party | null
   others: Other[]
   project: string
   startedAt: number

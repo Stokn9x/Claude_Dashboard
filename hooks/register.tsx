@@ -1,7 +1,7 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register, RenderElement } from 'claude-code'
 
-import type { Activity, AgentState, Office, Other, Phase, Sub } from '../types'
+import type { Activity, AgentState, Office, Other, Party, Phase, Sub } from '../types'
 
 // A pixel office for this session alone, seen from above: Claude at the big
 // desk, its subagents at the six desks of the team room. Nothing leaves the
@@ -19,6 +19,7 @@ const pause: Activity = { state: 'idle', detail: 'Holder pause' }
 
 const emptyOffice: Office = {
   sessionKey: '',
+  party: null,
   others: [],
   project: '',
   startedAt: 0,
@@ -174,6 +175,26 @@ const deliver = async ($: $, id: string) => {
   })
 }
 
+// Tests, commits and pull requests, recognised by the command that ran them.
+const TESTS = /\b(npm|pnpm|yarn|bun)\s+(run\s+)?test\b|\bnpx\s+(jest|vitest|playwright)\b|\b(pytest|jest|vitest)\b|\b(cargo|go|dotnet)\s+test\b|\bplugin\s+test\b/
+const COMMIT = /\bgit\s+commit\b/
+const PULL = /\bgh\s+pr\s+create\b/
+const PARTY_MS = 5000
+
+const partyFor = (command: string, isOk: boolean): Pick<Party, 'kind' | 'label'> | null => {
+  if (TESTS.test(command)) return isOk ? { kind: 'confetti', label: 'Testene er grønne' } : { kind: 'rain', label: 'Testene fejler' }
+  if (!isOk) return null
+  if (PULL.test(command)) return { kind: 'balloons', label: 'Pull request åbnet' }
+  if (COMMIT.test(command)) return { kind: 'balloons', label: 'Committet' }
+  return null
+}
+
+const celebrate = async ($: $, who: string, party: Pick<Party, 'kind' | 'label'>) => {
+  const at = await $.clock.now()
+  await update($, office, o => ({ ...o, party: { ...party, who, at } }))
+  $.clock.after(PARTY_MS, () => void quietly(update($, office, o => (o.party?.at === at ? { ...o, party: null } : o))))
+}
+
 type Patch = { lines: string[] }[]
 const countPatch = (patch: Patch | undefined) => {
   let added = 0
@@ -205,7 +226,8 @@ const runDemo = async ($: $) => {
     $.clock.after(i * 700, () => void quietly(arrive($, id, task, activity)))
     $.clock.after(14_000 + i * 2600, () => void quietly(deliver($, id)))
   })
-  $.clock.after(14_000 + demoTasks.length * 2600 + 16_000, () => void quietly(setMain($, pause)))
+  $.clock.after(14_000 + demoTasks.length * 2600 + 12_000, () => void quietly(celebrate($, 'main', { kind: 'confetti', label: 'Testene er grønne' })))
+  $.clock.after(14_000 + demoTasks.length * 2600 + 18_000, () => void quietly(setMain($, pause)))
 }
 
 // ─── Pixels ─────────────────────────────────────────────────────────────
@@ -597,6 +619,63 @@ const furniture = () => `
 
 type Scene = { source: string; width: number; height: number }
 
+// A steady scatter: the same party draws the same picture, so it never blinks.
+const scatter = (i: number, span: number) => ((i * 37 + 11) % 97) / 97 * span - span / 2
+
+const confetti = (cx: number, top: number) => {
+  const colours = ['#E5484D', '#3E7CC9', '#D6A23C', '#2E9E8F', '#8A6FD6', '#E07A4F']
+  return Array.from({ length: 28 }, (_, i) => {
+    const x = cx + scatter(i, 110)
+    const dur = 1.3 + (i % 5) * 0.18
+    const delay = (i % 7) * 0.12
+    return `<rect x="${x.toFixed(1)}" y="${top}" width="3" height="${i % 3 === 0 ? 2 : 3}" fill="${colours[i % colours.length]}">
+      <animate attributeName="y" values="${top};${top + 70}" dur="${dur}s" begin="${delay}s" repeatCount="3"/>
+      <animate attributeName="opacity" values="1;1;0" dur="${dur}s" begin="${delay}s" repeatCount="3"/></rect>`
+  }).join('')
+}
+
+const raincloud = (cx: number, top: number) => {
+  const puffs = [[-14, 6, 9], [0, 2, 12], [14, 6, 9], [-6, 10, 9], [8, 10, 9]]
+    .map(([dx, dy, r]) => `<circle cx="${cx + (dx as number)}" cy="${top + (dy as number)}" r="${r}" fill="#8B97A6" stroke="${OUTLINE}" stroke-width="1"/>`)
+    .join('')
+  const drops = Array.from({ length: 9 }, (_, i) => {
+    const x = cx - 18 + i * 4.5
+    return `<rect x="${x}" y="${top + 18}" width="1.5" height="4" fill="#5DA9E9"><animate attributeName="y" values="${top + 16};${top + 44}" dur="0.7s" begin="${(i % 4) * 0.17}s" repeatCount="indefinite"/></rect>`
+  }).join('')
+  return `${drops}${puffs}<rect x="${cx - 18}" y="${top + 10}" width="36" height="6" fill="#8B97A6"/>`
+}
+
+const balloons = (cx: number, top: number) =>
+  ['#E5484D', '#D6A23C', '#3E7CC9'].map((colour, i) => {
+    const x = cx - 22 + i * 22
+    return `<g><animateTransform attributeName="transform" type="translate" values="0 30;0 -10;0 -50" dur="${3 + i * 0.4}s" fill="freeze"/>
+      <path d="M${x} ${top + 14} q -3 8 0 16" stroke="${OUTLINE}" stroke-width="0.8" fill="none"/>
+      <ellipse cx="${x}" cy="${top + 6}" rx="7" ry="9" fill="${colour}" stroke="${OUTLINE}" stroke-width="1"/>
+      <ellipse cx="${x - 2}" cy="${top + 3}" rx="2" ry="3" fill="#FFFFFF" opacity="0.5"/></g>`
+  }).join('')
+
+const partyAt = (o: Office) => {
+  const p = o.party
+  if (!p) return ''
+  const sub = o.subs.find(s => s.id === p.who && s.phase === 'working' && s.seat >= 0)
+  const spot = sub ? seatAt(sub.seat) : MAIN
+  const art = p.kind === 'confetti' ? confetti(spot.cx, spot.dy - 60) : p.kind === 'rain' ? raincloud(spot.cx, spot.dy - 66) : balloons(spot.cx, spot.dy - 40)
+  return `${art}${tag(spot.cx, spot.dy - 76, p.label, p.kind === 'rain' ? '#5B6B7E' : '#2E9E8F')}`
+}
+
+// Claude's small talk in the kitchen, one line every few seconds.
+const smallTalk = (o: Office) => {
+  const lines = ['Kaffepause', o.linesAdded ? `${o.linesAdded} linjer i dag` : 'Klar når du er', 'Godt arbejde, team', 'Hvad nu?']
+  const slot = 3
+  const total = slot * lines.length
+  return lines
+    .map((line, i) => {
+      const values = lines.map((_, k) => (k === i ? 1 : 0)).join(';')
+      return `<g opacity="${i === 0 ? 1 : 0}"><animate attributeName="opacity" values="${values}" dur="${total}s" calcMode="discrete" repeatCount="indefinite"/>${bubble(KITCHEN_SEAT.x, KITCHEN_SEAT.y - 46, line)}</g>`
+    })
+    .join('')
+}
+
 // The project room: the other sessions' Claudes, one desk each.
 const projectRoom = (others: Other[]) => {
   const desks = Array.from({ length: 4 }, (_, i) => {
@@ -663,6 +742,17 @@ const officeSvg = (o: Office, now: number, hour: number): Scene => {
 
   const queue = extra > 0 ? tag(DOOR.x, 350, `+${extra} venter ved døren`, '#C8643B') : ''
 
+  const thanks = walking
+    .filter(s => s.phase === 'delivering')
+    .map(s => {
+      const arrived = walkMs(deliverPath(s.seat)) / 1000 - (now - s.since) / 1000
+      return { begin: arrived, end: arrived + HANDOVER_MS / 1000, name: s.name }
+    })
+  const mainSays = isOut
+    ? ''
+    : `<g>${thanks.map(w => `<set attributeName="opacity" to="0" begin="${sec(w.begin)}" end="${sec(w.end)}"/>`).join('')}${mainBubble}</g>
+      ${thanks.map(w => `<g opacity="0"><set attributeName="opacity" to="1" begin="${sec(w.begin)}" end="${sec(w.end)}"/>${bubble(MAIN.cx, MAIN.dy - 30, `Tak, ${w.name}!`)}</g>`).join('')}`
+
   const source = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" shape-rendering="crispEdges">
   <defs><clipPath id="building"><rect width="${W}" height="${H}" rx="10"/></clipPath></defs>
   <g clip-path="url(#building)">
@@ -676,7 +766,8 @@ const officeSvg = (o: Office, now: number, hour: number): Scene => {
     ${desks}
     ${projectRoom(o.others)}
     ${walkers}
-    ${mainBubble}${bubbles}${queue}
+    ${mainSays}${isOut ? smallTalk(o) : ''}${bubbles}${queue}
+    ${partyAt(o)}
   </g>
 </svg>`
 
@@ -759,7 +850,7 @@ const leaveOffice = async ($: $) => {
 const refreshFrame = async ($: $) => {
   const o = await readOffice($)
   const f = await read($, frame)
-  const visible = (x: Office | null) => (x ? JSON.stringify({ main: x.main, subs: x.subs, project: x.project, others: fresh(x).others.map(y => [y.key, y.project, y.main, y.helpers]) }) : '')
+  const visible = (x: Office | null) => (x ? JSON.stringify({ main: x.main, subs: x.subs, project: x.project, party: fresh(x).party, others: fresh(x).others.map(y => [y.key, y.project, y.main, y.helpers]) }) : '')
   if (visible(o) === visible(f.office)) return
   const at = await $.clock.now()
   await update($, frame, () => ({ office: o, at }))
@@ -864,6 +955,12 @@ export const register: Register = on => {
           : countPatch(r.structuredPatch)
         await quietly(update($, office, o => ({ ...o, linesAdded: o.linesAdded + counted.added, linesRemoved: o.linesRemoved + counted.removed })))
       }
+    }
+    if ((e.tool === 'Bash' || e.tool === 'PowerShell') && 'result' in ran && ran.result) {
+      const result = ran.result as { interrupted?: boolean; backgroundTaskId?: string }
+      const command = String((e as unknown as { command?: unknown }).command ?? '')
+      const party = result.backgroundTaskId || result.interrupted ? null : partyFor(command, !ran.isError)
+      if (party) await quietly(celebrate($, e.agentId ?? 'main', party))
     }
     if (!sub) await quietly(setActivity($, e.agentId, thinking))
 
