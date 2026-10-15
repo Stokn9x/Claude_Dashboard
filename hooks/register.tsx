@@ -331,8 +331,9 @@ const figure = (look: Look, facing: Facing, isWalking: boolean) => {
   const left = -5 * P
   const drawn = frames
     .map((legs, i) => {
-      // Up a pixel on the passing frames: the bob of a step.
-      const lift = isWalking && i % 2 === 1 ? -P : 0
+      // The bob of a step: down a pixel as a foot lands, over the waist, so
+      // body and legs never part.
+      const lift = isWalking && i % 2 === 0 ? P : 0
       const art = paint(body, look, left, top + lift) + paint(legs, look, left, top + body.length * P)
       if (!isWalking) return art
       const values = frames.map((_, k) => (k === i ? 1 : 0)).join(';')
