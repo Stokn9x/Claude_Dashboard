@@ -23,6 +23,7 @@ Status: ✅ lavet · 🟡 delvist · ⬜ ikke lavet · ➖ ikke længere relevan
 | 0.7.9 | Mere levende figurer: lidt større, blinker, ånder, og en tænkeboble med … i stedet for "Tænker" |
 | 0.8.0 | Spillets fase 0: grundplanen som data, ruter med A\*, kamera med træk, zoom og minikort, gåture med fast varighed, kroner tjent ved arbejdet og vist på siden |
 | 0.9.0 | Spillets fase 1: køb skriveborde for kroner i butikken eller ved at klikke på skiltet; hjælpere uden skrivebord sidder på gulvet med en laptop og brokker sig |
+| 0.10.0 | Spillets fase 2: køb køkken, toilet, sofahjørne, bordtennisbord og mødelokale; ledige grunde med skilte, byggeri med stillads og konfetti; toilet og mødelokale er nye rum under projektrummet |
 
 ## 🔧 Fejl og ting der driller
 

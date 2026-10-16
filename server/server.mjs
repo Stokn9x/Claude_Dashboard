@@ -15,7 +15,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-const VERSION = '0.9.0'
+const VERSION = '0.10.0'
 const HOST = '127.0.0.1'
 const PORT = Number(process.env.AGENT_KONTOR_PORT || 4747)
 const HERE = path.dirname(fileURLToPath(import.meta.url))
@@ -122,9 +122,12 @@ const pruneCredited = now => {
 // Desks 1-2 come with the office; the team room has room for six.
 const DESK_PRICES = [0, 0, 500, 750, 1000, 1500]
 const MAX_DESKS = DESK_PRICES.length
+// Rooms, and furniture for the team room, bought once each.
+const ROOM_PRICES = { kitchen: 2000, toilet: 1500, lounge: 2500, pingpong: 3000, meeting: 5000 }
 
 const priceOf = item => {
   if (item === 'desk') return game.owned.desks < MAX_DESKS ? DESK_PRICES[game.owned.desks] : null
+  if (item in ROOM_PRICES) return game.owned.rooms.includes(item) ? null : ROOM_PRICES[item]
   return null
 }
 
@@ -134,6 +137,7 @@ const buy = item => {
   if (game.kroner < price) return { status: 409, error: `Det koster ${price} kr, og du har ${Math.floor(game.kroner)} kr` }
   game.kroner -= price
   if (item === 'desk') game.owned.desks += 1
+  else game.owned.rooms = [...game.owned.rooms, item]
   game.log = [...(game.log ?? []), { at: Date.now(), item, price }].slice(-50)
   isGameChanged = true
   saveGame()
@@ -145,7 +149,7 @@ const buy = item => {
 const gameView = () => ({
   kroner: Math.floor(game.kroner),
   owned: game.owned,
-  next: { desk: priceOf('desk') },
+  next: Object.fromEntries(['desk', ...Object.keys(ROOM_PRICES)].map(item => [item, priceOf(item)])),
   maxDesks: MAX_DESKS,
   rates: RATES,
   bought: (game.log ?? []).slice(-5),

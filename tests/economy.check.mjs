@@ -68,5 +68,17 @@ check('three desks now', after.owned.desks, 3)
 check('and 500 kr less', after.kroner, 260)
 check('the next costs 750', after.next.desk, 750)
 
+// Rooms: bought once, and only with the money for them.
+check('the kitchen costs 2000', after.next.kitchen, 2000)
+check('the kitchen cannot be afforded yet', (await buy({ origin, 'x-kontor-token': token }, 'kitchen')).status, 409)
+write({ ...zero, added: 2500 }, { key: 'sB' })
+await sleep(900)
+check('buying the kitchen works', (await buy({ origin, 'x-kontor-token': token }, 'kitchen')).status, 200)
+const withKitchen = (await state()).game
+check('the kitchen is owned', withKitchen.owned.rooms.includes('kitchen'), true)
+check('and not for sale again', withKitchen.next.kitchen, null)
+check('a second kitchen is refused', (await buy({ origin, 'x-kontor-token': token }, 'kitchen')).status, 409)
+check('something unknown is refused', (await buy({ origin, 'x-kontor-token': token }, 'castle')).status, 409)
+
 child.kill()
 fs.rmSync(home, { recursive: true, force: true })

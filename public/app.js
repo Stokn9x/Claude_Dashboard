@@ -49,14 +49,32 @@ const ROOM_TYPES = {
     // Where a helper without a desk sits on the floor with its laptop
     floor: [[70, 372], [100, 372], [252, 372], [276, 372], [364, 372], [394, 372], [424, 372], [34, 278], [62, 278], [90, 278]].map(([x, y]) => ({ x, y })),
     plants: [[462, 150, true], [20, 150], [380, 368], [56, 368], [234, 366, true]],
-    lights: [[130, 366, 54, 0.42], ...[[166, 200], [314, 200], [166, 300], [314, 300]].map(([x, y]) => [x, y, 66, 0.16, 'ceiling'])],
-    bulbs: [[130, 366]],
+    lights: [[130, 366, 54, 0.42, 'lamp', 'lounge'], ...[[166, 200], [314, 200], [166, 300], [314, 300]].map(([x, y]) => [x, y, 66, 0.16, 'ceiling'])],
+    bulbs: [[130, 366, 'lounge']],
+    // Furniture bought for the room, and where its sign stands until then
+    items: { lounge: { x: 180, y: 362 }, pingpong: { x: 316, y: 362 } },
     blocks: [
       // Desks, and the chairs behind them: walkers go round, not over people
       ...[0, 1, 2, 3, 4, 5].map(i => [50 + (i % 3) * 148, 201 + Math.floor(i / 3) * 102, 84, 30]),
       ...[0, 1, 2, 3, 4, 5].map(i => [71 + (i % 3) * 148, 184 + Math.floor(i / 3) * 102, 42, 22]),
       [8, 178, 14, 76], [14, 356, 30, 18], [138, 346, 84, 31], [290, 349, 52, 28], [452, 334, 16, 24],
     ],
+  },
+  toilet: {
+    home: { x: 6, y: 514 },
+    w: 114,
+    h: 90,
+    plants: [[106, 588]],
+    lights: [[63, 559, 44, 0.18, 'ceiling']],
+    blocks: [[10, 516, 100, 40], [12, 584, 44, 16]],
+  },
+  meeting: {
+    home: { x: 126, y: 514 },
+    w: 348,
+    h: 90,
+    plants: [[140, 528], [460, 528, true]],
+    lights: [[240, 560, 54, 0.3], [360, 560, 54, 0.3]],
+    blocks: [[168, 532, 264, 58], [424, 516, 40, 16]],
   },
   // Where the other sessions sit
   project: {
@@ -72,23 +90,42 @@ const ROOM_TYPES = {
 const PLAN = {
   rooms: [
     { id: 'claude', type: 'corner', x: 6, y: 16 },
-    { id: 'kitchen', type: 'kitchen', x: 252, y: 16 },
+    { id: 'kitchen', type: 'kitchen', x: 252, y: 16, buy: 'kitchen' },
     { id: 'team', type: 'team', x: 6, y: 138 },
     { id: 'project', type: 'project', x: 6, y: 384 },
+    { id: 'toilet', type: 'toilet', x: 6, y: 514, buy: 'toilet' },
+    { id: 'meeting', type: 'meeting', x: 126, y: 514, buy: 'meeting' },
   ],
-  // Openings in the walls, in world units, and the front door.
+  // Openings in the walls, in world units, between two rooms (open once
+  // both are built), and the front door.
   doors: [
-    { x: 246, y: 90, w: 6, h: 32, colour: '#CDB892' },
-    { x: 196, y: 132, w: 40, h: 6, colour: '#CDB892' },
-    { x: 300, y: 132, w: 40, h: 6, colour: '#D5DAD2' },
-    { x: 214, y: 378, w: 48, h: 6, colour: '#C3CCD6' },
-    { x: 474, y: 236, w: 6, h: 40, colour: '#8C6B4A', isEntrance: true },
+    { x: 246, y: 90, w: 6, h: 32, colour: '#CDB892', between: ['claude', 'kitchen'] },
+    { x: 196, y: 132, w: 40, h: 6, colour: '#CDB892', between: ['claude', 'team'] },
+    { x: 300, y: 132, w: 40, h: 6, colour: '#D5DAD2', between: ['kitchen', 'team'] },
+    { x: 214, y: 378, w: 48, h: 6, colour: '#C3CCD6', between: ['team', 'project'] },
+    { x: 40, y: 502, w: 36, h: 12, colour: '#C3CCD6', between: ['project', 'toilet'] },
+    { x: 280, y: 502, w: 48, h: 12, colour: '#C3CCD6', between: ['project', 'meeting'] },
+    { x: 474, y: 236, w: 6, h: 40, colour: '#8C6B4A', isEntrance: true, between: ['team'] },
   ],
   entrance: { x: 478, y: 256 },
   doormat: [462, 242, 12, 28],
 }
 
 const typeOf = room => ROOM_TYPES[room.type]
+
+// What can be bought, by its id: rooms and the team room's furniture.
+const ITEMS = {
+  desk: { name: 'Skrivebord', about: 'Hjælpere uden skrivebord sidder på gulvet med en laptop og brokker sig.' },
+  kitchen: { name: 'Køkken', about: 'Claude holder kaffepause i køkkenet i stedet for ved skrivebordet.' },
+  toilet: { name: 'Toilet', about: 'Et toilet med to båse og en håndvask. Hvem har ikke brug for det?' },
+  lounge: { name: 'Sofahjørne', about: 'En sofa, et sofabord og en lampe i teamrummet.' },
+  pingpong: { name: 'Bordtennisbord', about: 'Et bordtennisbord i teamrummet.' },
+  meeting: { name: 'Mødelokale', about: 'Et mødelokale med et langt bord og en skærm på væggen.' },
+}
+// Whether something is bought; everything counts as bought until the
+// server has said what is.
+const owns = item => !item || !state.game || (state.game.owned?.rooms ?? []).includes(item)
+const isBuilt = room => owns(room.buy)
 const shiftOf = room => ({ dx: room.x - typeOf(room).home.x, dy: room.y - typeOf(room).home.y })
 const roomsOf = type => PLAN.rooms.filter(r => r.type === type)
 const firstRoom = type => roomsOf(type)[0] ?? null
@@ -135,7 +172,7 @@ const MAIN = (() => {
 })()
 const coffeeSpot = () => {
   const room = firstRoom('kitchen')
-  return room ? at(room, typeOf(room).coffee) : null
+  return room && isBuilt(room) ? at(room, typeOf(room).coffee) : null
 }
 const handoffFor = seat => {
   const room = firstRoom('corner')
@@ -402,7 +439,10 @@ const ctx = canvas.getContext('2d')
 // keeps its own units (W × H), so a bigger office later only changes those.
 const fit = () => {
   const room = stage.getBoundingClientRect()
-  const scale = Math.max(0.5, Math.min(room.width / W, room.height / H))
+  // In a narrow window the picture sets its own height from the width (at
+  // most most of the screen), and the list follows under it.
+  const isNarrow = window.matchMedia('(max-width: 720px)').matches
+  const scale = Math.max(0.5, isNarrow ? Math.min(room.width / W, (window.innerHeight * 0.78) / H) : Math.min(room.width / W, room.height / H))
   const dpr = window.devicePixelRatio || 1
   const next = scale * dpr
   canvas.style.width = `${Math.floor(W * scale)}px`
@@ -757,7 +797,7 @@ const board = (stats, kroner) => {
 // A wall clock showing the time it is.
 const clock = date => {
   const room = firstRoom('kitchen')
-  if (!room) return
+  if (!room || !isBuilt(room)) return
   const { x, y } = at(room, typeOf(room).clock)
   const r = typeOf(room).clock.r
   circle(x, y, r + 1, OUTLINE)
@@ -807,7 +847,7 @@ const darknessAt = h => {
 // The windows of every room, where they are now: in a top wall (x, the top
 // of the room) and in side walls (x of the wall, y, height, which way in).
 const topWindows = () =>
-  PLAN.rooms.flatMap(room => (typeOf(room).windows ?? []).map(x => ({ x: x + shiftOf(room).dx, y: room.y })))
+  PLAN.rooms.filter(isBuilt).flatMap(room => (typeOf(room).windows ?? []).map(x => ({ x: x + shiftOf(room).dx, y: room.y })))
 const sideWindows = () =>
   PLAN.rooms.flatMap(room =>
     (typeOf(room).sideWindows ?? []).map(([x, y, h]) => {
@@ -863,16 +903,18 @@ const evening = (h, screens) => {
     ctx.fillRect(x - r, y - r, r * 2, r * 2)
   }
   ctx.globalCompositeOperation = 'lighter'
-  for (const room of visibleRooms()) {
+  for (const room of visibleRooms().filter(isBuilt)) {
     const { dx, dy } = shiftOf(room)
-    for (const [x, y, r, alpha, kind] of typeOf(room).lights ?? []) glow(x + dx, y + dy, r, kind === 'ceiling' ? '255, 228, 180' : '255, 196, 120', alpha)
+    for (const [x, y, r, alpha, kind, needs] of typeOf(room).lights ?? []) {
+      if (owns(needs)) glow(x + dx, y + dy, r, kind === 'ceiling' ? '255, 228, 180' : '255, 196, 120', alpha)
+    }
   }
   for (const [x, y] of screens) glow(x, y, 26, '130, 180, 255', 0.3)
   ctx.globalCompositeOperation = 'source-over'
   // The bulbs themselves
-  for (const room of visibleRooms()) {
+  for (const room of visibleRooms().filter(isBuilt)) {
     const { dx, dy } = shiftOf(room)
-    for (const [x, y] of typeOf(room).bulbs ?? []) circle(x + dx, y + dy, 1.8, '#FFF3C4')
+    for (const [x, y, needs] of typeOf(room).bulbs ?? []) if (owns(needs)) circle(x + dx, y + dy, 1.8, '#FFF3C4')
   }
 }
 
@@ -982,7 +1024,7 @@ const roomDrawers = {
     fill(460, 76, 5, 10, '#2F5F9C')
   },
 
-  team: (g, fill, dot) => {
+  team: (g, fill, dot, has) => {
     // Sage carpet
     fill(6, 138, 468, 240, '#CBD9C7')
     for (let c = 0; c < 20; c++) fill(6 + c * 24, 138, 1, 240, '#BCCBB8')
@@ -1010,6 +1052,7 @@ const roomDrawers = {
     fill(19, 360, 20, 3, '#2B2F36')
     fill(21, 365, 16, 6, '#F6F7F8')
     // The lounge corner: a rug, a sofa against the wall, a coffee table, a lamp
+    if (has('lounge')) {
     g.fillStyle = '#E6D3B3'
     g.beginPath()
     g.roundRect(138, 346, 84, 31, 4)
@@ -1031,7 +1074,9 @@ const roomDrawers = {
     dot(130, 366, 6, OUTLINE)
     dot(130, 366, 4.8, '#F6E3A8')
     dot(130, 366, 1.6, '#D6A23C')
+    }
     // A ping-pong table, net across the middle
+    if (has('pingpong')) {
     fill(290, 350, 52, 26, OUTLINE)
     fill(291, 351, 50, 24, '#2E8B6E')
     fill(291, 362.5, 50, 1, '#FFFFFF')
@@ -1040,10 +1085,68 @@ const roomDrawers = {
     dot(300, 356, 1.6, '#FFFFFF')
     dot(286, 358, 3, '#E5484D', OUTLINE)
     dot(346, 368, 3, '#3E7CC9', OUTLINE)
+    }
     // The water cooler
     fill(452, 334, 16, 24, OUTLINE)
     fill(453, 335, 14, 10, '#9CC4EC')
     fill(453, 346, 14, 11, '#E9EEF2')
+  },
+
+  toilet: (g, fill, dot) => {
+    // Small pale tiles
+    fill(6, 514, 114, 90, '#E3EEF2')
+    for (let c = 0; c < 15; c++) for (let r = 0; r < 12; r++) if ((c + r) % 2 === 0) fill(6 + c * 8, 514 + r * 8, 8, 8, '#D4E3E9')
+    // Two stalls along the top wall, a door each
+    for (const x of [10, 60]) {
+      fill(x, 516, 50, 40, OUTLINE)
+      fill(x + 1, 517, 48, 38, '#F4F7F8')
+      dot(x + 25, 528, 7, OUTLINE)
+      dot(x + 25, 528, 5.8, '#FFFFFF')
+      dot(x + 25, 529, 3.2, '#CFE3EC')
+      fill(x + 18, 518, 14, 4, '#E9EEF2')
+      fill(x + 8, 553, 34, 3, '#7FA7C2')
+    }
+    // A sink and a mirror
+    fill(12, 584, 44, 16, OUTLINE)
+    fill(13, 585, 42, 14, '#F4F7F8')
+    dot(34, 592, 5, '#CFE3EC', '#9CB4C6')
+    fill(20, 598, 28, 2, '#9CC4EC')
+  },
+
+  meeting: (g, fill, dot) => {
+    // Dark wooden floor
+    fill(126, 514, 348, 90, '#B48A64')
+    for (let i = 0; i < 9; i++) {
+      fill(126, 516 + i * 10, 348, 1, '#A47A55')
+      fill(140 + ((i * 61) % 320), 516 + i * 10, 1, 10, '#A47A55')
+    }
+    // A screen on the wall, and a whiteboard in the corner
+    fill(270, 515, 60, 6, OUTLINE)
+    fill(271, 516, 58, 4, '#1F2A44')
+    fill(424, 516, 40, 16, OUTLINE)
+    fill(425, 517, 38, 14, '#F6F7F8')
+    fill(428, 520, 20, 1.5, '#3E7CC9')
+    fill(428, 524, 28, 1.5, '#E07A4F')
+    // The long table and its chairs
+    for (let i = 0; i < 6; i++) {
+      for (const y of [538, 584]) {
+        dot(190 + i * 44, y, 6, OUTLINE)
+        dot(190 + i * 44, y, 4.8, '#465566')
+      }
+    }
+    g.fillStyle = OUTLINE
+    g.beginPath()
+    g.roundRect(168, 544, 264, 34, 10)
+    g.fill()
+    g.fillStyle = '#6E4B32'
+    g.beginPath()
+    g.roundRect(169, 545, 262, 32, 9)
+    g.fill()
+    fill(180, 548, 240, 2, '#8A6143')
+    for (const x of [214, 300, 386]) {
+      fill(x, 556, 12, 9, '#F6F7F8')
+      dot(x + 18, 560, 2.4, '#FFFFFF', '#B9C3CC')
+    }
   },
 
   project: (g, fill) => {
@@ -1095,12 +1198,30 @@ const visibleRooms = () => PLAN.rooms.filter(room => {
   return isInView(f.x, f.y, f.w, f.h)
 })
 
+// A plot not yet bought: rough ground, a few tufts, and a fence of stakes
+// and rope. Its sign, with the price, is drawn on top each frame.
+const drawLot = (g, fill, room) => {
+  const t = typeOf(room)
+  fill(room.x, room.y, t.w, t.h, '#A9C08A')
+  for (let i = 0; i < 14; i++) {
+    const x = room.x + ((i * 53) % (t.w - 10)) + 4
+    const y = room.y + ((i * 37) % (t.h - 10)) + 4
+    fill(x, y, 6, 3, i % 2 ? '#93AB75' : '#B9A27A')
+  }
+  g.setLineDash([4, 3])
+  g.strokeStyle = '#F6F1E4'
+  g.lineWidth = 1.2
+  g.strokeRect(room.x + 4, room.y + 4, t.w - 8, t.h - 8)
+  g.setLineDash([])
+  for (const [x, y] of [[room.x + 4, room.y + 4], [room.x + t.w - 4, room.y + 4], [room.x + 4, room.y + t.h - 4], [room.x + t.w - 4, room.y + t.h - 4]]) fill(x - 1.5, y - 1.5, 3, 3, '#8B5E3C')
+}
+
 // The walls, floors and furniture: everything that does not move, drawn
 // again only when the light or the view changes. Rooms out of view are
 // skipped, so a large office costs no more than what is on screen.
 const drawBuilding = (project, hour) => {
   const isNight = hour < 7 || hour >= 19
-  const key = `${project}|${isNight}|${hour < 9 || hour >= 17}|${canvas.width}x${canvas.height}|${view.x.toFixed(2)},${view.y.toFixed(2)},${view.zoom.toFixed(3)}`
+  const key = `${project}|${isNight}|${hour < 9 || hour >= 17}|${canvas.width}x${canvas.height}|${view.x.toFixed(2)},${view.y.toFixed(2)},${view.zoom.toFixed(3)}|${(state.game?.owned?.rooms ?? ['*']).join(',')}`
   if (key === backgroundKey) return
   backgroundKey = key
   if (background.width !== canvas.width || background.height !== canvas.height) {
@@ -1133,6 +1254,7 @@ const drawBuilding = (project, hour) => {
   // The ground outside, then each room's walls
   fill(WORLD.x, WORLD.y, W, H, isNight ? '#1C2430' : '#7FB069')
   for (const room of rooms) {
+    if (!isBuilt(room)) continue
     const f = frameOf(room)
     fill(f.x, f.y, f.w, f.h, WALL)
     if (typeOf(room).topWall) {
@@ -1144,12 +1266,17 @@ const drawBuilding = (project, hour) => {
       }
     }
   }
-  // Floors and furniture, each room in its own place
+  // Floors and furniture, each room in its own place; a plot not yet bought
+  // is an empty lot with a fence
   for (const room of rooms) {
+    if (!isBuilt(room)) {
+      drawLot(g, fill, room)
+      continue
+    }
     const { dx, dy } = shiftOf(room)
     g.save()
     g.translate(dx, dy)
-    roomDrawers[room.type]?.(g, fill, dot)
+    roomDrawers[room.type]?.(g, fill, dot, owns)
     for (const [x, y, big] of typeOf(room).plants ?? []) {
       const r = big ? 9 : 7
       fill(x - 5, y, 10, 8, '#B5683E')
@@ -1160,7 +1287,8 @@ const drawBuilding = (project, hour) => {
     g.restore()
   }
   // Doors, the front door's mat, and windows in the side walls
-  for (const d of PLAN.doors) fill(d.x, d.y, d.w, d.h, d.colour)
+  const roomById = id => PLAN.rooms.find(r => r.id === id)
+  for (const d of PLAN.doors) if ((d.between ?? []).every(id => roomById(id) && isBuilt(roomById(id)))) fill(d.x, d.y, d.w, d.h, d.colour)
   if (PLAN.doormat) fill(...PLAN.doormat, '#6E5A44')
   for (const w of sideWindows()) {
     fill(w.x, w.y, 6, w.h, sky)
@@ -1176,6 +1304,85 @@ const drawBuilding = (project, hour) => {
   g.fillStyle = '#E9EEF2'
   g.textAlign = 'center'
   g.fillText(clip(project || 'Kontoret', 26), mid, WORLD.y + 11.5)
+}
+
+// ── Building ─────────────────────────────────────────────────────────────
+// What is for sale right now, and where its sign stands: a lot's centre,
+// or the spot a piece of furniture will take.
+const forSaleNow = () => {
+  if (!state.game) return []
+  const sales = []
+  for (const room of PLAN.rooms) {
+    if (room.buy && !isBuilt(room)) {
+      const price = state.game.next?.[room.buy]
+      if (typeof price === 'number') sales.push({ item: room.buy, price, x: room.x + typeOf(room).w / 2, y: room.y + typeOf(room).h / 2 })
+    }
+    for (const [item, spot] of Object.entries(typeOf(room).items ?? {})) {
+      const price = state.game.next?.[item]
+      if (!owns(item) && typeof price === 'number') sales.push({ item, price, isFurniture: true, ...at(room, spot) })
+    }
+  }
+  return sales
+}
+
+// Where a bought thing stands, to put up the scaffolding.
+const BUILD_MS = 10_000
+const PARTY_AFTER_MS = 5000
+const areaOf = item => {
+  for (const room of PLAN.rooms) {
+    if (room.buy === item) return { x: room.x, y: room.y, w: typeOf(room).w, h: typeOf(room).h }
+    const spot = typeOf(room).items?.[item]
+    if (spot) {
+      const p = at(room, spot)
+      return { x: p.x - 44, y: p.y - 18, w: 88, h: 36 }
+    }
+  }
+  return null
+}
+
+// For ten seconds after a purchase: scaffolding over the spot, a progress
+// bar and the word; then confetti over the new thing.
+const construction = (now, t) => {
+  for (const bought of state.game?.bought ?? []) {
+    if (bought.item === 'desk') continue
+    const age = now - bought.at
+    const area = areaOf(bought.item)
+    if (!area || age < 0 || age > BUILD_MS + PARTY_AFTER_MS) continue
+    const name = ITEMS[bought.item]?.name ?? 'Nyt'
+    if (age < BUILD_MS) {
+      ctx.save()
+      ctx.beginPath()
+      ctx.rect(area.x, area.y, area.w, area.h)
+      ctx.clip()
+      ctx.fillStyle = 'rgba(214, 162, 60, 0.18)'
+      ctx.fillRect(area.x, area.y, area.w, area.h)
+      ctx.strokeStyle = 'rgba(139, 94, 60, 0.85)'
+      ctx.lineWidth = 1.4
+      for (let x = area.x - area.h; x < area.x + area.w; x += 12) {
+        ctx.beginPath()
+        ctx.moveTo(x, area.y + area.h)
+        ctx.lineTo(x + area.h, area.y)
+        ctx.stroke()
+      }
+      for (let y = area.y + 8; y < area.y + area.h; y += 18) rect(area.x, y, area.w, 2.5, '#8B5E3C')
+      ctx.restore()
+      const cx = area.x + area.w / 2
+      const cy = area.y + area.h / 2
+      tag(cx, cy - 12, `Bygger ${name.toLowerCase()} …`, '#AD7F26')
+      rounded(cx - 30, cy + 2, 60, 6, 3, '#F6F1E4', OUTLINE, 1)
+      rounded(cx - 29, cy + 3, 58 * Math.min(1, age / BUILD_MS), 4, 2, '#D6A23C')
+      // A builder's hammer, going
+      const swing = Math.sin(t / 90) * 0.6
+      ctx.save()
+      ctx.translate(cx + 38, cy + 4)
+      ctx.rotate(swing)
+      rect(-1, -9, 2, 10, '#8B5E3C')
+      rect(-4, -12, 8, 4, '#5B6672')
+      ctx.restore()
+    } else {
+      party({ kind: 'confetti', label: `${name} er klar!`, at: performance.now() - (age - BUILD_MS) }, { cx: area.x + area.w / 2, dy: area.y + area.h / 2 + 30 }, t)
+    }
+  }
 }
 
 // ── Clicking on someone ──────────────────────────────────────────────────
@@ -1415,6 +1622,20 @@ const draw = () => {
     const { cx, dy } = slots[list.length]
     forSaleSign(cx, dy, nextPrice, (state.game?.kroner ?? 0) >= nextPrice, t)
   }
+  // Signs on everything else for sale: lots, and furniture spots
+  for (const sale of forSaleNow()) {
+    const canAfford = (state.game?.kroner ?? 0) >= sale.price
+    if (sale.isFurniture) {
+      ctx.setLineDash([3, 3])
+      rounded(sale.x - 34, sale.y - 14, 68, 28, 4, 'rgba(255,255,255,0.18)', canAfford ? '#2E9E8F' : '#8A94A0', 1.2)
+      ctx.setLineDash([])
+    }
+    const bob = canAfford ? Math.sin(t / 300 + sale.x) * 1 : 0
+    tag(sale.x, sale.y - 6 + bob, `${ITEMS[sale.item].name}: ${kr(sale.price)}`, canAfford ? '#2E9E8F' : '#5B6672')
+    if (!sale.isFurniture) label(canAfford ? 'Klik for at bygge' : 'Ledig grund', sale.x, sale.y + 14, 6.5, canAfford ? '#21776B' : '#4E6A3A', 600)
+    frameHits.push({ kind: 'shop', id: sale.item, x0: sale.x - 46, y0: sale.y - 12, x1: sale.x + 46, y1: sale.y + 18 })
+  }
+  construction(now, t)
   // The one whose card is open, ringed.
   const ring = selected && frameHits.find(h => h.kind === selected.kind && h.id === selected.id)
   if (ring) {
@@ -1472,9 +1693,9 @@ const drawMinimap = () => {
   mini.setTransform(k, 0, 0, k, -WORLD.x * k, -WORLD.y * k)
   mini.fillStyle = '#2A323B'
   mini.fillRect(WORLD.x, WORLD.y, W, H)
-  const colours = { corner: '#DCC194', kitchen: '#F3F5F6', team: '#CBD9C7', project: '#D6DCE6' }
+  const colours = { corner: '#DCC194', kitchen: '#F3F5F6', team: '#CBD9C7', project: '#D6DCE6', toilet: '#E3EEF2', meeting: '#B48A64' }
   for (const room of PLAN.rooms) {
-    mini.fillStyle = colours[room.type] ?? '#C9CED3'
+    mini.fillStyle = isBuilt(room) ? (colours[room.type] ?? '#C9CED3') : '#A9C08A'
     mini.fillRect(room.x, room.y, typeOf(room).w, typeOf(room).h)
   }
   mini.lineWidth = 3 / k
@@ -1807,7 +2028,7 @@ const buyItem = async item => {
     const res = await fetch('/api/buy', { method: 'POST', headers: { 'content-type': 'application/json', 'x-kontor-token': state.token }, body: JSON.stringify({ item }) })
     const answer = await res.json()
     if (answer.game) state.game = answer.game
-    shopMessage = res.ok ? 'Købt! Den næste hjælper uden plads sætter sig ved det.' : answer.error ?? 'Det gik ikke'
+    shopMessage = res.ok ? (item === 'desk' ? 'Købt! Den næste hjælper uden plads sætter sig ved det.' : `Købt! ${ITEMS[item]?.name ?? 'Det'} bliver bygget nu.`) : answer.error ?? 'Det gik ikke'
   } catch {
     shopMessage = 'Kontoret svarer ikke lige nu'
   }
@@ -1817,31 +2038,66 @@ const buyItem = async item => {
 
 const RATE_TEXT = { added: 'linje tilføjet', removed: 'linje fjernet', delivered: 'opgave afleveret af en hjælper', tests: 'grønne tests (højst hvert 10. minut)', commits: 'commit', prs: 'pull request' }
 
-const renderShop = () => {
-  const g = state.game
-  if (!g) {
-    shop.replaceChildren(el('p', { className: 'empty' }, ['Butikken åbner, når kontoret er forbundet.']))
-    return
-  }
-  const price = g.next?.desk
-  const canAfford = typeof price === 'number' && g.kroner >= price
-  const deskItem = el('li', { className: 'item' }, [
-    el('div', { className: 'item-head' }, [el('strong', {}, ['Skrivebord']), el('span', { className: 'item-count' }, [`${g.owned.desks} af ${g.maxDesks}`])]),
-    el('p', { className: 'hint' }, ['Hjælpere uden skrivebord sidder på gulvet med en laptop og brokker sig.']),
-    typeof price === 'number'
-      ? el('button', { className: 'buy', type: 'button', disabled: !canAfford || isBuying, onclick: () => buyItem('desk') }, [isBuying ? 'Køber…' : `Køb nr. ${g.owned.desks + 1} for ${kr(price)}`])
-      : el('p', { className: 'hint' }, ['Teamrummet er fuldt. Flere pladser kommer med teamrum 2.']),
-    ...(typeof price === 'number' && !canAfford ? [el('p', { className: 'hint' }, [`Mangler ${kr(price - g.kroner)}`])] : []),
-  ])
+// Built once and then only updated: the state arrives several times a
+// second, and a button rebuilt under the pointer would swallow the click.
+let shopParts = null
+
+const SHOP_ORDER = ['desk', 'kitchen', 'toilet', 'lounge', 'pingpong', 'meeting']
+
+const buildShop = g => {
+  const saldoValue = el('strong', {}, [''])
+  const message = el('p', { className: 'shop-message', hidden: true }, [''])
+  const rows = SHOP_ORDER.map(item => {
+    const count = el('span', { className: 'item-count' }, [''])
+    const button = el('button', { className: 'buy', type: 'button', onclick: () => buyItem(item) }, [''])
+    const missing = el('p', { className: 'hint' }, [''])
+    const done = el('p', { className: 'owned' }, [''])
+    const li = el('li', { className: 'item' }, [
+      el('div', { className: 'item-head' }, [el('strong', {}, [ITEMS[item].name]), count]),
+      el('p', { className: 'hint' }, [ITEMS[item].about]),
+      button,
+      missing,
+      done,
+    ])
+    return { item, li, count, button, missing, done }
+  })
   const rates = Object.entries(g.rates ?? {}).map(([k, v]) => el('li', {}, [el('span', { className: 'rate' }, [`${String(v).replace('.', ',')} kr`]), RATE_TEXT[k] ?? k]))
   shop.replaceChildren(
-    el('div', { className: 'shop-saldo' }, [el('span', { className: 'hint' }, ['Saldo']), el('strong', {}, [kr(g.kroner)])]),
-    ...(shopMessage ? [el('p', { className: 'shop-message' }, [shopMessage])] : []),
-    el('ul', { className: 'items' }, [deskItem]),
-    el('p', { className: 'hint' }, ['Kommer snart: køkken, toilet, sofahjørne, bordtennis og mødelokale.']),
+    el('div', { className: 'shop-saldo' }, [el('span', { className: 'hint' }, ['Saldo']), saldoValue]),
+    message,
+    el('ul', { className: 'items' }, rows.map(r => r.li)),
     el('h3', {}, ['Sådan tjener du kroner']),
     el('ul', { className: 'rates' }, rates),
   )
+  return { saldoValue, message, rows }
+}
+
+const renderShop = () => {
+  const g = state.game
+  if (!g) {
+    shopParts = null
+    shop.replaceChildren(el('p', { className: 'empty' }, ['Butikken åbner, når kontoret er forbundet.']))
+    return
+  }
+  shopParts ??= buildShop(g)
+  const p = shopParts
+  p.saldoValue.textContent = kr(g.kroner)
+  p.message.hidden = !shopMessage
+  p.message.textContent = shopMessage
+  for (const row of p.rows) {
+    const price = g.next?.[row.item]
+    const isForSale = typeof price === 'number'
+    const canAfford = isForSale && g.kroner >= price
+    const isDesk = row.item === 'desk'
+    row.count.textContent = isDesk ? `${g.owned.desks} af ${g.maxDesks}` : ''
+    row.button.hidden = !isForSale
+    row.button.disabled = !canAfford || isBuying
+    row.button.textContent = isBuying ? 'Køber…' : isForSale ? `${isDesk ? `Køb nr. ${g.owned.desks + 1}` : 'Køb'} for ${kr(price)}` : ''
+    row.missing.hidden = !isForSale || canAfford
+    row.missing.textContent = isForSale ? `Mangler ${kr(Math.max(0, price - g.kroner))}` : ''
+    row.done.hidden = isForSale
+    row.done.textContent = isDesk ? 'Teamrummet er fuldt. Flere pladser kommer med teamrum 2.' : 'Ejet ✓'
+  }
 }
 
 try {

@@ -46,8 +46,8 @@
     aside { min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
     @media (max-width: 720px) {
       main { max-width: none; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto; align-content: start; overflow-y: auto; }
-      .stage { aspect-ratio: var(--office); max-height: 78vh; justify-content: center; }
-      aside { overflow: visible; }
+      .stage { justify-content: center; min-height: auto; }
+      aside { overflow: visible; min-height: auto; }
     }
 
     /* The details card over the office, next to the figure it is about. */
@@ -86,6 +86,8 @@
     .item-head { display: flex; justify-content: space-between; align-items: baseline; }
     .item-count { color: var(--soft); font-size: 12px; }
     .hint { color: var(--soft); font-size: 12px; margin: 0; }
+    .shop [hidden] { display: none; }
+    .owned { color: #2E9E8F; font-size: 12px; font-weight: 600; margin: 0; }
     .buy { border: 0; border-radius: 8px; padding: 7px 10px; font: inherit; font-weight: 600; cursor: pointer; background: #2E9E8F; color: #FFFFFF; }
     .buy:disabled { background: var(--line); color: var(--soft); cursor: default; }
     .rates li { display: grid; grid-template-columns: 64px 1fr; font-size: 13px; }
