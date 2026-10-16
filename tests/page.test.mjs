@@ -17,41 +17,83 @@ const idle = await import(js('idle'))
 const voices = await import(js('voices'))
 const util = await import(js('util'))
 
-const { PLAN, WORLD, GROUNDS, typeOf, frameOf, deskSlots, desks, placeOf } = plan
-const ALL_ROOMS = ['claude', 'team', 'kitchen', 'toilet', 'lounge', 'pingpong', 'meeting', 'plants', 'art', 'neon', 'espresso', 'aquarium', 'chairs', 'screens', 'team2', 'hobby', 'reception']
+const { PLAN, WORLD, GROUNDS, CHAINS, typeOf, frameOf, fullFrameOf, rectOf, deskSlots, desks, placeOf } = plan
+const STEPS = Object.values(CHAINS).flat()
+const ALL_ROOMS = ['claude', 'team', ...STEPS, 'pingpong', 'meeting', 'plants', 'art', 'neon', 'espresso', 'aquarium', 'chairs', 'screens', 'reception']
 const owning = (rooms, deskCount) => {
   store.state = { sessions: [], game: { owned: { rooms, desks: deskCount }, kroner: 0, next: {} } }
 }
-const everything = () => owning(ALL_ROOMS, 10)
+const everything = () => owning(ALL_ROOMS, 22)
 const startOffice = () => owning(['claude', 'team'], 2)
+// Offices on the way: each chain bought up to a step, the rest not
+const LAYOUTS = [
+  ['claude', 'team'],
+  ['claude', 'team', 'team1-2', 'kitchen', 'toilet', 'lounge', 'meeting'],
+  ['claude', 'team', 'team1-2', 'team1-3', 'team2', 'kitchen', 'kitchen-2', 'lounge', 'lounge-2', 'toilet', 'toilet-2', 'meeting', 'reception', 'pingpong'],
+  ['claude', 'team', 'team1-2', 'team1-3', 'team2', 'team2-2', 'lounge', 'lounge-2', 'lounge-3', 'toilet', 'toilet-2', 'toilet-3'],
+  ALL_ROOMS,
+]
 const overlaps = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h
 const helper = (id, extra = {}) => ({ id, name: id, task: `Opgave ${id}`, seat: 0, phase: 'working', since: 0, activity: { state: 'working', detail: 'Tænker' }, ...extra })
 
 // ── The floor plan ───────────────────────────────────────────────────────
 
-test('every room lies inside the office, and no two rooms overlap', () => {
+test('every room lies inside the office, fully grown, and no two rooms that stand overlap', () => {
   for (const room of PLAN.rooms) {
-    const f = frameOf(room)
+    const f = fullFrameOf(room)
     assert.ok(f.x >= WORLD.x && f.y >= WORLD.y && f.x + f.w <= WORLD.x + WORLD.w && f.y + f.h <= WORLD.y + WORLD.h, room.id)
   }
-  for (const [i, a] of PLAN.rooms.entries()) {
-    for (const b of PLAN.rooms.slice(i + 1)) {
-      assert.ok(!overlaps({ x: a.x, y: a.y, w: typeOf(a).w, h: typeOf(a).h }, { x: b.x, y: b.y, w: typeOf(b).w, h: typeOf(b).h }), `${a.id} and ${b.id}`)
+  for (const rooms of LAYOUTS) {
+    owning(rooms, 0)
+    const standing = PLAN.rooms.filter(plan.isBuilt)
+    for (const [i, a] of standing.entries()) {
+      for (const b of standing.slice(i + 1)) assert.ok(!overlaps(frameOf(a), rectOf(b)) && !overlaps(rectOf(a), frameOf(b)), `${a.id} and ${b.id} with ${rooms.join(',')}`)
     }
   }
 })
 
+test('every room opens on the hall, and a depot stands until its step is bought', () => {
+  for (const room of PLAN.rooms.filter(r => r.id !== 'hall' && !r.until)) {
+    assert.ok(PLAN.doors.some(d => d.between?.includes(room.id) && d.between.includes('hall')) || room.id === 'reception', room.id)
+  }
+  startOffice()
+  assert.equal(plan.isBuilt(plan.roomById('kitchen-depot')), true)
+  owning(['claude', 'team', 'kitchen', 'kitchen-2'], 0)
+  assert.equal(plan.isBuilt(plan.roomById('kitchen-depot')), false)
+  assert.equal(rectOf(plan.roomById('kitchen')).w, 260, 'the kitchen has grown into it')
+})
+
+test('a room grows by its steps, and has only the furniture they cover', () => {
+  startOffice()
+  const team = plan.roomById('team')
+  assert.equal(rectOf(team).x, 0)
+  owning(['claude', 'team', 'team1-2', 'lounge'], 0)
+  assert.equal(rectOf(team).x, -130)
+  const lounge = plan.roomById('lounge')
+  const hobbies = Object.entries(typeOf(lounge).hobbies).filter(([, spots]) => plan.spotsIn(lounge, spots).length).map(([kind]) => kind)
+  assert.deepEqual(hobbies.sort(), ['gaming', 'sofa'])
+  owning(['claude', 'team', 'lounge', 'lounge-2', 'lounge-3'], 0)
+  assert.equal(Object.values(typeOf(lounge).hobbies).every(spots => plan.spotsIn(lounge, spots).length === spots.length), true)
+})
+
 test('every door joins rooms that exist, and the front door opens to the path', () => {
-  for (const door of PLAN.doors) for (const id of door.between) assert.ok(plan.roomById(id), id)
+  for (const door of PLAN.doors) for (const id of door.between ?? [door.closed]) assert.ok(plan.roomById(id), id)
   const front = PLAN.doors.find(d => d.isEntrance)
   assert.ok(front)
   assert.deepEqual(plan.walkway()[0], plan.entrance())
   assert.ok(GROUNDS.path.some(p => util.isIn(plan.walkway()[1].x, plan.walkway()[1].y, p)), 'the corner is on the path')
 })
 
-test('sixteen desks in all with the second team room; only the bought ones are used', () => {
+test('22 desks in all, three more for each step a team room grows; only the bought ones are used', () => {
   everything()
-  assert.equal(deskSlots().length, 16, 'ten, and six more in the second team room')
+  assert.equal(deskSlots().length, 22)
+  startOffice()
+  assert.equal(deskSlots().length, 7, 'three in team room 1 and four in the quiet room')
+  owning(['claude', 'team', 'team1-2'], 0)
+  const before = deskSlots()
+  owning(['claude', 'team', 'team1-2', 'team1-3'], 0)
+  assert.deepEqual(deskSlots().slice(0, before.length), before, 'a new step only adds desks at the end')
+  assert.equal(deskSlots().length, 13)
   owning(['claude', 'team'], 4)
   assert.equal(desks().length, 4)
   assert.equal(placeOf(3).isDesk, true)
@@ -89,16 +131,42 @@ test('a helper on the bench goes in by the path and the front door', () => {
 
 // ── Routes and walks ─────────────────────────────────────────────────────
 
-test('no route goes through a wall in the full office', () => {
-  everything()
-  const result = routes.checkRoutes()
-  assert.ok(result.checked > 200)
-  assert.deepEqual(result.problems, [])
+test('no route goes through a wall or a depot, in the office you start with, on the way, or full grown', () => {
+  for (const rooms of LAYOUTS) {
+    owning(rooms, 10)
+    const result = routes.checkRoutes()
+    assert.ok(result.checked > 50)
+    assert.deepEqual(result.problems, [], rooms.join(','))
+  }
 })
 
-test('no route goes through a wall in the office you start with', () => {
-  startOffice()
-  assert.deepEqual(routes.checkRoutes().problems, [])
+test('from one room to another a walk goes by the hall, in the lane on its right', () => {
+  everything()
+  const hall = rectOf(plan.roomById('hall'))
+  const inHall = p => util.isIn(p.x, p.y, [hall.x, hall.y, hall.w, hall.h])
+  const walk = routes.route(placeOf(0).spot, plan.handoffFor(0))
+  const along = walk.slice(1).map((p, i) => [walk[i], p]).filter(([a, b]) => inHall(a) && inHall(b) && a.y === b.y && a.x !== b.x)
+  assert.ok(along.length > 0, 'it uses the hall')
+  for (const [a, b] of along) assert.equal(a.y, plan.laneOf(b.x > a.x), 'east in the south lane, west in the north lane')
+  // Out of team room 2 and into the meeting room: never through Claude's office
+  const claude = rectOf(plan.roomById('claude'))
+  for (const p of routes.route(placeOf(13).spot, { x: 600, y: 180 })) assert.ok(!util.isIn(p.x, p.y, [claude.x, claude.y, claude.w, claude.h]), `${p.x},${p.y}`)
+})
+
+test('walks go at one pace: a short one ends early, a long one is brisker to fit', () => {
+  everything()
+  const short = [{ x: 0, y: 0 }, { x: 80, y: 0 }]
+  assert.equal(routes.walkMs(short, 10_000), 80 / routes.SPEED)
+  const long = [{ x: 0, y: 0 }, { x: 5000, y: 0 }]
+  assert.equal(routes.walkMs(long, 10_000), 10_000)
+  // With a result, a helper stays at its desk until it is time to set off,
+  // and reaches Claude just as the handover begins.
+  const walks = routes.WALKS
+  const sub = helper('a', { phase: 'delivering', since: 0, seat: 0 })
+  assert.equal(routes.poseOf(sub, 10).seated, true)
+  const there = routes.poseOf(sub, walks.deliver - 1)
+  const spot = plan.handoffFor(0)
+  assert.ok(Math.hypot(there.x - spot.x, there.y - spot.y) < 2)
 })
 
 test('no route crosses a lot that is not built', () => {
@@ -195,11 +263,16 @@ test('a meeting needs the meeting room and three helpers', () => {
 })
 
 test('an errand walks there, stays, and walks back', () => {
-  const home = { x: 100, y: 200 }
-  const errand = { kind: 'coffee', start: 0, stay: breaks.STAY.coffee, dest: { x: 330, y: 100 } }
+  everything()
+  const home = placeOf(0).spot
+  const dest = plan.spotsIn(plan.roomById('kitchen'), typeOf(plan.roomById('kitchen')).standing)[0]
+  const errand = { kind: 'coffee', start: 0, stay: breaks.STAY.coffee, dest }
+  const go = routes.walkMs(routes.route(home, dest), 8000)
+  const come = routes.walkMs(routes.route(dest, home), 8000)
   assert.equal(breaks.errandPose(home, errand, -1), null)
-  assert.equal(breaks.errandPose(home, errand, 3000 + 10).isThere, true)
-  assert.equal(breaks.errandPose(home, errand, 2 * 3000 + breaks.STAY.coffee), null)
+  assert.equal(breaks.errandPose(home, errand, go - 10).isThere, undefined)
+  assert.equal(breaks.errandPose(home, errand, go + 10).isThere, true)
+  assert.equal(breaks.errandPose(home, errand, go + breaks.STAY.coffee + come), null)
 })
 
 test('banter needs two in the kitchen, and only they and their colleagues speak', () => {
@@ -341,9 +414,12 @@ test('helpers with neighbouring ids still look different', () => {
 test('everything the server sells has a name, an icon and a text in the shop', async () => {
   // The names the server has prices for, read from its source.
   const server = (await import('node:fs')).readFileSync(new URL('../server/server.mjs', import.meta.url), 'utf8')
-  const keysOf = name => [...new RegExp(`const ${name} = \{([^}]*)\}`).exec(server)[1].matchAll(/(\w+):/g)].map(m => m[1])
+  const keysOf = name => [...new RegExp(`const ${name} = \{([^}]*)\}`).exec(server)[1].matchAll(/'?([\w-]+)'?:/g)].map(m => m[1])
   const prices = ['desk', ...keysOf('ROOM_PRICES'), ...keysOf('DECOR_PRICES')]
-  assert.ok(prices.includes('reception') && prices.includes('screens'))
+  assert.ok(prices.includes('reception') && prices.includes('screens') && prices.includes('team2-3'))
+  // The server's chains of steps are the page's
+  const chains = new RegExp('const CHAINS = \\[([^\\]]*(?:\\][^\\]]*)*?)\\n\\]').exec(server)[1]
+  for (const steps of Object.values(CHAINS)) assert.ok(chains.includes(steps.map(s => `'${s}'`).join(', ')), steps.join(','))
   for (const item of prices) {
     assert.ok(plan.ITEMS[item]?.name && plan.ITEMS[item]?.icon && plan.ITEMS[item]?.about, item)
   }

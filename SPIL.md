@@ -1,6 +1,6 @@
 # Spillet i Agent-kontor
 
-Status: **fase 0 til 5 er lavet (0.8.0 til 0.18.0).** Beslutningerne står under [Besluttet](#besluttet). Den næste store ændring er en ny grundplan med gange og rum, der vokser i trin: se [GRUNDPLAN.md](GRUNDPLAN.md).
+Status: **fase 0 til 5 er lavet (0.8.0 til 0.18.0), og kontoret har fået en ny grundplan med en hovedgang og rum, der vokser i trin (0.19.0, se [GRUNDPLAN.md](GRUNDPLAN.md)).** Beslutningerne står under [Besluttet](#besluttet).
 
 ## Idéen
 

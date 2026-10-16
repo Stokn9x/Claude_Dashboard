@@ -1,6 +1,6 @@
 # Ny grundplan for kontoret
 
-Status: **aftalt og klar til at bygge, ikke bygget endnu.** Tegningen er forslag 4 fra vores snak den 16. oktober 2026; svarene på de åbne spørgsmål står under [Besluttet](#besluttet).
+Status: **bygget i 0.19.0.** Tegningen er forslag 4 fra vores snak den 16. oktober 2026; svarene på de åbne spørgsmål står under [Besluttet](#besluttet), og det, der blev anderledes under byggeriet, under [Sådan blev det](#sådan-blev-det).
 
 ![Ny grundplan](docs/grundplan.svg)
 
@@ -52,11 +52,11 @@ Skrivebord 17-22 koster 16.000, 17.000, 18.000, 19.000, 20.000 og 21.000 kr, så
 
 ## Hvordan hjælperne går
 
-Den nye plan dur ikke, hvis hjælperne går, som de gør i dag. Ruterne (`public/js/routes.js`) finder den korteste vej på et gitter af felter med A\*, og hver tur tager fast tid, uanset hvor langt der er (`WALKS` i mod'en: ind 4 s, aflevering 3,5 s, ud 4 s). I et større hus giver det to problemer: de skærer gennem rummene, og på en lang tur suser de afsted. Derfor laves gåturene om sammen med grundplanen:
+Den nye plan duede ikke med gåturene fra før 0.19.0. Ruterne (`public/js/routes.js`) fandt den korteste vej på et gitter af felter med A\*, og hver tur tog fast tid, uanset hvor langt der var (`WALKS` i mod'en: ind 4 s, aflevering 3,5 s, ud 4 s). I et større hus giver det to problemer: de skærer gennem rummene, og på en lang tur suser de afsted. Derfor laves gåturene om sammen med grundplanen:
 
-- **Gangen er vejen.** Felterne på gangen koster mindre end felterne i rummene, så A\* vælger gangen. Man går kun ind i et rum, hvis det er dér, man skal hen, og altid gennem døren.
+- **Gangen er vejen.** En gåtur går rum for rum: ud ad døren, hen ad gangen og ind ad den næste dør. Alle rum har kun dør til gangen, så man går aldrig gennem et andet rum. Man går kun ind i et rum, hvis det er dér, man skal hen.
 - **Gennem døren, lige på.** Ruten går gennem midten af døren og et skridt lige ind i rummet, før den drejer, så ingen går skråt gennem karmen.
-- **Bløde ruter.** Ruten rettes ud bagefter: overflødige knæk fjernes, hvor der er fri bane, så de går i lige linjer og ikke i trapper.
+- **Bløde ruter.** Inde i rummene findes vejen rundt om møblerne med A\*, og ruten rettes ud bagefter: overflødige knæk fjernes, hvor der er fri bane, så de går i lige linjer og ikke i trapper.
 - **Højre side af gangen.** Man holder til højre i gangretningen, så to, der mødes, går forbi hinanden og ikke igennem hinanden.
 - **Fast fart i stedet for fast tid.** Siden går med samme tempo overalt. Mod'ens tider bliver et loft: er ruten kort, når hjælperen frem før tid og sætter sig; kun en rute, der er længere end loftet, går hurtigere. Lofterne i `WALKS` hæves, så de passer til den længste rute i et fuldt udbygget hus.
 - **Depoter og trin, der ikke er købt, er lukkede.** Et depot har en lukket dør og er ikke en del af gitteret, og et trin har kun gulv, når det er købt.
@@ -65,10 +65,21 @@ Den nye plan dur ikke, hvis hjælperne går, som de gør i dag. Ruterne (`public
 ## Når den bygges
 
 - **Ingen mister noget.** Et gemt spil flyttes over til den nye plan: købt køkken bliver køkken trin 1, toilet bliver toilet trin 1, loungen bliver lounge trin 1, teamrum 2 bliver teamrum 2 trin 2 (det havde 6 borde), og teamrum 1 starter på trin 2, fordi det allerede har plads til 6. Købte skriveborde og pynt beholdes.
-- **Sofahjørnet og bordtennisbordet** står i dag i teamrummet. De flytter ind i loungen eller bliver til en del af dens trin.
+- **Sofahjørnet og bordtennisbordet** stod i teamrummet. Sofaen er nu en del af loungens trin 1, og bordtennisbordet står i loungen og kan købes, når loungen er bygget.
 - **Navnene ryddes op.** I dag har loungen id'et `hobby`, mens `lounge` er sofahjørnet i teamrummet. I den nye plan hedder loungen `lounge`, og de gamle id'er flyttes over, når et gemt spil læses.
 - **Grundplanen ligger kun i `public/js/plan.js`** (`ROOM_TYPES`, `PLAN`, `GROUNDS`). Trinene bliver nye ting i serverens priser, og rummenes størrelse følger af det købte trin.
 - **Ruterne skal tjekkes** i hver kombination af trin, med `kontorCheckRoutes()` og `tests/page.test.mjs` (se [Hvordan hjælperne går](#hvordan-hjælperne-går)).
+
+## Sådan blev det
+
+Bygget i 0.19.0, med disse ændringer i forhold til tegningen:
+
+- **Gangen er bredere**, 64 enheder i stedet for 40, så der er plads til to vognbaner.
+- **Toilettet er lavere** end de andre rum i sydrækken (150 i stedet for 250), så tre båse ikke bliver et langt, tomt rum. Haven fortsætter under det.
+- **Bordtennisbordet står i loungen** og kan købes, når loungen er bygget. Et gemt spil med bordet, men uden lounge, får loungen med.
+- **Skrivebordene fyldes i fast rækkefølge:** teamrum 1's tre første, stillerummets fire, så tre for hvert trin. Teamrummenes trin er én kæde (teamrum 1 trin 2 og 3, så teamrum 2 trin 1-3), så et nyt trin altid tilføjer borde til sidst, og ingen hjælper bytter plads.
+- **Gå-tiderne er lofter:** ind 12 s, aflevering 8 s, ud 9 s. Siden går med 80 enheder i sekundet. Med et resultat bliver hjælperen siddende, til den skal gå, og når frem til Claude præcis, når afleveringen begynder.
+- **Hjælpere uden skrivebord** sidder langs væggene i receptionen og ikke i teamrummet.
 
 ## Besluttet
 

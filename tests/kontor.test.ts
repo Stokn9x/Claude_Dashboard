@@ -86,13 +86,13 @@ for (const surface of ['terminal', 'desktop'] as const) {
     expect(after).toContain('Afleverer: Kortlæg API’et')
 
     // The walk to Claude's desk and the handover take their time…
-    await clock.advance(6500)
+    await clock.advance(11_000)
     expect(JSON.stringify(await ui.drawn())).toContain('Holder fri: Kortlæg API’et')
 
     // …then a few minutes off work, and the walk out of the door.
     await clock.advance(3 * 60_000)
     expect(JSON.stringify(await ui.drawn())).toContain('Går igen: Kortlæg API’et')
-    await clock.advance(7000)
+    await clock.advance(10_000)
     expect(JSON.stringify(await ui.drawn())).toContain('Ingen hjælpere i kontoret')
   })
 
@@ -102,7 +102,7 @@ for (const surface of ['terminal', 'desktop'] as const) {
     const ui = await $.ui.mount({ plugin: 'agent-kontor', surface, component: 'Pane', requestId: 'kontor', props: paneProps })
 
     await $.command.run({ command: 'kontor', args: 'demo' } as never)
-    await clock.advance(11000)
+    await clock.advance(16_000)
     const drawn = JSON.stringify(await ui.drawn())
 
     expect(drawn).toContain('6 af 6 hjælpere arbejder')
@@ -125,7 +125,7 @@ for (const surface of ['terminal', 'desktop'] as const) {
 
     // The Agent call is back at once, but the helper is still at work.
     await $.tool.call({ tool: 'Agent', prompt: 'p', description: 'Læs README', tool_use_id: 'b1', run_in_background: true } as never)
-    await clock.advance(9000)
+    await clock.advance(13_000)
     expect(JSON.stringify(await ui.drawn())).toContain('1 af 1 hjælpere arbejder')
 
     await $.classic.SubagentStop({ agent_id: 'sub-b1', agent_type: 'Explore', stop_hook_active: false, agent_transcript_path: '' } as never)
@@ -309,7 +309,7 @@ test('a helper whose loop failed goes home, and says so', async ($, on) => {
   const ui = await $.ui.mount({ plugin: 'agent-kontor', surface: 'desktop', component: 'Pane', requestId: 'kontor', props: paneProps })
 
   await $.tool.call({ tool: 'Agent', prompt: 'p', description: 'Læs README', tool_use_id: 'b1', run_in_background: true } as never)
-  await clock.advance(9000)
+  await clock.advance(13_000)
   expect(file.last()?.subs[0]?.phase).toBe('working')
 
   // A rate limit ends its loop: no SubagentStop, only the engine's list says so.
@@ -381,7 +381,7 @@ test('every helper gets a place number, without a limit, and a freed number is u
 
   // The second helper is done; once it has handed over and is off work, its number is free.
   await $.classic.SubagentStop({ agent_id: 'sub-b2', agent_type: 'Explore', stop_hook_active: false, agent_transcript_path: '' } as never)
-  await clock.advance(7000)
+  await clock.advance(11_000)
   await $.tool.call({ tool: 'Agent', prompt: 'p', description: 'Læs README', tool_use_id: 'b8', run_in_background: true } as never)
   await clock.advance(600)
   expect(seatOf('sub-b8')).toBe(1)
@@ -398,7 +398,7 @@ test('a finished helper stays off work for a while, goes back to work when calle
   await $.tool.call({ tool: 'Agent', prompt: 'p', description: 'Læs README', tool_use_id: 'b1', run_in_background: true } as never)
   await clock.advance(5000)
   await $.classic.SubagentStop({ agent_id: 'sub-b1', agent_type: 'Explore', stop_hook_active: false, agent_transcript_path: '' } as never)
-  await clock.advance(7000)
+  await clock.advance(11_000)
   expect(phaseOf()?.phase).toBe('idle')
   expect(phaseOf()?.activity.detail).toBe('Holder fri')
 
@@ -407,17 +407,17 @@ test('a finished helper stays off work for a while, goes back to work when calle
   await clock.advance(600)
   expect(phaseOf()?.phase).toBe('arriving')
   expect(phaseOf()?.from).toBe('idle')
-  await clock.advance(5000)
+  await clock.advance(13_000)
   expect(phaseOf()?.phase).toBe('working')
 
   // Done again, and then left alone: home after a few minutes off work.
   await $.classic.SubagentStop({ agent_id: 'sub-b1', agent_type: 'Explore', stop_hook_active: false, agent_transcript_path: '' } as never)
-  await clock.advance(7000)
+  await clock.advance(11_000)
   expect(phaseOf()?.phase).toBe('idle')
   await clock.advance(3 * 60_000)
   expect(phaseOf()?.phase).toBe('leaving')
   expect(phaseOf()?.from).toBe('idle')
-  await clock.advance(5000)
+  await clock.advance(10_000)
   expect(phaseOf()).toBeUndefined()
 })
 

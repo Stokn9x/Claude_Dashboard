@@ -14,7 +14,7 @@ Talk to the user in Danish. The page is dark only (the user's wish); there is no
 
 Rules that keep the parts apart:
 
-- **The floor plan lives only in `public/js/plan.js`** (`ROOM_TYPES`, `PLAN`, `GROUNDS`). The mod knows no coordinates: every walk takes a fixed time (`WALKS` in the mod, sent in the status file), and the page sets the pace.
+- **The floor plan lives only in `public/js/plan.js`** (`ROOM_TYPES`, `PLAN`, `CHAINS`, `GROUNDS`). The mod knows no coordinates: `WALKS` in the mod (sent in the status file) is a ceiling for each walk, and the page walks at one pace (`SPEED`), briskly only when a route is longer than its ceiling.
 - **The server owns money and prices.** The mod only counts earnings (`earned`, with the rules: 100 lines per edit at most, green tests at most every ten minutes); the server credits the growth of each session's counts, times wellbeing. The page never decides a price.
 - **Breaks, meetings and banter are page-only and deterministic** (from helper ids and the clock), so every viewer sees the same and a reload changes nothing.
 - **The mod must never get in Claude's way.** Everything it does runs through `quietly()`; a failure is dropped.
@@ -31,7 +31,7 @@ The camera: the canvas covers the window; `view` is the world point in the middl
 
 - `SPIL.md` is the game's plan, phase by phase, with what is decided. Update its status line and phase table when a phase lands.
 - `UDVIDELSER.md` lists everything built and planned, with a version table at the top. Add a row for each release and set item statuses.
-- `GRUNDPLAN.md` (with `docs/grundplan.svg`) is the agreed redesign of the floor plan: a corridor, two rows of rooms, rooms that grow in steps. Its open questions are settled; update it when it is built. It also changes how helpers walk (corridor first, fixed speed instead of fixed time).
+- `GRUNDPLAN.md` (with `docs/grundplan.svg`) is the floor plan built in 0.19.0: a hall, two rows of rooms, rooms that grow in steps; its "Sådan blev det" section says where the build differs from the drawing.
 
 ## Developing
 
@@ -79,7 +79,10 @@ Commit messages end with `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com
 - **Patch scripts:** heredocs mangle backslashes and quotes. Write larger patches as Python files with the Write tool, assert every replacement, and remember to actually run the script. A `\n` or `\t` inside a Python string in such a script becomes a real newline or tab in the file: check the result with `node --check`, or fix the spot with the Edit tool.
 - **Every bought thing needs an entry in `ITEMS` (plan.js)**, or the shop throws and the whole panel stops rendering. `tests/page.test.mjs` reads the server's price lists and checks this.
 - **The engine's hooks are set before the first `$` call in a mod test.** A second `on(...)` for the same hook mid-test fails; give a different fake its own test. A test that waits on `$.clock.after` must advance the clock itself (`clock.advance`) while the call runs.
-- **Room geometry:** a door between two rooms must span both walls (each room has its own 6-unit wall), or the route check finds a wall in the gap. A walk between outside places is a straight line: keep the bench and the lawn where that line misses the buildings. Things that only exist once bought (furniture) are blocks with a fifth entry, the item they need.
+- **Room geometry:** a door must span both walls (each room has its own 6-unit wall). Every room opens on the hall, and a walk goes room by room (`roomPath`): out of a door a step straight on (`MOUTH`), along the hall in the lane on the right (`laneOf`), in by the next door; within a room A* round the furniture, then pulled straight. A walk between outside places is a straight line: keep the bench and the lawn where that line misses the buildings. Things that only exist once bought (furniture) are blocks with a fifth entry, the item they need.
+- **Rooms that grow:** a room's `grows` list moves its west edge (`x`) or widens it (`w`) for each step bought; `rectOf` is the room now, `fullRectOf` fully grown. A type is drawn and furnished at full size, and anything outside `rectOf` is not there yet (`hasNow`, `spotsIn`): desks, spots, lamps, blocks. A step inside the house has a depot (`until`) that stands until it is bought. The south row's types are drawn for y 314 and shifted down to `SOUTH` by the room's position, so the hall's width is one number.
+- **Desks fill in a fixed order** (`DESK_ORDER`), and the team rooms' steps are one chain on the server, so a new step only adds desks at the end and nobody moves.
+- **A saved game for an older floor plan is moved over by the server** (`migrate`, `PLAN_VERSION`): bump the version and extend `migrate` whenever owned ids change meaning.
 - **A floor plan change can cut off a room.** Furniture in a narrow corridor, or a door that does not quite meet the floor on both sides, leaves A* without a route, and the walk then cuts straight through walls. After changing `ROOM_TYPES` or `PLAN`, run `kontorCheckRoutes()` in the page's console in an office that owns everything; it must report no problems.
 - **The balance is slow on purpose:** the office should take weeks of work. `tests/economy.check.mjs` reads rates and prices from the server, so changing them does not break it.
 - **A helper's life:** arriving → working → delivering → idle (off work, `WALKS.idle`, three minutes) → leaving. Called on while idle, it goes back to `arriving` with `from: 'idle'`; a stuck one skips idle. Idle and leaving helpers hold no seat. What an idle helper does is the page's (`idle.js`); the walks between idle spots are remembered in the page only, so a reload can skip one.

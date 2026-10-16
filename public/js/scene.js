@@ -6,8 +6,8 @@
 import { store, focused, owns } from './store.js'
 import { OUTLINE, bubble, canvas, circle, ctx, dashed, label, rect, rounded, say, shadow, tag } from './gfx.js'
 import { hashOf, kr } from './util.js'
-import { ITEMS, MAIN, MAIN_SPOT, PLAN, ROOM_TYPES, at, coffeeSpot, deskSlots, desks, firstRoom, isBuilt, placeOf, shiftOf, typeOf } from './plan.js'
-import { HOMEWARD_MS, WALKS, homewardPose, outAt, poseOf, route, walkAt } from './routes.js'
+import { ITEMS, MAIN, MAIN_SPOT, PLAN, ROOM_TYPES, at, coffeeSpot, deskSlots, desks, firstRoom, isBuilt, lotOf, nextStepOf, placeOf, rectOf, shiftOf, stepArea, typeOf } from './plan.js'
+import { HOMEWARD_MS, WALKS, homewardPose, outAt, poseOf, route, walkAt, walkMs } from './routes.js'
 import { STAY, banterFor, breakNow, errandPose, meetingNow } from './breaks.js'
 import { claudeLook, hands, lookFor, onTheFloor, sitting, sittingBack, standing } from './figures.js'
 import { board, chair, clock, desk, deskThingsFor, mug, steam } from './furniture.js'
@@ -21,7 +21,8 @@ import { drawLife } from './outdoors.js'
 
 const BUILD_MS = 10_000
 const PARTY_AFTER_MS = 5000
-const MOVE_MS = 2500
+// The longest a walk to a newly bought desk takes; most are shorter
+const MOVE_MS = 6000
 const NAME = '#4A5868'
 const CLAUDE = '#C8643B'
 
@@ -54,11 +55,13 @@ const idlePose = (sub, plan, now) => {
     walk = { from: { x: from.x, y: from.y }, to: target.spot, start: walk ? now : sub.since }
     idleWalks.set(sub.id, walk)
   }
-  const k = (now - walk.start) / IDLE_WALK_MS
+  const points = route(walk.from, walk.to)
+  const ms = walkMs(points, IDLE_WALK_MS)
+  const k = (now - walk.start) / ms
   const pose =
     k < 1
-      ? walkAt(route(walk.from, walk.to), k)
-      : { x: target.spot.x, y: target.spot.y, facing: target.spot.facing ?? 'front', isWalking: false, isThere: true, there: now - walk.start - IDLE_WALK_MS }
+      ? walkAt(points, k)
+      : { x: target.spot.x, y: target.spot.y, facing: target.spot.facing ?? 'front', isWalking: false, isThere: true, there: now - walk.start - ms }
   lastIdle.set(sub.id, { x: pose.x, y: pose.y })
   return { ...pose, isIdle: true, errand: { kind: target.kind, dest: target.spot, index: target.index, slot: target.slot } }
 }
@@ -107,8 +110,9 @@ const party = (p, spot, t) => {
 }
 
 // ── For sale and building work ───────────────────────────────────────────
-// What is for sale right now, and where its sign stands: a lot's centre,
-// the spot a piece of furniture will take, or the next desk.
+// What is for sale right now, and where its sign stands: a lot's centre (a
+// room, or the next step of one that grows), the spot a piece of furniture
+// will take, or the next desk.
 const forSaleNow = list => {
   const game = store.state.game
   if (!game) return []
@@ -118,11 +122,15 @@ const forSaleNow = list => {
     const { cx, dy } = slots[list.length]
     sales.push({ item: 'desk', price: game.next.desk, isDesk: true, x: cx, y: dy })
   }
+  const lotSale = (item, lot) => {
+    const price = game.next?.[item]
+    if (typeof price === 'number') sales.push({ item, price, x: lot.x + lot.w / 2, y: lot.y + lot.h / 2 })
+  }
   for (const room of PLAN.rooms) {
-    if (room.buy && !isBuilt(room)) {
-      const price = game.next?.[room.buy]
-      if (typeof price === 'number') sales.push({ item: room.buy, price, x: room.x + typeOf(room).w / 2, y: room.y + typeOf(room).h / 2 })
-    }
+    if (room.until) continue
+    if (room.buy && !isBuilt(room)) lotSale(room.buy, rectOf(room))
+    const step = isBuilt(room) && nextStepOf(room)
+    if (step && typeof step.buy === 'string') lotSale(step.buy, lotOf(room, step))
     for (const [item, spot] of Object.entries(typeOf(room).items ?? {})) {
       const price = game.next?.[item]
       if (!owns(item) && typeof price === 'number') sales.push({ item, price, isFurniture: true, ...at(room, spot) })
@@ -160,7 +168,11 @@ const drawSaleSigns = (sales, hits, t) => {
 // Where a bought thing stands, to put up the scaffolding.
 const areaOf = item => {
   for (const room of PLAN.rooms) {
-    if (room.buy === item) return { x: room.x, y: room.y, w: typeOf(room).w, h: typeOf(room).h }
+    if (room.until) continue
+    // A room goes up without its steps, which go up when they are bought
+    if (room.buy === item) return { x: room.x, y: room.y, w: room.w ?? typeOf(room).w, h: room.h ?? typeOf(room).h }
+    const step = stepArea(room, item)
+    if (step && room.grows.some(s => s.buy === item)) return step
     const spot = typeOf(room).items?.[item]
     if (spot) {
       const p = at(room, spot)
@@ -248,7 +260,7 @@ const receptionist = ({ subs, walkers, hits, t }, now, walks) => {
   rect(cx + 13, dy - 11, 16, 9, '#7FB4F0')
   circle(cx - 28, dy + 2, 2.6, '#D6A23C', OUTLINE)
   tag(cx, dy + 31, RECEPTIONIST.name, '#20262E')
-  const arriving = subs.find(s => s.phase === 'arriving' && now - s.since < walks.arrive)
+  const arriving = walkers.find(w => w.sub.phase === 'arriving' && w.sub.from !== 'idle' && w.pose.isWalking)?.sub
   const leaving = walkers.find(w => w.pose.isHomeward || (w.sub.phase === 'leaving' && !w.pose.isIdle))
   const line = arriving
     ? `Velkommen, ${arriving.name}!`
@@ -262,7 +274,7 @@ const receptionist = ({ subs, walkers, hits, t }, now, walks) => {
 
 // The lounge's screens light up while someone plays.
 const hobbyScreens = (walkers, t) => {
-  const room = firstRoom('hobby')
+  const room = firstRoom('lounge')
   if (!room || !isBuilt(room)) return
   const playing = kind => walkers.some(w => w.pose.isIdle && w.pose.isThere && w.pose.errand.kind === kind)
   const { tv, arcade } = typeOf(room)
@@ -317,9 +329,10 @@ const errandsNow = (subs, now, meeting, pause) => {
     lastPlaces.set(sub.id, spot)
     const move = moves.get(sub.id)
     if (!move) continue
-    const k = (now - move.start) / MOVE_MS
+    const points = route(move.from, move.to)
+    const k = (now - move.start) / walkMs(points, MOVE_MS)
     if (k >= 1) moves.delete(sub.id)
-    else if (!onErrand.has(sub.id)) onErrand.set(sub.id, walkAt(route(move.from, move.to), k))
+    else if (!onErrand.has(sub.id)) onErrand.set(sub.id, walkAt(points, k))
   }
   return onErrand
 }
@@ -393,8 +406,7 @@ const drawWalkers = ({ walkers, players, hits, t }) => {
       tag(pose.x, pose.y - 26, 'Optaget', '#E5484D')
       continue
     }
-    if (kind === 'lounge') sitting(pose.x, pose.y, look, false, t, hashOf(sub.id))
-    else if (pose.isThere && pose.errand?.dest?.sit) {
+    if (pose.isThere && pose.errand?.dest?.sit) {
       if (pose.errand.dest.facing === 'back') sittingBack(pose.x, pose.y, look)
       else sitting(pose.x, pose.y, look, false, t, hashOf(sub.id))
       if (kind === 'guitar') {
@@ -463,7 +475,7 @@ const drawSpeech = frame => {
       if (w) bubble(w.pose.x, w.pose.y - 52, text, false, t, 48)
     }
   }
-  // In the hobby room each says a line now and then, on its own beat.
+  // In the lounge each says a line now and then, on its own beat.
   for (const w of walkers) {
     const lines = w.pose.isIdle && w.pose.isThere ? HOBBY_LINES[w.pose.errand.kind] : null
     const beat = (t + hashOf(w.sub.id) % 7000) % 10_000

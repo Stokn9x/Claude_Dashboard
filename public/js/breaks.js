@@ -3,20 +3,22 @@
 // takes which break, and when, is worked out from their ids and the clock,
 // so every viewer sees the same and a reload changes nothing. Every three
 // minutes there is a break: some fetch coffee (and talk), some go to the
-// toilet, two play ping-pong, each only in rooms that are bought. Every ten
+// toilet, two play ping-pong in the lounge, each only where it is bought. Every ten
 // minutes, with three or more helpers in, Claude holds a short meeting.
 // Nobody leaves while they wait for you.
 import { store, owns } from './store.js'
 import { hashOf, kr, stir } from './util.js'
-import { at, firstRoom, isBuilt, typeOf } from './plan.js'
-import { route, walkAt } from './routes.js'
+import { at, firstRoom, isBuilt, spotsIn, typeOf } from './plan.js'
+import { route, walkAt, walkMs } from './routes.js'
 import { voice } from './voices.js'
 
 const BREAK_EVERY = 180_000
 const BREAK_AT = 20_000
 const MEETING_EVERY = 600_000
 const MEETING_AT = 60_000
-const ERRAND_WALK = 3000
+// The longest an errand's walk takes either way; most are shorter, at the
+// common pace.
+const ERRAND_WALK = 8000
 export const STAY = { coffee: 22_000, toilet: 12_000, pingpong: 24_000, meeting: 25_000 }
 
 // Helpers who can take a break that starts at `start`: at their place well
@@ -59,14 +61,13 @@ export const breakNow = (subs, now, walks, meeting) => {
   // Ping-pong takes two; the rest go for coffee.
   const extra = picks.pingpong.length >= 2 ? picks.pingpong.splice(2) : picks.pingpong.splice(0)
   if (owns('kitchen')) picks.coffee.push(...extra)
-  picks.toilet = picks.toilet.slice(0, 2)
   const kitchen = firstRoom('kitchen')
-  const team = firstRoom('team')
   const toilet = firstRoom('toilet')
+  const lounge = firstRoom('lounge')
   const spotsFor = {
-    coffee: kitchen ? typeOf(kitchen).standing.map(p => at(kitchen, p)) : [],
-    toilet: toilet ? typeOf(toilet).stalls.map(p => at(toilet, p)) : [],
-    pingpong: team ? typeOf(team).pingpong.map(p => at(team, p)) : [],
+    coffee: spotsIn(kitchen, typeOf(kitchen).standing),
+    toilet: spotsIn(toilet, typeOf(toilet).stalls),
+    pingpong: owns('pingpong') ? spotsIn(lounge, typeOf(lounge).pingpong) : [],
   }
   const errands = new Map()
   for (const kind of ['coffee', 'toilet', 'pingpong']) {
@@ -83,10 +84,14 @@ export const breakNow = (subs, now, walks, meeting) => {
 // Where someone on an errand is: on the way there, there, or on the way back.
 export const errandPose = (home, e, now) => {
   const t = now - e.start
-  if (t < 0 || t >= 2 * ERRAND_WALK + e.stay) return null
-  if (t < ERRAND_WALK) return { ...walkAt(route(home, e.dest), t / ERRAND_WALK), errand: e }
-  if (t < ERRAND_WALK + e.stay) return { x: e.dest.x, y: e.dest.y, facing: e.dest.facing ?? 'front', isWalking: false, isThere: true, there: t - ERRAND_WALK, errand: e }
-  return { ...walkAt(route(e.dest, home), (t - ERRAND_WALK - e.stay) / ERRAND_WALK), errand: e }
+  const there = route(home, e.dest)
+  const back = route(e.dest, home)
+  const go = walkMs(there, ERRAND_WALK)
+  const come = walkMs(back, ERRAND_WALK)
+  if (t < 0 || t >= go + e.stay + come) return null
+  if (t < go) return { ...walkAt(there, t / go), errand: e }
+  if (t < go + e.stay) return { x: e.dest.x, y: e.dest.y, facing: e.dest.facing ?? 'front', isWalking: false, isThere: true, there: t - go, errand: e }
+  return { ...walkAt(back, (t - go - e.stay) / come), errand: e }
 }
 
 // ── Banter ───────────────────────────────────────────────────────────────

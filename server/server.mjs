@@ -15,7 +15,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-const VERSION = '0.18.0'
+const VERSION = '0.19.0'
 const HOST = '127.0.0.1'
 const PORT = Number(process.env.AGENT_KONTOR_PORT || 4747)
 const HERE = path.dirname(fileURLToPath(import.meta.url))
@@ -58,7 +58,35 @@ const START = { desks: 0, rooms: ['claude', 'team'] }
 // A session's credited counts are kept this long after it was last seen.
 const CREDIT_KEEP_MS = 7 * 24 * 60 * 60_000
 
-const newGame = () => ({ v: 1, kroner: 0, owned: { ...START, rooms: [...START.rooms] }, credited: {}, startedAt: Date.now() })
+// The floor plan the saved game is drawn for: 2 is the plan with the
+// corridor and rooms that grow in steps (0.19.0).
+const PLAN_VERSION = 2
+const newGame = () => ({ v: 1, plan: PLAN_VERSION, kroner: 0, owned: { ...START, rooms: [...START.rooms] }, credited: {}, startedAt: Date.now() })
+
+// A game saved for the old floor plan, moved over to the new one so nobody
+// loses anything: team room 1 had room for six desks, so it starts on its
+// second step; team room 2 had six more, so team room 1 is full grown and
+// team room 2 on its second step; the old lounge (id 'hobby') is the new
+// lounge's first two steps; the sofa corner (the old 'lounge') becomes the
+// lounge's first step, or, with the old lounge as well, is paid back; a
+// ping-pong table, which stands in the lounge now, brings the lounge along.
+const SOFA_CORNER_PRICE = 4000
+const migrate = saved => {
+  if ((saved.plan ?? 1) >= PLAN_VERSION) return { saved, isMigrated: false }
+  const old = new Set(saved.owned?.rooms ?? [])
+  const rooms = new Set([...old].filter(item => item !== 'hobby' && item !== 'lounge'))
+  rooms.add('team1-2')
+  if (old.has('team2')) for (const step of ['team1-3', 'team2', 'team2-2']) rooms.add(step)
+  let refund = 0
+  if (old.has('hobby')) {
+    rooms.add('lounge')
+    rooms.add('lounge-2')
+    if (old.has('lounge')) refund = SOFA_CORNER_PRICE
+  } else if (old.has('lounge')) rooms.add('lounge')
+  // The ping-pong table stands in the lounge now: it comes with one.
+  if (old.has('pingpong')) rooms.add('lounge')
+  return { saved: { ...saved, plan: PLAN_VERSION, kroner: saved.kroner + refund, owned: { ...START, ...(saved.owned ?? {}), rooms: [...rooms] } }, isMigrated: true }
+}
 
 // A copy of spil.json is put aside once a day, and the last week of them
 // kept: one bad write must never cost all the kroner.
@@ -100,11 +128,14 @@ const loadGame = () => {
     }
   }
   if (!saved) return newGame()
-  return { ...newGame(), ...saved, owned: { ...START, ...(saved.owned ?? {}) }, credited: saved.credited ?? {} }
+  const moved = migrate(saved)
+  isMigrated = moved.isMigrated
+  return { ...newGame(), ...moved.saved, owned: { ...START, ...(moved.saved.owned ?? {}) }, credited: moved.saved.credited ?? {} }
 }
 
+let isMigrated = false
 let game = loadGame()
-let isGameChanged = isRecovered
+let isGameChanged = isRecovered || isMigrated
 
 // Written whole to a side file first, then moved into place: a crash
 // half-way never leaves a broken spil.json.
@@ -138,13 +169,18 @@ const backupGame = now => {
 // How the office feels, 0 to 100: a bare office is so-so, every room and
 // piece of furniture makes it better, every helper on the floor worse. It
 // multiplies what the work earns by 0.8 to 1.2.
+// Every step a room grows lifts it a little more.
 const WELLBEING = {
   base: 40,
-  kitchen: 15, toilet: 10, lounge: 10, pingpong: 10, meeting: 5, reception: 5, hobby: 8, team2: 6,
+  kitchen: 15, 'kitchen-2': 4,
+  toilet: 10, 'toilet-2': 3, 'toilet-3': 2,
+  lounge: 10, 'lounge-2': 6, 'lounge-3': 6,
+  pingpong: 10, meeting: 5, reception: 5,
+  'team1-2': 2, 'team1-3': 2, team2: 4, 'team2-2': 2, 'team2-3': 2,
   plants: 3, art: 3, neon: 2, espresso: 3, aquarium: 5, chairs: 6, screens: 5,
   perFloorSitter: -8,
 }
-const LIFTS = ['kitchen', 'toilet', 'lounge', 'pingpong', 'meeting', 'reception', 'hobby', 'team2', 'plants', 'art', 'neon', 'espresso', 'aquarium', 'chairs', 'screens']
+const LIFTS = Object.keys(WELLBEING).filter(item => item !== 'base' && item !== 'perFloorSitter')
 // Helpers on the floor right now: the most any session has beyond the
 // desks, and which session that is (the page names it when it is not the
 // one in view).
@@ -260,23 +296,49 @@ const pruneCredited = now => {
 
 // ── The shop ────────────────────────────────────────────────────────────
 // Prices live here and only here: the page asks to buy, the server decides.
-// Every desk is bought, the first two cheaply; the team room has room for six, the
-// quiet room for four more.
-// Six more come with the second team room (phase 5).
-const DESK_PRICES = [300, 500, 800, 1200, 1800, 2500, 3500, 4500, 6000, 8000, 10_000, 11_000, 12_000, 13_000, 14_000, 15_000]
+// Every desk is bought, the first two cheaply. Team room 1 starts with
+// room for three and the quiet room has four; each step a team room grows
+// makes room for three more, 22 in all.
+const DESK_PRICES = [300, 500, 800, 1200, 1800, 2500, 3500, 4500, 6000, 8000, 10_000, 11_000, 12_000, 13_000, 14_000, 15_000, 16_000, 17_000, 18_000, 19_000, 20_000, 21_000]
 const MAX_DESKS = DESK_PRICES.length
-// The desks the rooms that stand have room for: ten, sixteen with team room 2.
-const desksRoom = () => (game.owned.rooms.includes('team2') ? MAX_DESKS : 10)
-// Rooms, and furniture for the team room, bought once each.
-const ROOM_PRICES = { kitchen: 3000, toilet: 2500, lounge: 4000, pingpong: 6000, meeting: 12000, reception: 7000, hobby: 9000, team2: 15000 }
+// Rooms that grow in steps, each step sold once the one before it stands.
+// The team rooms are one chain, so the desks fill them in order: team room
+// 2 is built once team room 1 is full grown.
+const CHAINS = [
+  ['team1-2', 'team1-3', 'team2', 'team2-2', 'team2-3'],
+  ['kitchen', 'kitchen-2'],
+  ['lounge', 'lounge-2', 'lounge-3'],
+  ['toilet', 'toilet-2', 'toilet-3'],
+]
+// Furniture that stands in a room is sold once the room stands.
+const NEEDS = { pingpong: 'lounge' }
+const stepBefore = item => {
+  if (NEEDS[item]) return NEEDS[item]
+  for (const chain of CHAINS) {
+    const i = chain.indexOf(item)
+    if (i > 0) return chain[i - 1]
+  }
+  return null
+}
+const desksRoom = () => 7 + 3 * CHAINS[0].filter(step => game.owned.rooms.includes(step)).length
+// Rooms and their steps, and the ping-pong table in the lounge, bought
+// once each. Every step costs twice the one before it.
+const ROOM_PRICES = {
+  'team1-2': 4000, 'team1-3': 8000, team2: 10_000, 'team2-2': 20_000, 'team2-3': 40_000,
+  kitchen: 3000, 'kitchen-2': 6000,
+  lounge: 4000, 'lounge-2': 8000, 'lounge-3': 16_000,
+  toilet: 2500, 'toilet-2': 5000, 'toilet-3': 10_000,
+  pingpong: 6000, meeting: 12_000, reception: 7000,
+}
 // Decor and upgrades: bought once each, for the look and for wellbeing.
 const DECOR_PRICES = { plants: 600, art: 900, neon: 1200, espresso: 1500, aquarium: 2500, chairs: 4000, screens: 5000 }
 const THING_PRICES = { ...ROOM_PRICES, ...DECOR_PRICES }
 
 const priceOf = item => {
   if (item === 'desk') return game.owned.desks < desksRoom() ? DESK_PRICES[game.owned.desks] : null
-  if (item in THING_PRICES) return game.owned.rooms.includes(item) ? null : THING_PRICES[item]
-  return null
+  if (!(item in THING_PRICES) || game.owned.rooms.includes(item)) return null
+  const before = stepBefore(item)
+  return before && !game.owned.rooms.includes(before) ? null : THING_PRICES[item]
 }
 
 const buy = item => {
@@ -314,7 +376,7 @@ const ACHIEVEMENTS = [
   { id: 'commits-10', name: 'Committed', about: 'Lav 10 commits', reward: 150, value: () => total('commits'), target: 10 },
   { id: 'prs-5', name: 'Ship it', about: 'Åbn 5 pull requests', reward: 300, value: () => total('prs'), target: 5 },
   { id: 'desk-3', name: 'Indflytning', about: 'Køb det første skrivebord', reward: 50, value: () => game.owned.desks, target: 1 },
-  { id: 'desk-10', name: 'Fuldt hus', about: 'Køb alle seksten skriveborde', reward: 1000, value: () => game.owned.desks, target: MAX_DESKS },
+  { id: 'desk-10', name: 'Fuldt hus', about: 'Køb alle 22 skriveborde', reward: 1000, value: () => game.owned.desks, target: MAX_DESKS },
   { id: 'kitchen', name: 'Kaffekultur', about: 'Byg køkkenet', reward: 100, value: () => (game.owned.rooms.includes('kitchen') ? 1 : 0), target: 1 },
   { id: 'all-rooms', name: 'Hele kontoret', about: 'Byg alle rum og alt inventar', reward: 2000, value: () => ALL_ROOMS.filter(r => game.owned.rooms.includes(r)).length, target: ALL_ROOMS.length },
   { id: 'wellbeing-90', name: 'Trivselsguru', about: 'Nå en trivsel på 90', reward: 500, value: () => wellbeing().score, target: 90 },

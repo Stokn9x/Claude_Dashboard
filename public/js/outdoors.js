@@ -90,8 +90,8 @@ export const drawGrounds = (g, view) => {
   fill(b.x + 11, b.y + 6, 2, 4, OUTLINE)
 
   // The hedge along the street, open where the path comes out
-  const gapFrom = GROUNDS.path[1][0] - 4
-  const gapTo = GROUNDS.path[1][0] + GROUNDS.path[1][2] + 4
+  const gapFrom = GROUNDS.path.at(-1)[0] - 4
+  const gapTo = GROUNDS.path.at(-1)[0] + GROUNDS.path.at(-1)[2] + 4
   for (let x = S.x; x < S.x + S.w; x += 36) {
     if (x + 32 > gapFrom && x < gapTo) continue
     if (!seen(x, HEDGE_Y)) continue
@@ -121,7 +121,7 @@ export const drawGrounds = (g, view) => {
     fill(view.x, road.y + road.h - 2, view.w, 2, '#9A958C')
     for (let x = Math.floor(view.x / 30) * 30; x < view.x + view.w; x += 30) fill(x, road.y + road.h / 2 - 1, 16, 2, '#E9E2C9')
     // A pedestrian crossing where the path meets the street
-    for (let k = 0; k < 5; k++) fill(GROUNDS.path[1][0] - 2 + k * 6, road.y + 4, 3, road.h - 8, '#E9E9E4')
+    for (let k = 0; k < 5; k++) fill(GROUNDS.path.at(-1)[0] - 2 + k * 6, road.y + 4, 3, road.h - 8, '#E9E9E4')
   }
   // Grass on the far side of the street goes on as before.
 

@@ -6,7 +6,7 @@
 // or pinch to zoom, double-click to go back to the whole office.
 import { store } from './store.js'
 import { canvas } from './gfx.js'
-import { GROUNDS, PLAN, WORLD, frameOf, typeOf, isBuilt } from './plan.js'
+import { GROUNDS, PLAN, WORLD, fullFrameOf, isBuilt, rectOf } from './plan.js'
 
 const ZOOM_MIN = 0.55
 const ZOOM_MAX = 5
@@ -38,7 +38,7 @@ export const isInView = (x, y, w, h) => {
 }
 export const visibleRooms = () =>
   PLAN.rooms.filter(room => {
-    const f = frameOf(room)
+    const f = fullFrameOf(room)
     return isInView(f.x, f.y, f.w, f.h)
   })
 
@@ -247,7 +247,7 @@ const fitAllButton = document.getElementById('fit-all')
 const mini = minimap.getContext('2d')
 // The map shows the office and a little of the grounds round it.
 const MAP = { x: WORLD.x - 60, y: WORLD.y - 50, w: WORLD.w + 120, h: WORLD.h + 100 }
-const MAP_COLOURS = { corner: '#DCC194', kitchen: '#F3F5F6', team: '#CBD9C7', quiet: '#D6DCE6', toilet: '#E3EEF2', meeting: '#B48A64', team2: '#D3D0C8', hobby: '#E8DCC8', reception: '#E6E2DA' }
+const MAP_COLOURS = { corner: '#DCC194', kitchen: '#F3F5F6', team: '#CBD9C7', quiet: '#D6DCE6', toilet: '#E3EEF2', meeting: '#B48A64', team2: '#D3D0C8', lounge: '#7A5E4C', reception: '#E6E2DA', hall: '#B9C1C8', depot: '#8E979F' }
 
 export const drawMinimap = () => {
   const isAway = !isHome()
@@ -269,8 +269,10 @@ export const drawMinimap = () => {
   mini.fillStyle = '#3E4852'
   mini.fillRect(WORLD.x, WORLD.y, WORLD.w, WORLD.h)
   for (const room of PLAN.rooms) {
+    if (!isBuilt(room) && room.until) continue
+    const r = rectOf(room)
     mini.fillStyle = isBuilt(room) ? (MAP_COLOURS[room.type] ?? '#C9CED3') : '#A9C08A'
-    mini.fillRect(room.x, room.y, typeOf(room).w, typeOf(room).h)
+    mini.fillRect(r.x, r.y, r.w, r.h)
   }
   // What the free part of the window shows
   const kv = scale()

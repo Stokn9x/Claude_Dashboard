@@ -203,25 +203,68 @@ test('a streak with a day missing starts over', async () => {
   }
 })
 
-test('desks beyond the tenth are for sale only once the second team room stands', async () => {
+test('a room grows one step at a time, and each team room step makes room for three desks', async () => {
   const home = newHome()
-  fs.writeFileSync(gameFile(home), JSON.stringify({ v: 1, kroner: 0, owned: { desks: 10, rooms: ['claude', 'team'] }, credited: {} }))
+  fs.writeFileSync(gameFile(home), JSON.stringify({ v: 1, plan: 2, kroner: 0, owned: { desks: 7, rooms: ['claude', 'team'] }, credited: {} }))
   const first = await start(home)
   try {
     const { game } = JSON.parse((await get('/api/state')).body)
+    assert.equal(game.maxDesks, 7, 'three in team room 1, four in the quiet room')
     assert.equal(game.next.desk, null)
-    assert.equal(game.maxDesks, 10)
-    assert.equal(typeof game.next.team2, 'number')
+    assert.equal(typeof game.next['team1-2'], 'number')
+    assert.equal(game.next['team1-3'], null, 'not before step 2')
+    assert.equal(game.next.team2, null, 'team room 2 comes once team room 1 is full grown')
+    assert.equal(game.next['kitchen-2'], null, 'not before the kitchen')
+    assert.equal(game.next['toilet'], 2500)
+    assert.equal(game.next.pingpong, null, 'the ping-pong table stands in the lounge')
   } finally {
     await stop(first)
   }
-  fs.writeFileSync(gameFile(home), JSON.stringify({ v: 1, kroner: 0, owned: { desks: 10, rooms: ['claude', 'team', 'team2'] }, credited: {} }))
+  fs.writeFileSync(gameFile(home), JSON.stringify({ v: 1, plan: 2, kroner: 0, owned: { desks: 13, rooms: ['claude', 'team', 'team1-2', 'team1-3'] }, credited: {} }))
   const second = await start(home)
   try {
     const { game } = JSON.parse((await get('/api/state')).body)
-    assert.equal(game.maxDesks, 16)
-    assert.ok(game.next.desk > 8000, 'the eleventh desk costs more than the tenth')
+    assert.equal(game.maxDesks, 13)
+    assert.equal(game.next.team2, 10_000)
+    assert.equal(game.next['team1-2'], null, 'bought already')
   } finally {
     await stop(second)
+  }
+})
+
+test('a game saved for the old floor plan is moved over, and nobody loses anything', async () => {
+  const home = newHome()
+  fs.writeFileSync(gameFile(home), JSON.stringify({ v: 1, kroner: 100, owned: { desks: 16, rooms: ['claude', 'team', 'team2', 'hobby', 'lounge', 'kitchen', 'plants'] }, credited: {} }))
+  const child = await start(home)
+  try {
+    const { game } = JSON.parse((await get('/api/state')).body)
+    const rooms = game.owned.rooms
+    for (const item of ['team1-2', 'team1-3', 'team2', 'team2-2', 'lounge', 'lounge-2', 'kitchen', 'plants']) assert.ok(rooms.includes(item), item)
+    assert.ok(!rooms.includes('hobby'))
+    assert.equal(game.owned.desks, 16)
+    assert.ok(game.maxDesks >= 16, 'room for every desk bought')
+    assert.equal(game.kroner, 4100, 'the sofa corner is paid back, as the old lounge became the new one')
+  } finally {
+    await stop(child)
+  }
+  const saved = JSON.parse(fs.readFileSync(gameFile(home), 'utf8'))
+  assert.equal(saved.plan, 2, 'moved once, and saved')
+  const again = await start(home)
+  try {
+    assert.equal(JSON.parse((await get('/api/state')).body).game.kroner, 4100, 'not paid back twice')
+  } finally {
+    await stop(again)
+  }
+  // A small office keeps its six places in team room 1, and its ping-pong
+  // table brings the lounge it now stands in
+  const small = newHome()
+  fs.writeFileSync(gameFile(small), JSON.stringify({ v: 1, kroner: 0, owned: { desks: 10, rooms: ['claude', 'team', 'pingpong'] }, credited: {} }))
+  const third = await start(small)
+  try {
+    const { game } = JSON.parse((await get('/api/state')).body)
+    assert.ok(game.owned.rooms.includes('team1-2') && game.owned.rooms.includes('lounge'))
+    assert.equal(game.maxDesks, 10)
+  } finally {
+    await stop(third)
   }
 })

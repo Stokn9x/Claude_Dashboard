@@ -1,43 +1,53 @@
 // ── Routes ───────────────────────────────────────────────────────────────
-// Walks find their way on a grid of small cells, open where a room's floor
-// or a door is and nothing stands in the way, with A*: the fewest steps, and
-// a little extra for every turn so a route goes in straight runs. Routes are
-// kept until the floor plan changes.
+// A walk goes room by room: out of a room by its door, along the hall in
+// the lane on its right, and in by the next door. Every room opens on the
+// hall, so nobody cuts through someone else's room. A door is walked
+// straight through, from a step inside one room to a step inside the
+// other. Within a room the way round the furniture is found with A* on a
+// grid of small cells, the fewest steps with a little extra for every
+// turn, and then pulled straight wherever the way is clear, so helpers walk
+// in lines, not staircases. Outside is open grass, reached by the front
+// door and the path. Routes are kept until the floor plan changes.
 import { store, owns } from './store.js'
 import { hashOf, isIn } from './util.js'
-import { PLAN, WORLD, MAIN_SPOT, entrance, frameOf, walkway, at, deskSlots, firstRoom, handoffFor, isBuilt, isOpenDoor, placeOf, shiftOf, typeOf } from './plan.js'
+import { GROUNDS, PLAN, WORLD, MAIN_SPOT, entrance, frameOf, walkway, at, deskSlots, firstRoom, handoffFor, hasNow, isBuilt, isDepot, isOpenDoor, laneOf, placeOf, rectOf, shiftOf, spotsIn, typeOf } from './plan.js'
 
 const STEP = 6
 const TURN = 0.6
 const MOVES = [[1, 0], [-1, 0], [0, 1], [0, -1]]
+// How far into a room a walk goes straight on from a door
+const MOUTH = 10
 
 // The grid is built when a route is first needed, and again whenever
-// something is bought: only rooms that stand have floor, and a door only
-// opens between two rooms that stand, so no walk cuts across an empty lot.
+// something is bought: only rooms that stand have floor (a depot has none),
+// and furniture is in the way only once it stands.
 let grid = null
 let gridKey = null
 const routes = new Map()
+
+const walkable = () => PLAN.rooms.filter(room => isBuilt(room) && !isDepot(room))
+const box = r => [r.x, r.y, r.w, r.h]
 
 const buildGrid = () => {
   const cols = Math.ceil(WORLD.w / STEP)
   const rows = Math.ceil(WORLD.h / STEP)
   const open = new Uint8Array(cols * rows)
-  const floors = PLAN.rooms.filter(isBuilt).map(r => [r.x + 2, r.y + 2, typeOf(r).w - 4, typeOf(r).h - 4])
-  // A door reaches a little into the rooms on both sides, so the floor on
-  // one side, the door and the floor on the other always meet in the grid.
-  const doors = PLAN.doors.filter(isOpenDoor).map(d => (d.w < d.h ? [d.x - 5, d.y, d.w + 10, d.h] : [d.x, d.y - 5, d.w, d.h + 10]))
-  // Furniture, with a margin so feet keep clear of it
-  const blocks = PLAN.rooms.flatMap(room => {
+  const floors = walkable().map(room => {
+    const r = rectOf(room)
+    return [r.x + 2, r.y + 2, r.w - 4, r.h - 4]
+  })
+  // Furniture, with a margin so feet keep clear of it. A block that needs
+  // something bought stands only once it is, and one beyond the floor the
+  // room has now is not there yet.
+  const blocks = walkable().flatMap(room => {
     const { dx, dy } = shiftOf(room)
-    // A block that needs something bought stands only once it is
-    return (typeOf(room).blocks ?? []).filter(b => owns(b[4])).map(([x, y, w, h]) => [x + dx - 3, y + dy - 3, w + 6, h + 6])
+    return (typeOf(room).blocks ?? []).filter(([x, y, w, h, needs]) => owns(needs) && hasNow(room, [x + w / 2, y + h / 2])).map(([x, y, w, h]) => [x + dx - 3, y + dy - 3, w + 6, h + 6])
   })
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
       const x = WORLD.x + c * STEP + STEP / 2
       const y = WORLD.y + r * STEP + STEP / 2
-      const isFloor = floors.some(f => isIn(x, y, f)) || doors.some(d => isIn(x, y, d))
-      open[r * cols + c] = isFloor && !blocks.some(b => isIn(x, y, b)) ? 1 : 0
+      open[r * cols + c] = floors.some(f => isIn(x, y, f)) && !blocks.some(b => isIn(x, y, b)) ? 1 : 0
     }
   }
   return { cols, rows, open }
@@ -57,17 +67,19 @@ const cellOf = p => {
   return r * grid.cols + c
 }
 const centreOf = i => ({ x: WORLD.x + (i % grid.cols) * STEP + STEP / 2, y: WORLD.y + Math.floor(i / grid.cols) * STEP + STEP / 2 })
+// A cell a walk in this room may use: open, and on the room's own floor.
+const isUsable = (i, area) => grid.open[i] === 1 && isIn(centreOf(i).x, centreOf(i).y, area)
 
-// The nearest open cell, for a spot that lies on furniture or in a wall.
-const nearestOpen = start => {
-  if (grid.open[start]) return start
+// The nearest usable cell, for a spot that lies on furniture.
+const nearestOpen = (start, area) => {
+  if (isUsable(start, area)) return start
   const seen = new Set([start])
   const queue = [start]
   for (let head = 0; head < queue.length; head++) {
     const i = queue[head]
     for (const j of [i - 1, i + 1, i - grid.cols, i + grid.cols]) {
       if (j < 0 || j >= grid.open.length || seen.has(j)) continue
-      if (grid.open[j]) return j
+      if (isUsable(j, area)) return j
       seen.add(j)
       queue.push(j)
     }
@@ -110,10 +122,11 @@ const makeHeap = () => {
   return { push, pop, size: () => heap.length }
 }
 
-const findPath = (from, to) => {
-  const { cols, rows, open } = grid
-  const start = nearestOpen(cellOf(from))
-  const goal = nearestOpen(cellOf(to))
+// The way between two points in one room, round its furniture, as corners.
+const findPath = (from, to, area) => {
+  const { cols, rows } = grid
+  const start = nearestOpen(cellOf(from), area)
+  const goal = nearestOpen(cellOf(to), area)
   const gc = goal % cols
   const gr = Math.floor(goal / cols)
   const h = i => Math.abs((i % cols) - gc) + Math.abs(Math.floor(i / cols) - gr)
@@ -141,7 +154,7 @@ const findPath = (from, to) => {
       const nr = r + MOVES[d][1]
       if (nc < 0 || nr < 0 || nc >= cols || nr >= rows) continue
       const j = nr * cols + nc
-      if (!open[j]) continue
+      if (!isUsable(j, area)) continue
       const next = cost[s] + 1 + (d === dir ? 0 : TURN)
       const t = j * 4 + d
       if (next < cost[t]) {
@@ -157,19 +170,35 @@ const findPath = (from, to) => {
   for (let s = end; s >= 0; s = back[s]) cells.push(s >> 2)
   cells.reverse()
   const corners = cells.filter((cell, k) => k === 0 || k === cells.length - 1 || cells[k + 1] - cell !== cell - cells[k - 1])
-  return [from, ...corners.map(centreOf), to].filter((p, k, all) => k === 0 || p.x !== all[k - 1].x || p.y !== all[k - 1].y)
+  return [from, ...corners.map(centreOf), to]
 }
 
-const inside = (from, to) => {
-  ensureGrid()
-  const key = `${from.x},${from.y}>${to.x},${to.y}`
-  if (!routes.has(key)) routes.set(key, findPath(from, to))
-  return routes.get(key)
+// Whether a straight line between two points in a room keeps to its free
+// floor. The ends may lie on furniture (a chair, a stall), so the first and
+// last few units are not checked.
+const isClear = (a, b, area) => {
+  const d = Math.hypot(b.x - a.x, b.y - a.y)
+  for (let k = 4; k <= d - 4; k += 2) {
+    const p = { x: a.x + ((b.x - a.x) * k) / d, y: a.y + ((b.y - a.y) * k) / d }
+    if (!isUsable(cellOf(p), area)) return false
+  }
+  return true
 }
 
-// Outside the office is open grass: a walk between a place outside (the
-// bench, the path) and one inside goes by the corner of the path and the
-// front door.
+// Corners pulled straight: from each point, on to the furthest one that
+// can be seen from it.
+const straighten = (points, area) => {
+  const out = [points[0]]
+  for (let i = 0; i < points.length - 1; ) {
+    let j = points.length - 1
+    while (j > i + 1 && !isClear(points[i], points[j], area)) j--
+    out.push(points[j])
+    i = j
+  }
+  return out
+}
+
+// ── Rooms and doors ──────────────────────────────────────────────────────
 // Outdoors is anywhere no standing room (with its walls) covers.
 export const isOutdoors = p =>
   !PLAN.rooms.some(room => {
@@ -177,13 +206,112 @@ export const isOutdoors = p =>
     const f = frameOf(room)
     return isIn(p.x, p.y, [f.x, f.y, f.w, f.h])
   })
+
+// The room a point is in: the one whose floor it is on, or 'out'; a point
+// in a wall or a doorway belongs to the nearest room.
+const roomAt = p => {
+  const rooms = walkable()
+  const on = rooms.find(room => isIn(p.x, p.y, box(rectOf(room))))
+  if (on) return on.id
+  if (isOutdoors(p)) return 'out'
+  let best = rooms[0]
+  let bestD = Infinity
+  for (const room of rooms) {
+    const r = rectOf(room)
+    const d = Math.hypot(Math.max(r.x - p.x, 0, p.x - r.x - r.w), Math.max(r.y - p.y, 0, p.y - r.y - r.h))
+    if (d < bestD) {
+      best = room
+      bestD = d
+    }
+  }
+  return best.id
+}
+
+// The rooms a door joins; the front door joins the reception and outdoors.
+const sidesOf = door => (door.isEntrance ? [door.between[0], 'out'] : door.between)
+
+// A step either side of a door, by the room each lies in. Outside the front
+// door it is the doorstep itself.
+const mouthsOf = door => {
+  const isAcross = door.w >= door.h
+  const cx = door.x + door.w / 2
+  const cy = door.y + door.h / 2
+  const one = isAcross ? { x: cx, y: door.y - MOUTH } : { x: door.x - MOUTH, y: cy }
+  const two = isAcross ? { x: cx, y: door.y + door.h + MOUTH } : { x: door.x + door.w + MOUTH, y: cy }
+  const [a, b] = sidesOf(door)
+  const isOneA = roomAt(one) === a
+  const mouths = { [a]: isOneA ? one : two, [b]: isOneA ? two : one }
+  if (door.isEntrance) mouths.out = entrance()
+  return mouths
+}
+
+// The doors from one room to another, fewest first.
+const roomPath = (a, b) => {
+  const doors = PLAN.doors.filter(isOpenDoor)
+  const prev = new Map([[a, null]])
+  const queue = [a]
+  for (let head = 0; head < queue.length; head++) {
+    const r = queue[head]
+    if (r === b) break
+    for (const door of doors) {
+      const sides = sidesOf(door)
+      if (!sides.includes(r)) continue
+      const s = sides[0] === r ? sides[1] : sides[0]
+      if (prev.has(s)) continue
+      prev.set(s, { from: r, to: s, door })
+      queue.push(s)
+    }
+  }
+  if (!prev.has(b)) return null
+  const steps = []
+  for (let r = b; prev.get(r); r = prev.get(r).from) steps.unshift(prev.get(r))
+  return steps
+}
+
+// One room's part of a walk, from p to q. Outdoors it is straight over the
+// grass, by the corner of the path to or from the front door. In the hall
+// it is in the lane on the right. Elsewhere it goes round the furniture.
+const leg = (id, p, q) => {
+  if (id === 'out') {
+    const [door, corner] = walkway()
+    const isAtDoor = pt => pt.x === door.x && pt.y === door.y
+    return isAtDoor(p) || isAtDoor(q) ? [p, corner, q] : [p, q]
+  }
+  if (id === 'hall') {
+    if (Math.abs(p.x - q.x) < 1) return [p, q]
+    const lane = laneOf(q.x > p.x)
+    return [p, { x: p.x, y: lane }, { x: q.x, y: lane }, q]
+  }
+  const room = PLAN.rooms.find(r => r.id === id)
+  const r = rectOf(room)
+  const area = [r.x + 1, r.y + 1, r.w - 2, r.h - 2]
+  return straighten(findPath(p, q, area), area)
+}
+
+const withoutRepeats = points => points.filter((p, k) => k === 0 || p.x !== points[k - 1].x || p.y !== points[k - 1].y)
+
+const findRoute = (from, to) => {
+  const a = roomAt(from)
+  const b = roomAt(to)
+  if (a === b) return withoutRepeats(leg(a, from, to))
+  const steps = roomPath(a, b)
+  if (!steps) return [from, to]
+  const points = [from]
+  let here = from
+  for (const { from: r, to: s, door } of steps) {
+    const mouths = mouthsOf(door)
+    points.push(...leg(r, here, mouths[r]).slice(1), mouths[s])
+    here = mouths[s]
+  }
+  points.push(...leg(b, here, to).slice(1))
+  return withoutRepeats(points)
+}
+
 export const route = (from, to) => {
-  const isFromOut = isOutdoors(from)
-  const isToOut = isOutdoors(to)
-  if (!isFromOut && !isToOut) return inside(from, to)
-  const [door, corner] = walkway()
-  const points = isFromOut && isToOut ? [from, to] : isFromOut ? [from, corner, ...inside(door, to)] : [...inside(from, door), corner, to]
-  return points.filter((p, k) => k === 0 || p.x !== points[k - 1].x || p.y !== points[k - 1].y)
+  ensureGrid()
+  const key = `${from.x},${from.y}>${to.x},${to.y}`
+  if (!routes.has(key)) routes.set(key, findRoute(from, to))
+  return routes.get(key)
 }
 // In from the corner of the path outside, through the front door.
 const arriveRoute = seat => route(walkway()[1], placeOf(seat).spot)
@@ -191,12 +319,19 @@ const deliverRoute = seat => route(placeOf(seat).spot, handoffFor(seat))
 const leaveRoute = seat => route(handoffFor(seat), entrance())
 
 // ── Walks ────────────────────────────────────────────────────────────────
-// Every walk takes as long as the status file says (the mod's WALKS),
-// however far it goes: a longer route is a brisker walk.
-export const WALKS = { arrive: 4000, deliver: 3500, handover: 2600, leave: 4000, idle: 180_000 }
+// Everyone walks at the same pace. The mod's times (WALKS, sent in the
+// status file) are a ceiling: a walk that would take longer is brisker, so
+// it still fits. Coming in, a helper walks at once and sits down when it
+// gets there. With a result, it finishes up at its desk and sets off so it
+// reaches Claude just as the handover begins; going home, it lingers and
+// sets off so it steps out of the front door just as its time is up.
+export const SPEED = 0.08
+export const WALKS = { arrive: 12_000, deliver: 8000, handover: 2600, leave: 9000, idle: 180_000 }
 
 const facingOf = (a, b) => (Math.abs(b.x - a.x) > Math.abs(b.y - a.y) ? (b.x > a.x ? 'right' : 'left') : b.y > a.y ? 'front' : 'back')
 const lengthOf = points => points.slice(1).reduce((d, p, i) => d + Math.hypot(p.x - points[i].x, p.y - points[i].y), 0)
+// How long a walk takes at the common pace, at most `most` ms.
+export const walkMs = (points, most) => Math.max(1, Math.min(most, lengthOf(points) / SPEED))
 
 // Where a walk has got to at the fraction k of its time.
 export const walkAt = (points, k) => {
@@ -213,6 +348,13 @@ export const walkAt = (points, k) => {
   return { x: last.x, y: last.y, facing: 'front', isWalking: false }
 }
 
+// A walk that must end at `end` ms: standing at its start until it sets off.
+const walkEndingAt = (points, e, end, facing = 'front') => {
+  const ms = walkMs(points, end)
+  const off = end - ms
+  return e < off ? { x: points[0].x, y: points[0].y, facing, isWalking: false } : walkAt(points, (e - off) / ms)
+}
+
 // What a helper is doing at this moment: at its place, or somewhere along a
 // walk; null once it is out of the door. A helper off work (idle) is placed
 // by the page (see idle.js); `origin` is where it was idling, for the walk
@@ -222,20 +364,25 @@ export const poseOf = (sub, now, walks = WALKS, origin = null) => {
   if (sub.phase === 'working') return { seated: true }
   if (sub.phase === 'idle') return { isIdle: true }
   if (sub.phase === 'arriving') {
-    if (e >= walks.arrive) return { seated: true }
-    return walkAt(sub.from === 'idle' && origin ? route(origin, placeOf(sub.seat).spot) : arriveRoute(sub.seat), e / walks.arrive)
+    const points = sub.from === 'idle' && origin ? route(origin, placeOf(sub.seat).spot) : arriveRoute(sub.seat)
+    const ms = walkMs(points, walks.arrive)
+    return e >= ms ? { seated: true } : walkAt(points, e / ms)
   }
   if (sub.phase === 'delivering') {
-    if (e < walks.deliver) return walkAt(deliverRoute(sub.seat), e / walks.deliver)
+    if (e < walks.deliver) {
+      const points = deliverRoute(sub.seat)
+      // Still finishing up at the desk until it is time to set off
+      return e < walks.deliver - walkMs(points, walks.deliver) ? { seated: true } : walkEndingAt(points, e, walks.deliver)
+    }
     if (e < walks.deliver + walks.handover) {
       const spot = handoffFor(sub.seat)
       return { x: spot.x, y: spot.y, facing: 'left', isWalking: false, handover: true }
     }
     const e2 = e - walks.deliver - walks.handover
-    return e2 < walks.leave ? walkAt(leaveRoute(sub.seat), e2 / walks.leave) : null
+    return e2 < walks.leave ? walkEndingAt(leaveRoute(sub.seat), e2, walks.leave, 'left') : null
   }
   if (e >= walks.leave) return null
-  return walkAt(sub.from === 'idle' && origin ? route(origin, entrance()) : leaveRoute(sub.seat), e / walks.leave)
+  return walkEndingAt(sub.from === 'idle' && origin ? route(origin, entrance()) : leaveRoute(sub.seat), e, walks.leave)
 }
 
 // ── Going home ───────────────────────────────────────────────────────────
@@ -262,21 +409,20 @@ export const homewardPose = (id, out, now) => {
 }
 
 // For checking the floor plan after a change: every route a helper or
-// Claude can take, walked in small steps; any that crosses a wall, or that A*
-// could not find and drew straight, is reported. In the browser console:
-// kontorCheckRoutes()
+// Claude can take, walked in small steps; any that crosses a wall or a
+// depot, or that could not be found and was drawn straight, is reported.
+// In the browser console: kontorCheckRoutes()
 export const checkRoutes = () => {
   ensureGrid()
-  const built = PLAN.rooms.filter(isBuilt)
-  const floors = built.map(r => [r.x, r.y, typeOf(r).w, typeOf(r).h])
+  const floors = walkable().map(room => box(rectOf(room)))
   const doors = PLAN.doors.filter(isOpenDoor).map(d => [d.x - 1, d.y - 1, d.w + 2, d.h + 2])
   // Outside is open ground: arrivals come up the path, and some wait on the bench.
   const isFloor = (x, y) => floors.some(f => isIn(x, y, f)) || doors.some(d => isIn(x, y, d)) || isOutdoors({ x, y })
   const problems = []
   const check = (name, points) => {
-    // A straight line indoors means A* found nothing; outdoors it is just a walk across the grass.
+    // A straight line indoors means no route was found; outdoors it is just a walk across the grass.
     const isIndoors = !isOutdoors(points[0]) || !isOutdoors(points[1])
-    if (points.length === 2 && isIndoors && Math.hypot(points[1].x - points[0].x, points[1].y - points[0].y) > 30) problems.push(`${name}: no route found`)
+    if (points.length === 2 && isIndoors && Math.hypot(points[1].x - points[0].x, points[1].y - points[0].y) > 30 && roomAt(points[0]) !== roomAt(points[1])) problems.push(`${name}: no route found`)
     for (let i = 0; i + 1 < points.length; i++) {
       const a = points[i]
       const b = points[i + 1]
@@ -292,10 +438,11 @@ export const checkRoutes = () => {
   const seats = deskSlots().length + 10 + 6
   let count = 0
   const spots = []
-  for (const room of built) {
+  for (const room of walkable()) {
     const t = typeOf(room)
-    for (const p of [...(t.standing ?? []), ...(t.stalls ?? []), ...(t.pingpong ?? []), ...(t.chairs ?? []), ...Object.values(t.hobbies ?? {}).flat()]) spots.push(at(room, p))
+    spots.push(...spotsIn(room, [...(t.standing ?? []), ...(t.stalls ?? []), ...(t.chairs ?? []), ...(owns('pingpong') ? t.pingpong ?? [] : []), ...Object.values(t.hobbies ?? {}).flat()]))
   }
+  spots.push(GROUNDS.hangout[0])
   for (let seat = 0; seat < seats; seat++) {
     const home = placeOf(seat).spot
     check(`arrive ${seat}`, arriveRoute(seat))

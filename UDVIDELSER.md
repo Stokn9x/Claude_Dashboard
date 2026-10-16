@@ -28,6 +28,7 @@ Status: ✅ lavet · 🟡 delvist · ⬜ ikke lavet · ⏸️ parkeret · ➖ ik
 | 0.11.1 | Fejlrettelser: ingen går gennem væggene (døre forbinder rummene i rutegitteret, og der er fri vej ud af Claudes kontor), nyt toilet med døren ud til et frit område, ingen fliser i væggene; langsommere indtjening og højere priser, så kontoret bygges over uger |
 | 0.12.0 | En lækrere side rundt om kontoret: topbjælke med ikon, trivsel, saldo og forbindelsesprik; kort med pixel-portræt og statuspille i listen; venteboks med "Gå til"; butik med ikoner og fremdrift; kun mørkt tema |
 | 0.13.0 | Spillets fase 4: pynt og opgraderinger i butikken, 17 præstationer med belønning og notifikation, statistik i den nye fane Fremskridt |
+| 0.19.0 | Den nye grundplan: en bred hovedgang med alle rum på hver sin side, Claude midt i huset over receptionen, have mellem huset og vejen. Teamrum, køkken, lounge og toilet starter små og vokser i trin (teamrummene mod vest, loungen og toilettet mod øst, køkkenet og loungen ind i et depot); 22 skriveborde i alt. Hjælperne går rum for rum: ud ad døren, i højre side af gangen og ind ad den næste dør, lige gennem dørene og i lige linjer inde i rummene, i samme tempo overalt. Bordtennisbordet står i loungen. Gemte spil flyttes over uden at miste noget |
 | 0.18.0 | Fase 5: teamrum 2 med seks skriveborde mere, en lounge med pool, bar, spillekonsol, dart, arkademaskine, jukebox, guitar og sofa, hvor hjælperne med fri slapper af, og en større reception foran hoveddøren, som står tom til den bliver indrettet, og hvor Bodil byder velkommen; vores egne tooltips i stedet for browserens; mødelokalets skærm hang under døren og er flyttet |
 | 0.17.0 | Lyd (slås fra med 🔊), en browser-besked når nogen venter på dig og fanen er skjult (🔔), og titlen på fanen siger det; saldo, trivsel og stribe i `/kontor panel`; linjer lavet med scripts tæller ved commit |
 | 0.16.1 | En server fra før 0.13.1 kender ikke `/api/quit` og blev ved med at køre efter en opdatering, så man så den gamle side; nu stopper mod'en den ud fra porten, men kun hvis det er kontorets egen `server.mjs` |
@@ -156,14 +157,13 @@ Fundet ved en gennemgang af koden og det, vi har set undervejs. **P1** er fejl, 
 | 71 | **Færdige hjælpere hænger ud:** efter afleveringen holder de fri i tre minutter (bordtennis to og to, kaffe, sofaen eller en snak på græsset ved stien), går tilbage til et skrivebord, hvis Claude kalder på dem igen, og går ellers hjem. Lavet i 0.16.0. | M | ✅ |
 | 72 | **Linjer skrevet gennem shell-scripts tæller ikke.** Kun Edit og Write giver kroner; `sed`, Python-scripts og lignende kan mod'en ikke tælle sikkert. Måske ud fra `git diff --stat` ved commit. Lavet i 0.17.0: efter `git commit` tæller mod'en de linjer i committen, som Edit og Write ikke allerede har talt, højst 400 hver vej pr. commit. | S | ✅ |
 
-| 74 | **Ny grundplan med gange og rum, der vokser i trin:** en hovedgang, to rækker rum, receptionen midt på forsiden, have mod vejen, og teamrum, køkken, lounge og toilet, der starter små og udvides i trin; gåturene laves om, så hjælperne går på gangen med fast fart. Planen og tegningen står i [GRUNDPLAN.md](GRUNDPLAN.md); de åbne spørgsmål er afklaret. | L | ⬜ |
+| 74 | **Ny grundplan med gange og rum, der vokser i trin:** en hovedgang, to rækker rum, receptionen midt på forsiden, have mod vejen, og teamrum, køkken, lounge og toilet, der starter små og udvides i trin; gåturene laves om, så hjælperne går på gangen med fast fart. Planen og tegningen står i [GRUNDPLAN.md](GRUNDPLAN.md). Lavet i 0.19.0. | L | ✅ |
 
 ### Forslag til rækkefølge
 
-1. **74 den nye grundplan** fra [GRUNDPLAN.md](GRUNDPLAN.md), når de åbne spørgsmål er afklaret.
-2. **63 sæson og vejr** og **64 kontorhund eller -kat**.
-3. **66 månedens medarbejder** og **67 tv-tilstand**.
-4. **65 indret selv**: flyt pynt og inventar med træk og slip.
+1. **63 sæson og vejr** og **64 kontorhund eller -kat**.
+2. **66 månedens medarbejder** og **67 tv-tilstand**.
+3. **65 indret selv**: flyt pynt og inventar med træk og slip.
 
 ## 🧹 Oprydning
 

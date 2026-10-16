@@ -6,6 +6,12 @@ import { GROUNDS, WORLD } from './plan.js'
 
 const S = GROUNDS.scene
 export const HEDGE_Y = GROUNDS.pavement.y - 14
+// Round the lawn's spots, with room for the people standing there
+const LAWN = (() => {
+  const xs = GROUNDS.hangout.map(p => p.x)
+  const ys = GROUNDS.hangout.map(p => p.y)
+  return { x: Math.min(...xs) - 30, y: Math.min(...ys) - 50, w: Math.max(...xs) - Math.min(...xs) + 60, h: Math.max(...ys) - Math.min(...ys) + 70 }
+})()
 
 // Where nothing may grow: the office and a strip round it, the path, the
 // street with its hedge and pavements, the pond's banks and the bench. `r`
@@ -17,7 +23,7 @@ export const isClear = (x, y, r = 0) => {
     [S.x, HEDGE_Y - 18 - r, S.w, GROUNDS.farPavement.y + GROUNDS.farPavement.h - HEDGE_Y + 30 + r],
     [GROUNDS.bench.x - 30, GROUNDS.bench.y - 30, 60, 50],
     // The lawn where helpers off work hang out
-    [638 - r, 312 - r, 190 + 2 * r, 160 + 2 * r],
+    [LAWN.x - r, LAWN.y - r, LAWN.w + 2 * r, LAWN.h + 2 * r],
   ]
   if (keepOut.some(box => isIn(x, y, box))) return false
   const p = GROUNDS.pond

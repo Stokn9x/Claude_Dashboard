@@ -11,12 +11,13 @@ import type { Activity, AgentState, Earned, GameSummary, Office, Other, Party, P
 
 const PANE = 'kontor'
 
-// Every walk takes the same time, however far it goes: the page knows the
-// floor plan and sets the pace, this module only when each walk is over. The
-// status file carries these, so the two always agree.
+// How long each walk may take: the page knows the floor plan, walks at one
+// pace and fits every walk inside these times, briskly if it is long; this
+// module only knows when each walk is over. The status file carries these,
+// so the two always agree. The longest walks in a full-grown office fit.
 // `idle` is how long a helper stays after handing over, off work, before it
 // goes home; called on again in that time, it goes back to work.
-const WALKS = { arrive: 4000, deliver: 3500, handover: 2600, leave: 4000, idle: 3 * 60_000 }
+const WALKS = { arrive: 12_000, deliver: 8000, handover: 2600, leave: 9000, idle: 3 * 60_000 }
 
 const thinking: Activity = { state: 'working', detail: 'Tænker' }
 const pause: Activity = { state: 'idle', detail: 'Holder pause' }
@@ -370,10 +371,10 @@ const runDemo = async ($: $) => {
   demoTasks.forEach(([task, activity], i) => {
     const id = `demo-${i + 1}`
     $.clock.after(i * 700, () => void quietly(arrive($, id, task, activity)))
-    $.clock.after(14_000 + i * 2600, () => void quietly(deliver($, id)))
+    $.clock.after(24_000 + i * 2600, () => void quietly(deliver($, id)))
   })
-  $.clock.after(14_000 + demoTasks.length * 2600 + 12_000, () => void quietly(celebrate($, 'main', { kind: 'confetti', label: 'Testene er grønne' })))
-  $.clock.after(14_000 + demoTasks.length * 2600 + 18_000, () => void quietly(setMain($, pause)))
+  $.clock.after(24_000 + demoTasks.length * 2600 + 12_000, () => void quietly(celebrate($, 'main', { kind: 'confetti', label: 'Testene er grønne' })))
+  $.clock.after(24_000 + demoTasks.length * 2600 + 18_000, () => void quietly(setMain($, pause)))
 }
 
 // ─── Panel ──────────────────────────────────────────────────────────────

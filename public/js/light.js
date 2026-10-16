@@ -3,7 +3,7 @@
 // everything with the lamps, the screens and the street lights glowing.
 import { owns } from './store.js'
 import { circle, ctx } from './gfx.js'
-import { GROUNDS, PLAN, isBuilt, isOpenDoor, shiftOf, typeOf } from './plan.js'
+import { GROUNDS, PLAN, hasNow, isBuilt, isOpenDoor, shiftOf, sideWindowsOf, topWindowsOf, typeOf } from './plan.js'
 import { visibleRect, visibleRooms } from './camera.js'
 
 // The time of day, in hours (14.5 is half past two). ?tid=21:30 in the
@@ -29,18 +29,15 @@ const darknessAt = h => {
 export const isNightAt = h => h < 7 || h >= 19
 export const skyAt = h => (isNightAt(h) ? '#16233D' : h < 9 || h >= 17 ? '#F4B88A' : '#A9D8F5')
 
-// The windows in side walls: x of the wall, y, height, and which way in.
-// A window where an open door now joins two rooms is gone.
+// The windows in side walls, where the rooms' walls are now: x of the
+// wall, y, height, and which way in. A window where an open door now joins
+// two rooms is gone.
 export const sideWindows = () =>
   PLAN.rooms
-    .flatMap(room =>
-      (typeOf(room).sideWindows ?? []).map(([x, y, h]) => {
-        const { dx, dy } = shiftOf(room)
-        return { x: x + dx, y: y + dy, h, isLeft: x + dx < room.x }
-      }),
-    )
+    .filter(isBuilt)
+    .flatMap(sideWindowsOf)
     .filter(w => !PLAN.doors.some(d => isOpenDoor(d) && d.x < w.x + 6 && w.x < d.x + d.w && d.y < w.y + w.h && w.y < d.y + d.h))
-const topWindows = () => PLAN.rooms.filter(isBuilt).flatMap(room => (typeOf(room).windows ?? []).map(x => ({ x: x + shiftOf(room).dx, y: room.y })))
+const topWindows = () => PLAN.rooms.filter(isBuilt).flatMap(room => topWindowsOf(room).map(x => ({ x, y: room.y })))
 
 // Sunlight through the windows, falling at an angle that follows the sun:
 // from the east in the morning, from the west in the afternoon.
@@ -95,7 +92,7 @@ export const evening = (h, screens, headlights = []) => {
   for (const room of rooms) {
     const { dx, dy } = shiftOf(room)
     for (const [x, y, r, alpha, kind, needs] of typeOf(room).lights ?? []) {
-      if (owns(needs)) glow(x + dx, y + dy, r, kind === 'ceiling' ? '255, 228, 180' : kind === 'neon' ? '255, 95, 162' : '255, 196, 120', alpha)
+      if (owns(needs) && hasNow(room, [x, y])) glow(x + dx, y + dy, r, kind === 'ceiling' ? '255, 228, 180' : kind === 'neon' ? '255, 95, 162' : '255, 196, 120', alpha)
     }
   }
   for (const [x, y] of screens) glow(x, y, 26, '130, 180, 255', 0.3)
@@ -105,7 +102,7 @@ export const evening = (h, screens, headlights = []) => {
   // The bulbs themselves
   for (const room of rooms) {
     const { dx, dy } = shiftOf(room)
-    for (const [x, y, needs] of typeOf(room).bulbs ?? []) if (owns(needs)) circle(x + dx, y + dy, 1.8, '#FFF3C4')
+    for (const [x, y, needs] of typeOf(room).bulbs ?? []) if (owns(needs) && hasNow(room, [x, y])) circle(x + dx, y + dy, 1.8, '#FFF3C4')
   }
   for (const lamp of GROUNDS.lamps) circle(lamp.x, lamp.y - 26, 2.4, '#FFF3C4')
 }

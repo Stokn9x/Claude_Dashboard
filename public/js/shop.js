@@ -5,7 +5,7 @@
 // the click.
 import { store, focused } from './store.js'
 import { el, kr } from './util.js'
-import { ITEMS } from './plan.js'
+import { CHAINS, ITEMS } from './plan.js'
 import { eventsBetween } from './activity.js'
 import { addEvents } from './feed.js'
 
@@ -19,10 +19,13 @@ export const onBought = fn => {
   afterBuy = fn
 }
 
+// A row is one thing, or a room that grows: then it offers the next step.
 const GROUPS = [
-  ['Pladser og rum', ['desk', 'kitchen', 'toilet', 'lounge', 'pingpong', 'meeting', 'reception', 'hobby', 'team2']],
+  ['Pladser og rum', ['desk', CHAINS.team, CHAINS.kitchen, CHAINS.lounge, CHAINS.toilet, 'meeting', 'reception', 'pingpong']],
   ['Pynt og opgraderinger', ['plants', 'art', 'neon', 'espresso', 'aquarium', 'chairs', 'screens']],
 ]
+// A chain's step now: the first not bought, or its last once all are.
+const stepNow = (steps, g) => steps.find(item => !g.owned.rooms.includes(item)) ?? steps[steps.length - 1]
 const RATE_TEXT = { added: 'linje tilføjet', removed: 'linje fjernet', delivered: 'opgave afleveret af en hjælper', tests: 'grønne tests (højst hvert 10. minut)', commits: 'commit', prs: 'pull request' }
 export const moodFace = score => (score < 35 ? '😟' : score < 60 ? '🙂' : '😄')
 const decimal = n => String(n).replace('.', ',')
@@ -51,23 +54,21 @@ export const buyItem = async item => {
 const buildShop = g => {
   const saldoValue = el('strong', {}, [''])
   const message = el('p', { className: 'shop-message', hidden: true }, [''])
-  const rows = GROUPS.flatMap(([, items]) => items).map(item => {
+  const rows = GROUPS.flatMap(([, items]) => items).map(entry => {
+    const steps = [entry].flat()
+    const item = stepNow(steps, g)
     const count = el('span', { className: 'item-count' }, [''])
-    const button = el('button', { className: 'buy', type: 'button', onclick: () => buyItem(item) }, [''])
+    const row = { steps, item }
+    const button = el('button', { className: 'buy', type: 'button', onclick: () => buyItem(row.item) }, [''])
     const missing = el('p', { className: 'hint' }, [''])
     const done = el('p', { className: 'owned' }, [''])
     const fill = el('span', {}, [])
     const progress = el('span', { className: 'progress' }, [fill])
-    const li = el('li', { className: 'item' }, [
-      el('span', { className: 'icon', ariaHidden: 'true' }, [ITEMS[item].icon ?? '📦']),
-      el('div', { className: 'item-head' }, [el('strong', {}, [ITEMS[item].name]), count]),
-      el('p', { className: 'hint' }, [ITEMS[item].about]),
-      progress,
-      button,
-      missing,
-      done,
-    ])
-    return { item, li, count, button, missing, done, progress, fill }
+    const icon = el('span', { className: 'icon', ariaHidden: 'true' }, [ITEMS[item].icon ?? '📦'])
+    const name = el('strong', {}, [ITEMS[item].name])
+    const about = el('p', { className: 'hint' }, [ITEMS[item].about])
+    const li = el('li', { className: 'item' }, [icon, el('div', { className: 'item-head' }, [name, count]), about, progress, button, missing, done])
+    return Object.assign(row, { entry, li, icon, name, about, count, button, missing, done, progress, fill })
   })
   const rates = Object.entries(g.rates ?? {}).map(([k, v]) => el('li', {}, [el('span', { className: 'rate' }, [`${decimal(v)} kr`]), RATE_TEXT[k] ?? k]))
   const moodScore = el('strong', {}, [''])
@@ -78,7 +79,7 @@ const buildShop = g => {
     el('div', { className: 'shop-saldo' }, [el('span', { className: 'coin', ariaHidden: 'true' }, []), saldoValue, el('span', { className: 'hint' }, ['til at bygge for'])]),
     message,
     el('section', { className: 'mood-box' }, [el('div', { className: 'item-head' }, [el('strong', {}, ['Trivsel']), moodScore]), el('span', { className: 'mood-bar' }, [moodBar]), moodNote, moodParts]),
-    ...GROUPS.flatMap(([title, items]) => [el('h3', {}, [title]), el('ul', { className: 'items' }, rows.filter(r => items.includes(r.item)).map(r => r.li))]),
+    ...GROUPS.flatMap(([title, items]) => [el('h3', {}, [title]), el('ul', { className: 'items' }, rows.filter(r => items.includes(r.entry)).map(r => r.li))]),
     el('h3', {}, ['Sådan tjener du kroner']),
     el('ul', { className: 'rates' }, rates),
   )
@@ -117,19 +118,38 @@ export const renderShop = () => {
   p.message.hidden = !shopMessage
   p.message.textContent = shopMessage
   for (const row of p.rows) {
+    // A room that grows shows its next step, named as such
+    const item = stepNow(row.steps, g)
+    if (item !== row.item) {
+      row.item = item
+      row.icon.textContent = ITEMS[item].icon ?? '📦'
+      row.name.textContent = ITEMS[item].name
+      row.about.textContent = ITEMS[item].about
+    }
     const price = g.next?.[row.item]
     const isForSale = typeof price === 'number'
     const canAfford = isForSale && g.kroner >= price
     const isDesk = row.item === 'desk'
-    row.count.textContent = isDesk ? `${g.owned.desks} af ${g.maxDesks}` : ''
+    const stepsOwned = row.steps.filter(step => g.owned.rooms.includes(step)).length
+    row.count.textContent = isDesk ? `${g.owned.desks} af ${g.maxDesks}` : row.steps.length > 1 ? `${stepsOwned} af ${row.steps.length}` : ''
     row.button.hidden = !isForSale
     row.button.disabled = !canAfford || isBuying
     row.button.textContent = isBuying ? 'Køber…' : isForSale ? `${isDesk ? `Køb nr. ${g.owned.desks + 1}` : 'Køb'} for ${kr(price)}` : ''
     row.missing.hidden = !isForSale || canAfford
     row.missing.textContent = isForSale ? `Mangler ${kr(Math.max(0, price - g.kroner))}` : ''
     row.done.hidden = isForSale
-    row.done.textContent = isDesk ? (g.owned.rooms.includes('team2') ? 'Alle seksten skriveborde er købt.' : 'Alle ti skriveborde er købt. Byg teamrum 2 for seks mere.') : 'Ejet ✓'
-    row.li.classList.toggle('is-owned', !isForSale)
+    const isOwned = isDesk || g.owned.rooms.includes(row.item)
+    const needs = ITEMS[row.item].needs
+    row.done.textContent = !isOwned && needs
+      ? `Kan købes, når ${ITEMS[needs].name.toLowerCase()}n er bygget.`
+      : isDesk
+      ? g.owned.desks >= 22
+        ? 'Alle 22 skriveborde er købt.'
+        : `Alle ${g.maxDesks} skriveborde er købt. Udvid et teamrum for tre mere.`
+      : row.steps.length > 1 && stepsOwned === row.steps.length
+        ? 'Fuldt udbygget ✓'
+        : 'Ejet ✓'
+    row.li.classList.toggle('is-owned', !isForSale && isOwned)
     row.progress.hidden = !isForSale || canAfford
     row.fill.style.width = isForSale ? `${Math.min(100, (100 * g.kroner) / price)}%` : '0%'
   }
