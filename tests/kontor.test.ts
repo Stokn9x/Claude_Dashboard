@@ -546,3 +546,55 @@ test('a server too old to know /api/quit is stopped by its process, and the new 
   expect(script).toMatch(/server.*server.*mjs/)
   expect(calls.indexOf('start')).toBeGreaterThan(calls.indexOf('stop by port'))
 })
+
+test('a commit earns the lines in it that Edit and Write did not count, up to a cap', async ($, on) => {
+  const clock = engine(on)
+  const file = statusFile(on)
+  let numstat = '120\t5\tsrc/a.ts\n-\t-\timg.png\n'
+  const dirs: (string | undefined)[] = []
+  on('process.run', (_, e) => {
+    if (e.argv[0] === 'git') dirs.push(e.init?.cwd)
+    return { value: { exitCode: 0, stdout: e.argv[0] === 'git' ? numstat : '', stderr: '' } } as never
+  })
+  await $.session.start(start())
+  const earned = () => (JSON.parse(JSON.stringify(file.last())) as { earned: Record<string, number> }).earned
+
+  // The Edit counts +2 −1; the commit holds 120 and 5: the rest is new.
+  await $.tool.call({ tool: 'Edit', file_path: 'C:/p/a.ts', old_string: 'a', new_string: 'b', tool_use_id: 'e1' } as never)
+  await $.tool.call({ tool: 'Bash', command: 'git commit -m "lines from a script"', tool_use_id: 'c1' } as never)
+  await clock.advance(600)
+  expect(earned().added).toBe(120)
+  expect(earned().removed).toBe(5)
+
+  // A huge generated commit earns at most the cap; the folder after cd is where git looks.
+  numstat = '5000\t0\tgenerated.json\n'
+  await $.tool.call({ tool: 'Bash', command: 'cd /c/kode/andet && git commit -m big', tool_use_id: 'c2' } as never)
+  await clock.advance(600)
+  expect(earned().added).toBe(520)
+  expect(dirs.at(-1)).toBe('c:/kode/andet')
+})
+
+test('the panel shows the saldo, wellbeing and streak once the office is open', async ($, on) => {
+  const clock = engine(on)
+  on('env.get', (_, e) => ({ value: e.name === 'OS' ? 'Windows_NT' : undefined }) as never)
+  on('http.fetch', (_, e) => {
+    const path = new URL(e.url).pathname
+    const text = path === '/api/state'
+      ? JSON.stringify({ game: { kroner: 1234, wellbeing: { score: 62 }, streak: { count: 3 }, achievements: [{ at: 1 }, { at: null }] } })
+      : JSON.stringify({ ok: true, app: 'agent-kontor', version: '9.9.9' })
+    return { value: { status: 200, ok: true, headers: {}, text } } as never
+  })
+  on('process.run', () => ({ value: { exitCode: 0, stdout: '', stderr: '' } }) as never)
+  await $.session.start(start())
+  const ui = await $.ui.mount({ plugin: 'agent-kontor', surface: 'desktop', component: 'Pane', requestId: 'kontor', props: paneProps })
+  await clock.advance(3500)
+  expect(JSON.stringify(await ui.drawn())).not.toContain('1.234 kr')
+
+  await $.command.run({ command: 'kontor', args: '' } as never)
+  await clock.advance(3500)
+  const drawn = JSON.stringify(await ui.drawn())
+  expect(drawn).toContain('1.234 kr')
+  expect(drawn).toContain('Trivsel 62')
+  expect(drawn).toContain('3 dage i træk')
+  expect(drawn).toContain('1 af 2')
+})

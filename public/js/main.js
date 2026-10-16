@@ -9,16 +9,21 @@ import { renderPage } from './panel.js'
 import { placeCard, renderCard } from './card.js'
 import { onBought } from './shop.js'
 import { eventsBetween } from './activity.js'
-import { addEvents } from './feed.js'
+import { addEvents, onEvents } from './feed.js'
+import { playFor } from './sound.js'
+import { notifyFor, titleFor } from './notify.js'
 
 const conn = document.getElementById('conn')
 const lostBanner = document.getElementById('lost')
 
 onBought(renderPage)
+onEvents(playFor)
+onEvents(notifyFor)
 
 const receive = next => {
   addEvents(eventsBetween(store.state, next))
   store.state = next
+  titleFor(next)
   if (store.selected) renderCard()
   // A session picked by hand stays in view while it lives. Until then the
   // view follows the work: away from a session on a break to one that isn't.

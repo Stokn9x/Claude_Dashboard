@@ -49,8 +49,13 @@ toggle.addEventListener('click', () => {
   render()
 })
 
+// Others that care about news (sound, notices) are told too.
+const listeners = []
+export const onEvents = fn => listeners.push(fn)
+
 export const addEvents = more => {
   if (!more.length) return
+  for (const fn of listeners) fn(more)
   events = [...events, ...more].slice(-KEEP)
   remember('feed', JSON.stringify(events))
   render()

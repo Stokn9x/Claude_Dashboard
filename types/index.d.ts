@@ -73,7 +73,14 @@ export type Office = {
   // applied here, where each event is seen.
   earned: Earned
   lastTestAt: number
+  // Lines Edit and Write have counted since the last commit; a commit earns
+  // only the lines beyond these (made some other way, a script, say).
+  editedSinceCommit: { added: number; removed: number }
+  // The game as the server last told it, for the panel. Null until then.
+  game: GameSummary | null
 }
+
+export type GameSummary = { kroner: number; wellbeing: number; streak: number; unlocked: number; achievements: number }
 
 declare module 'claude-code' {
   interface PluginState {

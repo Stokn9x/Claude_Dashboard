@@ -1,7 +1,7 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register, RenderElement } from 'claude-code'
 
-import type { Activity, AgentState, Earned, Office, Other, Party, Phase, Step, Sub } from '../types'
+import type { Activity, AgentState, Earned, GameSummary, Office, Other, Party, Phase, Step, Sub } from '../types'
 
 // A pixel office, seen from above: Claude at the big desk, its subagents at
 // desks in the team room. This module keeps track of who is where and writes
@@ -41,6 +41,8 @@ const emptyOffice: Office = {
   recent: [],
   earned: { added: 0, removed: 0, delivered: 0, tests: 0, commits: 0, prs: 0 },
   lastTestAt: 0,
+  editedSinceCommit: { added: 0, removed: 0 },
+  game: null,
 }
 const office = atom({ plugin: 'agent-kontor', key: 'office' } as const, emptyOffice)
 
@@ -282,6 +284,48 @@ const partyFor = (command: string, isOk: boolean): Pick<Party, 'kind' | 'label'>
   return null
 }
 
+// A commit earns the lines in it that Edit and Write did not count: made
+// by a script, a formatter, sed. At most this many each way per commit, so
+// committing a generated file does not buy the office.
+const COMMIT_LINES_MAX = 400
+
+// The folder a command like `cd "C:/kode/x" && git commit …` ran in, or
+// undefined for the session's own. Git Bash's /c/… is the engine's C:/….
+const commandDir = (command: string) => {
+  const m = /^\s*cd\s+(?:"([^"]+)"|'([^']+)'|(\S+))\s*(?:&&|;)/.exec(command)
+  const dir = m ? (m[1] ?? m[2] ?? m[3]) : undefined
+  return dir ? slashed(dir).replace(/^\/([a-z])\//i, '$1:/') : undefined
+}
+
+// Added and removed lines in the commit just made, from git itself.
+const commitLines = async ($: $, command: string) => {
+  const cwd = commandDir(command)
+  const run = await $.process.run(['git', 'show', '--numstat', '--format=', 'HEAD'], { timeoutMs: 10_000, ...(cwd ? { cwd } : {}) }).catch(() => null)
+  if (!run || run.exitCode !== 0) return null
+  let added = 0
+  let removed = 0
+  for (const line of run.stdout.split('\n')) {
+    const [a, r] = line.split('\t')
+    // Binary files say "-": they hold no lines.
+    if (/^\d+$/.test(a ?? '') && /^\d+$/.test(r ?? '')) {
+      added += Number(a)
+      removed += Number(r)
+    }
+  }
+  return { added, removed }
+}
+
+const creditCommit = async ($: $, command: string) => {
+  const lines = await commitLines($, command)
+  if (!lines) return
+  await update($, office, o => {
+    const before = o.editedSinceCommit ?? { added: 0, removed: 0 }
+    const added = Math.min(COMMIT_LINES_MAX, Math.max(0, lines.added - before.added))
+    const removed = Math.min(COMMIT_LINES_MAX, Math.max(0, lines.removed - before.removed))
+    return { ...o, linesAdded: o.linesAdded + added, linesRemoved: o.linesRemoved + removed, earned: earn(o.earned, { added, removed }), editedSinceCommit: { added: 0, removed: 0 } }
+  })
+}
+
 const celebrate = async ($: $, who: string, party: Pick<Party, 'kind' | 'label'>) => {
   const at = await $.clock.now()
   await update($, office, o => {
@@ -426,6 +470,24 @@ const readOthers = async ($: $) => {
   others.sort((a, b) => a.key.localeCompare(b.key))
   const shown = (list: Other[]) => JSON.stringify(list.map(x => [x.key, x.project, x.main, x.helpers]))
   if (shown(others) !== shown(o.others)) await update($, office, x => ({ ...x, others }))
+}
+
+// The game as the server tells it, for the panel: saldo, wellbeing, streak,
+// achievements. Only once the office is open, when its server runs.
+const readGame = async ($: $) => {
+  const o = await readOffice($)
+  if (!o.isOfficeOpen) return
+  let game: GameSummary | null = null
+  try {
+    const res = await $.http.fetch(`${ADDRESS}/api/state`)
+    const g = (JSON.parse(res.text) as { game?: { kroner?: number; wellbeing?: { score?: number }; streak?: { count?: number }; achievements?: { at: number | null }[] } }).game
+    if (g && typeof g.kroner === 'number') {
+      game = { kroner: g.kroner, wellbeing: g.wellbeing?.score ?? 0, streak: g.streak?.count ?? 0, unlocked: (g.achievements ?? []).filter(a => a.at).length, achievements: (g.achievements ?? []).length }
+    }
+  } catch {
+    return
+  }
+  if (JSON.stringify(game) !== JSON.stringify(o.game)) await update($, office, x => ({ ...x, game }))
 }
 
 const leaveOffice = async ($: $) => {
@@ -575,6 +637,7 @@ export const register: Register = on => {
     $.clock.every(WRITE_MS, () => void quietly(writeStatus($)))
     $.clock.every(READ_MS, () => void quietly(readOthers($)))
     $.clock.every(READ_MS, () => void quietly(sweepAgents($)))
+    $.clock.every(READ_MS, () => void quietly(readGame($)))
     $.clock.every(SERVER_CHECK_MS, () => void quietly(keepServer($)))
     return next(e)
   })
@@ -670,6 +733,7 @@ export const register: Register = on => {
             linesAdded: o.linesAdded + counted.added,
             linesRemoved: o.linesRemoved + counted.removed,
             earned: earn(o.earned, { added: Math.min(counted.added, LINES_PER_EDIT), removed: Math.min(counted.removed, LINES_PER_EDIT) }),
+            editedSinceCommit: { added: (o.editedSinceCommit?.added ?? 0) + counted.added, removed: (o.editedSinceCommit?.removed ?? 0) + counted.removed },
             subs: o.subs.map(s =>
               s.id === e.agentId ? { ...s, linesAdded: (s.linesAdded ?? 0) + counted.added, linesRemoved: (s.linesRemoved ?? 0) + counted.removed } : s,
             ),
@@ -682,6 +746,7 @@ export const register: Register = on => {
       const command = String((e as unknown as { command?: unknown }).command ?? '')
       const party = result.backgroundTaskId || result.interrupted ? null : partyFor(command, !ran.isError)
       if (party) await quietly(celebrate($, e.agentId ?? 'main', party))
+      if (party?.label === 'Committet') await quietly(creditCommit($, command))
     }
     if (!sub) await quietly(setActivity($, e.agentId, thinking))
 
@@ -758,6 +823,11 @@ export const register: Register = on => {
             <Button label="Åbn kontor" onPress={() => void quietly(openOffice($))} />
             <Button label="Kopiér adresse" onPress={press => void quietly($.ui.copy({ text: ADDRESS, surface: press.surface }))} />
           </Box>
+          {o.game ? (
+            <Box paddingX={1}>
+              <Text wrap="wrap">{`💰 ${o.game.kroner.toLocaleString('da-DK')} kr · Trivsel ${o.game.wellbeing}${o.game.streak ? ` · 🔥 ${o.game.streak} ${o.game.streak === 1 ? 'dag' : 'dage'} i træk` : ''} · 🏅 ${o.game.unlocked} af ${o.game.achievements}`}</Text>
+            </Box>
+          ) : null}
           {o.main.state === 'waiting' ? (
             <Box borderStyle="round" borderColor="#E5484D" paddingX={2}>
               <Text color="#E5484D" wrap="wrap">{`Claude venter på dig: ${o.main.detail}`}</Text>

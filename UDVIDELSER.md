@@ -28,6 +28,7 @@ Status: ✅ lavet · 🟡 delvist · ⬜ ikke lavet · ➖ ikke længere relevan
 | 0.11.1 | Fejlrettelser: ingen går gennem væggene (døre forbinder rummene i rutegitteret, og der er fri vej ud af Claudes kontor), nyt toilet med døren ud til et frit område, ingen fliser i væggene; langsommere indtjening og højere priser, så kontoret bygges over uger |
 | 0.12.0 | En lækrere side rundt om kontoret: topbjælke med ikon, trivsel, saldo og forbindelsesprik; kort med pixel-portræt og statuspille i listen; venteboks med "Gå til"; butik med ikoner og fremdrift; kun mørkt tema |
 | 0.13.0 | Spillets fase 4: pynt og opgraderinger i butikken, 17 præstationer med belønning og notifikation, statistik i den nye fane Fremskridt |
+| 0.17.0 | Lyd (slås fra med 🔊), en browser-besked når nogen venter på dig og fanen er skjult (🔔), og titlen på fanen siger det; saldo, trivsel og stribe i `/kontor panel`; linjer lavet med scripts tæller ved commit |
 | 0.16.1 | En server fra før 0.13.1 kender ikke `/api/quit` og blev ved med at køre efter en opdatering, så man så den gamle side; nu stopper mod'en den ud fra porten, men kun hvis det er kontorets egen `server.mjs` |
 | 0.16.0 | Færdige hjælpere bliver og holder fri i nogle minutter (bordtennis, kaffe, sofaen eller en snak på græsset), går tilbage til arbejdet, hvis Claude tager fat i dem igen, og går ellers hjem; hver hjælper har et temperament, der farver replikkerne; daglig bonus og stribe; nyt kontor starter uden skriveborde; gulvsiddere beholder deres plads, og dem uden plads venter på bænken; `node --test` tæller som tests; planten foran døren er flyttet |
 | 0.15.0 | Hjælperne kommer op ad stien og går ned ad den og hen ad fortovet, når de går hjem; aktivitetslog nederst; kameraet styres også med tastaturet (pile/WASD, + og −, 0); serveren gemmer en kopi af spil.json hver dag (en uge tilbage) og redder et ødelagt spil.json fra den nyeste; 28 nye tests af sidens logik og serveren; planerne er nu i ét plan, uden etager |
@@ -127,11 +128,11 @@ Fundet ved en gennemgang af koden og det, vi har set undervejs. **P1** er fejl, 
 |---|---|---|---|
 | 52 | **Brede skærme udnyttes ikke:** kontoret er bundet af højden, og panelet er smalt, så der er tomt på begge sider (set på 2000 px). Løst i 0.14.0: kontoret fylder hele vinduet med græs omkring, og panelet svæver ovenpå. | M | ✅ |
 | 53 | **Ingen backup af spil.json.** Én dårlig skrivning eller fejl kan koste alle kroner. Serveren bør gemme en daglig kopi (de sidste 7). Lavet i 0.15.0, og et ødelagt spil.json redder sig selv fra den nyeste kopi. | S | ✅ |
-| 54 | **`/kontor panel` i Claude kender ikke spillet:** ingen saldo, trivsel eller præstationer i tekstpanelet. | S | ⬜ |
+| 54 | **`/kontor panel` i Claude kender ikke spillet:** ingen saldo, trivsel eller præstationer i tekstpanelet. Lavet i 0.17.0: saldo, trivsel, stribe og præstationer står øverst i panelet, når kontoret er åbent. | S | ✅ |
 | 55 | **Siden har ingen automatiske tests.** Ruterne tjekkes kun med `kontorCheckRoutes()` i hånden; et lille script, der kører siden uden browser (eller i preview), ville fange fx akvariet, der lukkede døren. Lavet i 0.15.0: `tests/page.test.mjs` kører plan, ruter, pauser, træer og loggen i Node; `tests/server.test.mjs` tester filer, adgang og backup. Selve tegningen testes stadig kun i preview. | M | 🟡 |
 | 56 | **Statistikken starter først nu** (0.13.0); dagene før findes ikke. Intet at gøre ved det, men værd at vide. | – | ➖ |
-| 57 | **Ingen lyd** (punkt 16): dørklokke, aflevering, venter på dig, med en knap til at slå fra. | M | ⬜ |
-| 58 | **Ingen browser-notifikation**, når Claude venter på dig og fanen er skjult (punkt 30). | S | ⬜ |
+| 57 | **Ingen lyd** (punkt 16): dørklokke, aflevering, venter på dig, med en knap til at slå fra. Lavet i 0.17.0: små melodier lavet med Web Audio, og 🔊 i topbjælken slår dem fra. | M | ✅ |
+| 58 | **Ingen browser-notifikation**, når Claude venter på dig og fanen er skjult (punkt 30). Lavet i 0.17.0: 🔔 i topbjælken; fanens titel siger det altid. | S | ✅ |
 
 ### Udvidelser (P3)
 
@@ -151,13 +152,13 @@ Fundet ved en gennemgang af koden og det, vi har set undervejs. **P1** er fejl, 
 | 70 | **Liv udenfor:** hjælpere kommer gående op ad stien fra fortovet og går samme vej hjem; en hjælper uden plads venter på bænken. De går op ad det sidste stykke sti og hele vejen hjem i 0.15.0; bænken kom i 0.16.0. | M | ✅ |
 | 68 | **Gulvsidderne bytter plads, når et skrivebord købes,** fordi pladserne på gulvet tælles fra det første ledige skrivebord. De går pænt, men det ligner stoleleg. Hver gulvsidder bør beholde sin plads. Lavet i 0.16.0: hver plads følger af hjælperens nummer, så et nyt skrivebord flytter kun den, det er til. | S | ✅ |
 | 71 | **Færdige hjælpere hænger ud:** efter afleveringen holder de fri i tre minutter (bordtennis to og to, kaffe, sofaen eller en snak på græsset ved stien), går tilbage til et skrivebord, hvis Claude kalder på dem igen, og går ellers hjem. Lavet i 0.16.0. | M | ✅ |
-| 72 | **Linjer skrevet gennem shell-scripts tæller ikke.** Kun Edit og Write giver kroner; `sed`, Python-scripts og lignende kan mod'en ikke tælle sikkert. Måske ud fra `git diff --stat` ved commit. | S | ⬜ |
+| 72 | **Linjer skrevet gennem shell-scripts tæller ikke.** Kun Edit og Write giver kroner; `sed`, Python-scripts og lignende kan mod'en ikke tælle sikkert. Måske ud fra `git diff --stat` ved commit. Lavet i 0.17.0: efter `git commit` tæller mod'en de linjer i committen, som Edit og Write ikke allerede har talt, højst 400 hver vej pr. commit. | S | ✅ |
 
 ### Forslag til rækkefølge
 
-1. **57 lyd** og **58 browser-notifikation**, når Claude venter på dig.
-2. **72 linjer fra shell-scripts** og **54 spillet i `/kontor panel`**.
-3. Derefter **fase 5** i ét plan, og **63 sæson og vejr**.
+1. **Fase 5** i ét plan: mere grund, teamrum 2 og en bygning til de andre sessioner.
+2. **63 sæson og vejr** og **64 kontorhund eller -kat**.
+3. **66 månedens medarbejder** og **67 tv-tilstand**.
 
 ## 🧹 Oprydning
 
