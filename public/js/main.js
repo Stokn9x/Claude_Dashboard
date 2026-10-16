@@ -14,6 +14,7 @@ import { playFor } from './sound.js'
 import { notifyFor, titleFor } from './notify.js'
 import { settle } from './routes.js'
 import './tip.js'
+import './tv.js'
 
 const conn = document.getElementById('conn')
 const lostBanner = document.getElementById('lost')

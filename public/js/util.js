@@ -44,3 +44,13 @@ export const remember = (key, value) => {
     localStorage.setItem(`agent-kontor:${key}`, value)
   } catch {}
 }
+
+// Which Claude model a helper runs on, as a short name, from the model id;
+// null when it is not said.
+export const modelFamily = model => {
+  const m = String(model ?? '')
+  return /opus/i.test(m) ? 'Opus' : /sonnet/i.test(m) ? 'Sonnet' : /haiku/i.test(m) ? 'Haiku' : /fable/i.test(m) ? 'Fable' : null
+}
+// An agent type in Danish, for the card; one we do not know by its own name.
+const TYPE_TEXT = { Explore: 'Udforsker', Plan: 'Planlægger', 'general-purpose': 'Generalist' }
+export const typeText = type => (type ? TYPE_TEXT[type] ?? type : null)

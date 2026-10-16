@@ -28,6 +28,7 @@ Status: ✅ lavet · 🟡 delvist · ⬜ ikke lavet · ⏸️ parkeret · ➖ ik
 | 0.11.1 | Fejlrettelser: ingen går gennem væggene (døre forbinder rummene i rutegitteret, og der er fri vej ud af Claudes kontor), nyt toilet med døren ud til et frit område, ingen fliser i væggene; langsommere indtjening og højere priser, så kontoret bygges over uger |
 | 0.12.0 | En lækrere side rundt om kontoret: topbjælke med ikon, trivsel, saldo og forbindelsesprik; kort med pixel-portræt og statuspille i listen; venteboks med "Gå til"; butik med ikoner og fremdrift; kun mørkt tema |
 | 0.13.0 | Spillets fase 4: pynt og opgraderinger i butikken, 17 præstationer med belønning og notifikation, statistik i den nye fane Fremskridt |
+| 0.23.0 | Tv-tilstand (📺 eller T): fuld skærm uden panel, log og kort, og kameraet følger den, der venter på dig, en hjælper på vej ind eller med et resultat, og ellers dem, der arbejder, på skift; flytter man selv kameraet, venter det lidt. Hjælpernes type og model kan ses: Explore har et forstørrelsesglas på skrivebordet, Plan en tegningsrulle, navneskiltet har modellens farve (Opus lilla, Sonnet blå, Haiku grøn, Fable gylden), og kortet siger fx "Udforsker på Haiku" |
 | 0.22.0 | Dagens opsummering: serveren husker hver opgave, hjælperne afleverer eller går i stå (en uge tilbage), og fanen Fremskridt viser dagens opgaver med tid, navn og projekt. **📋 Kopiér** giver dagen som tekst til et standup eller en note: linjer, opgaver, commits, pull requests, tests og hver opgave |
 | 0.21.0 | Liv i kontoret: en kontorkat i butikken (3.500 kr, +4 trivsel), der vandrer mellem lænestolen hos Claude, receptionen, sin madskål i køkkenet, loungens sofa og plænen; den sover krøllet sammen med et "z", spiser og siger "Miav". Claude holder pause på flere måder: kaffe i køkkenet, vander planterne på sit kontor eller kalder på katten og klapper den. Koden er delt op: mod'en i seks filer, og siden har fået `rooms.js`, `sales.js`, `party.js` og `cat.js`. Alle tekstfiler har LF-linjeskift |
 | 0.20.1 | Robusthed: et spil.json, der bare er låst et øjeblik (antivirus, OneDrive), prøves igen i nogle sekunder og skrives aldrig over med en ældre kopi; en ekstra server, der starter samtidig, rører ingen filer, før porten er dens; dagens kopi af spillet laves én gang om dagen og overskrives ikke ved en genstart; serveren gemmer, før den lukker; stribe og dage følger kalenderen, også når der skiftes til og fra sommertid; et gammelt lounge-id rettes ved hver start; kun et navn kan købes; og står der `cd …` først i en kommando, vises kommandoen efter den |
@@ -77,7 +78,7 @@ Status: ✅ lavet · 🟡 delvist · ⬜ ikke lavet · ⏸️ parkeret · ➖ ik
 | 15 | **Fejringer:** konfetti ved grønne tests, regnsky ved røde, balloner ved commit og PR. | M | ✅ |
 | 16 | **Lyde:** dørklokke når en hjælper kommer, "ding" ved afleveringen, et blidt signal når Claude venter på dig. Nemt nu, hvor siden kører i browseren. | M | ⬜ |
 | 17 | **Dialog mellem agenterne:** Claude siger tak ved navn, småsnak i køkkenet. | S | ✅ |
-| 18 | **Udseende efter type:** Explore får forstørrelsesglas, Plan en tegnerulle. Modellen som farve på navneskiltet (Opus, Sonnet, Haiku). | M | ⬜ |
+| 18 | **Udseende efter type:** Explore får forstørrelsesglas, Plan en tegnerulle. Modellen som farve på navneskiltet (Opus, Sonnet, Haiku). Lavet i 0.23.0. | M | ✅ |
 | 19 | **Liv i pauserne:** hjælperne holder kaffepause, går på toilettet, spiller bordtennis og holder møde med Claude. Mangler: Claude der vander planter og går rundt. | L | 🟡 |
 | 20 | **Grænser som rekvisitter:** kaffekanden tømmes, efterhånden som 5-timers-grænsen bruges, og en plante visner, når konteksten fyldes. | M | ⬜ |
 | 21 | **Tavle og ur på væggen:** tavlen viser dagens linjer og pris, uret det rigtige klokkeslæt. | S | ✅ |
@@ -92,7 +93,7 @@ Status: ✅ lavet · 🟡 delvist · ⬜ ikke lavet · ⏸️ parkeret · ➖ ik
 | # | Hvad | Str. | Status |
 |---|---|---|---|
 | 30 | **Notifikation i browseren,** når Claude venter på dig, også når fanen ikke er i fokus. | S | ⬜ |
-| 31 | **Fuldskærm og "tv-tilstand"** til en ekstra skærm: større figurer, ingen liste. | S | ⬜ |
+| 31 | **Fuldskærm og "tv-tilstand"** til en ekstra skærm: større figurer, ingen liste. Lavet i 0.23.0 (se 67). | S | ✅ |
 | 32 | **Dagsstatistik på siden:** linjer, pris og antal hjælpere i dag og i ugen, gemt af serveren. | M | ⬜ |
 | 33 | **Flere kontorer:** ét rum pr. projekt, man kan gå mellem, i stedet for faner. | L | ⬜ |
 | 35 | **Et større kontor:** fundamentet er klar: rum er data, ruter findes med A\*, og kameraet kan zoome og flytte. Mangler selve de nye rum (spillets fase 2 og 5). | M | 🟡 |
@@ -155,7 +156,7 @@ Fundet ved en gennemgang af koden og det, vi har set undervejs. **P1** er fejl, 
 | 64 | **Kontorhund eller -kat** (punkt 23), evt. købt i butikken. Lavet i 0.21.0: en rød kontorkat i butikken. | M | ✅ |
 | 65 | **Indret selv:** flyt pynt og inventar rundt med træk og slip (punkt 25). | L | ⬜ |
 | 66 | **Månedens medarbejder:** hjælpernes navne går igen, så de kan få deres egen statistik og en pokal. | M | ⬜ |
-| 67 | **Tv-tilstand** til en ekstra skærm: fuld skærm, ingen panel, kameraet følger det, der sker (punkt 31). | S | ⬜ |
+| 67 | **Tv-tilstand** til en ekstra skærm: fuld skærm, ingen panel, kameraet følger det, der sker (punkt 31). Lavet i 0.23.0: 📺 eller T. | S | ✅ |
 
 | 69 | **Aktivitetslog:** en lille liste nederst over det seneste, der er sket (ny opgave, aflevering, grønne tests), med tid og hvem. Lavet i 0.15.0. | S | ✅ |
 | 70 | **Liv udenfor:** hjælpere kommer gående op ad stien fra fortovet og går samme vej hjem; en hjælper uden plads venter på bænken. De går op ad det sidste stykke sti og hele vejen hjem i 0.15.0; bænken kom i 0.16.0. | M | ✅ |
@@ -168,7 +169,7 @@ Fundet ved en gennemgang af koden og det, vi har set undervejs. **P1** er fejl, 
 ### Forslag til rækkefølge
 
 1. **63 sæson og vejr** (64 kontorkatten kom i 0.21.0).
-2. **66 månedens medarbejder** og **67 tv-tilstand**.
+2. **66 månedens medarbejder** (67 tv-tilstand kom i 0.23.0).
 3. **65 indret selv**: flyt pynt og inventar med træk og slip.
 
 ## 🧪 Testgennemgang 16.10.2026 (0.19.0)

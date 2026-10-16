@@ -3,7 +3,7 @@
 // office. Click a sign to buy what it offers.
 import { store, focused } from './store.js'
 import { canvas, stateColor } from './gfx.js'
-import { el } from './util.js'
+import { el, modelFamily, typeText } from './util.js'
 import { freeArea, hitAt, pixelsPerUnit, toScreen, wasDrag } from './camera.js'
 import { phaseLabel, showPanel, choose } from './panel.js'
 import { buyItem } from './shop.js'
@@ -57,6 +57,7 @@ export const renderCard = () => {
     typeof who.tools === 'number' ? `${who.tools} ${who.tools === 1 ? 'værktøj' : 'værktøjer'}` : null,
     who.linesAdded || who.linesRemoved ? `+${who.linesAdded ?? 0} −${who.linesRemoved ?? 0} linjer` : null,
     who.temper ? `${who.temper} type` : null,
+    who.type || who.model ? [typeText(who.type), modelFamily(who.model)].filter(Boolean).join(' på ') : null,
   ].filter(Boolean)
   const steps = [...(who.recent ?? [])].reverse()
   card.replaceChildren(

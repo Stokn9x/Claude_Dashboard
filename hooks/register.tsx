@@ -124,7 +124,7 @@ export const register: Register = on => {
     const r = await next(e)
     if ('agentId' in r && r.agentId) {
       spawned.set(e.tool_use_id, { agentId: r.agentId, isBackground: e.background })
-      await quietly(arrive($, r.agentId, e.description || 'En opgave', { state: 'working', detail: e.description || 'Går i gang' }))
+      await quietly(arrive($, r.agentId, e.description || 'En opgave', { state: 'working', detail: e.description || 'Går i gang' }, { type: e.subagentType, model: r.model }))
     }
     return r
   })

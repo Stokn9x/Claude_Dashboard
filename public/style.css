@@ -107,6 +107,11 @@ button.chip { cursor: pointer; }
 .card-steps time { color: var(--soft); font-variant-numeric: tabular-nums; margin-right: 8px; }
 
 /* The bottom-right corner: back to the whole office, and the minimap */
+/* ── Tv mode: the office alone, and the camera follows ──────────────── */
+body.tv .side, body.tv .side-open, body.tv .feed, body.tv .corner, body.tv .card { display: none !important; }
+body.tv header { opacity: 0.55; transition: opacity 0.3s; }
+body.tv header:hover { opacity: 1; }
+#tv[aria-pressed="true"] { background: var(--accent); color: #FFFFFF; }
 .corner { position: fixed; right: var(--gap); bottom: var(--gap); z-index: 2; display: grid; gap: 8px; justify-items: end; }
 .fit-all { padding: 6px 14px; font-size: 12px; font-weight: 600; cursor: pointer; }
 .minimap { display: block; border-radius: 10px; border: 2px solid rgba(255, 255, 255, 0.12); cursor: pointer; box-shadow: var(--shadow); }

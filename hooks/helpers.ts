@@ -84,9 +84,11 @@ export async function noteTool($: $, agentId: string | undefined, activity: Acti
 }
 
 // In by the door; tidy() sits it down when its walk is over.
-export async function arrive($: $, id: string, task: string, activity: Activity) {
+// The spawn's agent type and model come along, for the page to draw.
+export async function arrive($: $, id: string, task: string, activity: Activity, kind: { type?: string; model?: string } = {}) {
   const now = await $.clock.now()
-  await update($, office, o => (o.subs.some(s => s.id === id) ? o : { ...o, subs: [...o.subs, newSub(id, task, activity, 'arriving', now, o.subs)] }))
+  const extra = { ...(kind.type ? { type: kind.type } : {}), ...(kind.model ? { model: kind.model } : {}) }
+  await update($, office, o => (o.subs.some(s => s.id === id) ? o : { ...o, subs: [...o.subs, { ...newSub(id, task, activity, 'arriving', now, o.subs), ...extra }] }))
 }
 
 // Done: walk the result over to Claude, hand it over, then out of the door;
@@ -178,11 +180,21 @@ export const demoTasks: [string, Activity][] = [
   ['Opdatér README', { state: 'editing', detail: 'Skriver README.md' }],
 ]
 
+// The demo's helpers come in each kind and on each model.
+const DEMO_KINDS = [
+  { type: 'Explore', model: 'claude-haiku-5-5' },
+  { type: 'general-purpose', model: 'claude-sonnet-5-5' },
+  { type: 'general-purpose', model: 'claude-opus-5-5' },
+  { type: 'Explore', model: 'claude-sonnet-5-5' },
+  { type: 'Plan', model: 'claude-opus-5-5' },
+  { type: 'general-purpose', model: 'claude-haiku-5-5' },
+]
+
 export async function runDemo($: $) {
   await setMain($, { state: 'working', detail: 'Fordeler opgaver' })
   demoTasks.forEach(([task, activity], i) => {
     const id = `demo-${i + 1}`
-    $.clock.after(i * 700, () => void quietly(arrive($, id, task, activity)))
+    $.clock.after(i * 700, () => void quietly(arrive($, id, task, activity, DEMO_KINDS[i % DEMO_KINDS.length])))
     $.clock.after(24_000 + i * 2600, () => void quietly(deliver($, id)))
   })
   $.clock.after(24_000 + demoTasks.length * 2600 + 12_000, () => void quietly(celebrate($, 'main', { kind: 'confetti', label: 'Testene er grønne' })))

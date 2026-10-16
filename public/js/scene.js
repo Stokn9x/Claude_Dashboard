@@ -5,12 +5,12 @@
 // what everyone says, on top.
 import { store, focused, owns } from './store.js'
 import { OUTLINE, bubble, canvas, circle, ctx, dashed, label, rect, rounded, say, setPixelsPerUnit, shadow, tag } from './gfx.js'
-import { hashOf } from './util.js'
+import { hashOf, modelFamily } from './util.js'
 import { MAIN, MAIN_SPOT, ROOM_TYPES, at, coffeeSpot, desks, firstRoom, isBuilt, placeOf, shiftOf, typeOf } from './plan.js'
 import { HOMEWARD_MS, WALKS, homewardPose, outAt, poseOf, route, walkAt, walkMs } from './routes.js'
 import { STAY, banterFor, breakNow, errandPose, meetingNow } from './breaks.js'
 import { bowl, cat, claudeLook, hands, lookFor, onTheFloor, sitting, sittingBack, standing } from './figures.js'
-import { board, chair, clock, desk, deskThingsFor, mug, steam, wateringCan } from './furniture.js'
+import { blueprint, board, chair, clock, desk, deskThingsFor, magnifier, mug, steam, wateringCan } from './furniture.js'
 import { PAUSE_SLOT_MS, bowlOf, catNow, catPlaces, claudePause } from './cat.js'
 import { daylight, evening, timeOfDay } from './light.js'
 import { chatFor, grumbleAt } from './voices.js'
@@ -25,6 +25,9 @@ import { forSaleNow, drawSaleOutlines, drawSaleSigns, construction } from './sal
 // The longest a walk to a newly bought desk takes; most are shorter
 const MOVE_MS = 12_000
 const NAME = '#4A5868'
+// A helper's name plate in the colour of the model it runs on
+const MODEL_COLOUR = { Opus: '#7D55C7', Sonnet: '#3D74B8', Haiku: '#23857A', Fable: '#B8792A' }
+const nameColour = sub => MODEL_COLOUR[modelFamily(sub.model)] ?? NAME
 const CLAUDE = '#C8643B'
 
 const seatedBox = (cx, dy) => ({ x0: cx - 22, y0: dy - 34, x1: cx + 22, y1: dy + 42 })
@@ -276,7 +279,10 @@ const drawDesks = ({ list, seatedAt, glowing, hits, t }) => {
     deskThingsFor(sub.id, cx, dy)
     glowing.push([cx + 24, dy + 8])
     hands(cx, dy, lookFor(sub.id), sub.activity.state !== 'waiting', t + seat * 37)
-    tag(cx, dy + 30, sub.name, NAME)
+    // What its kind works with: a magnifying glass, a roll of plans
+    if (sub.type === 'Explore') magnifier(cx + 33, dy + 15)
+    else if (sub.type === 'Plan') blueprint(cx + 30, dy + 14)
+    tag(cx, dy + 30, sub.name, nameColour(sub))
     hits.push({ kind: 'sub', id: sub.id, ...seatedBox(cx, dy) })
   })
 }
@@ -286,7 +292,7 @@ const drawFloorSitters = ({ floorSitters, glowing, hits, t }) => {
   for (const { sub, spot } of floorSitters) {
     onTheFloor(spot.x, spot.y, lookFor(sub.id), t, hashOf(sub.id))
     glowing.push([spot.x, spot.y - 10])
-    tag(spot.x, spot.y + 3, sub.name, NAME)
+    tag(spot.x, spot.y + 3, sub.name, nameColour(sub))
     hits.push({ kind: 'sub', id: sub.id, x0: spot.x - 20, y0: spot.y - 44, x1: spot.x + 20, y1: spot.y + 14 })
   }
 }
@@ -315,7 +321,7 @@ const drawWalkers = ({ walkers, players, hits, t }) => {
     } else standing(pose.x, pose.y, look, pose.facing, pose.isWalking, t, hashOf(sub.id))
     if (kind === 'coffee') mug(pose.x + 9, pose.y - 22)
     if (kind === 'pingpong') circle(pose.x + (pose.facing === 'right' ? 10 : -10), pose.y - 18, 3.2, '#E5484D', OUTLINE)
-    tag(pose.x, pose.y + 3, sub.name, NAME)
+    tag(pose.x, pose.y + 3, sub.name, nameColour(sub))
     if (!pose.isHomeward) hits.push({ kind: 'sub', id: sub.id, ...standingBox(pose.x, pose.y) })
   }
   // The ping-pong ball, while both players are at the table

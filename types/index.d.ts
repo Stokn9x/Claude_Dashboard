@@ -30,6 +30,10 @@ export type Sub = {
   linesAdded?: number
   linesRemoved?: number
   recent?: Step[]
+  // The agent type it was spawned as (Explore, Plan, general-purpose, …) and
+  // the model it runs on, when the spawn said; the page draws them.
+  type?: string
+  model?: string
 }
 
 // Another Claude session on this computer, as its own status file says.

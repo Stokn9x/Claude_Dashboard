@@ -223,3 +223,26 @@ export const wateringCan = (x, y, t) => {
   }
   ctx.globalAlpha = 1
 }
+
+// On an Explore helper's desk: a magnifying glass.
+export const magnifier = (x, y) => {
+  ctx.strokeStyle = OUTLINE
+  ctx.lineWidth = 2.6
+  ctx.beginPath()
+  ctx.moveTo(x + 2.5, y + 2.5)
+  ctx.lineTo(x + 7, y + 7)
+  ctx.stroke()
+  ctx.strokeStyle = '#8B5E3C'
+  ctx.lineWidth = 1.6
+  ctx.stroke()
+  circle(x, y, 3.6, '#CFE8F7', OUTLINE)
+  rect(x - 1.8, y - 1.8, 1.4, 1.4, '#FFFFFF')
+}
+
+// On a Plan helper's desk: a roll of plans, blue, half unrolled.
+export const blueprint = (x, y) => {
+  rounded(x - 7, y - 3, 12, 8, 1, '#3E6FB5', OUTLINE, 1)
+  for (const dy of [-1, 1.5]) rect(x - 5, y + dy, 8, 0.6, '#BFD6F2')
+  rect(x - 3, y - 2, 0.6, 6, '#BFD6F2')
+  rounded(x + 4, y - 4, 4, 10, 2, '#5A8BD0', OUTLINE, 1)
+}
