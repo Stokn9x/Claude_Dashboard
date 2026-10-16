@@ -523,3 +523,20 @@ test("Claude's pause: coffee only with a kitchen, the cat only once bought", () 
   owning(['claude', 'team', 'kitchen', 'cat'], 0)
   assert.deepEqual([...kinds()].sort(), ['cat', 'kitchen', 'plants'])
 })
+
+// ── The day's summary ────────────────────────────────────────────────────
+
+test("the day's summary counts the work and lists the tasks in order", async () => {
+  const { summaryText } = await import(js('summary'))
+  const at = (h, m) => new Date(2026, 9, 16, h, m).getTime()
+  const text = summaryText(
+    { added: 1200, removed: 40, delivered: 2, tests: 1, commits: 3, prs: 0, tasks: [{ at: at(14, 5), name: 'Ida', task: 'Find fejlen', project: 'b', failed: true }, { at: at(10, 42), name: 'Freja', task: 'Kortlæg API’et', project: 'a' }] },
+    at(17, 0),
+  )
+  assert.match(text, /^Agent-kontor, fredag 16\. oktober/)
+  assert.match(text, /1\.200 linjer tilføjet, 40 fjernet/)
+  assert.match(text, /1 opgave løst af hjælperne, 1 gik i stå/)
+  assert.match(text, /3 commits, grønne tests 1 gang/)
+  assert.ok(text.indexOf('10.42 Freja (a): Kortlæg API’et') < text.indexOf('14.05 Ida (b): Find fejlen (gik i stå)'), text)
+  assert.doesNotMatch(summaryText({ added: 0, removed: 0, tasks: [] }), /Opgaver/)
+})

@@ -1,10 +1,57 @@
 // ── Progress: statistics and achievements ────────────────────────────────
 import { store } from './store.js'
 import { el, number } from './util.js'
+import { summaryText } from './summary.js'
 
 const panel = document.getElementById('progress')
 const toasts = document.getElementById('toasts')
 let progressKey = ''
+
+// Today's tasks, the newest first, a few of them; the copy button gives all
+// of the day as text.
+const TASKS_SHOWN = 8
+const clock = at => new Date(at).toLocaleTimeString('da-DK', { hour: '2-digit', minute: '2-digit' })
+const todayList = today => {
+  const tasks = [...(today.tasks ?? [])].sort((a, b) => b.at - a.at)
+  const isMixed = new Set(tasks.map(t => t.project)).size > 1
+  const rows = tasks.slice(0, TASKS_SHOWN).map(t =>
+    el('li', { className: t.failed ? 'is-stuck' : '' }, [
+      el('span', { className: 'task-time' }, [clock(t.at)]),
+      el('span', { className: 'task-what' }, [el('strong', {}, [t.name]), ` ${t.task}`, ...(isMixed && t.project ? [el('em', {}, [` · ${t.project}`])] : [])]),
+      el('span', { className: 'task-mark', title: t.failed ? 'Gik i stå' : 'Afleveret' }, [t.failed ? '⚠' : '✓']),
+    ]),
+  )
+  return [
+    el('div', { className: 'today-head' }, [el('h3', {}, ['I dag']), el('button', { type: 'button', className: 'copy', title: 'Kopiér dagens opsummering som tekst' }, ['📋 Kopiér'])]),
+    tasks.length ? el('ul', { className: 'tasks' }, rows) : el('p', { className: 'hint' }, ['Ingen opgaver afleveret endnu i dag.']),
+    ...(tasks.length > TASKS_SHOWN ? [el('p', { className: 'hint' }, [`og ${number(tasks.length - TASKS_SHOWN)} mere: de står alle i kopien.`])] : []),
+  ]
+}
+
+// The copy button lives in a list that is rebuilt as the day goes on, so the
+// panel listens for it.
+panel.addEventListener('click', async e => {
+  const button = e.target.closest?.('.copy')
+  const today = store.state.game?.stats?.today
+  if (!button || !today) return
+  const text = summaryText(today)
+  let isCopied = false
+  try {
+    await navigator.clipboard.writeText(text)
+    isCopied = true
+  } catch {
+    // Some browsers refuse the clipboard API here: the old way still works.
+    const area = el('textarea', { value: text, readOnly: true, style: 'position:fixed;opacity:0;pointer-events:none' })
+    document.body.append(area)
+    area.select()
+    try {
+      isCopied = document.execCommand('copy')
+    } catch {}
+    area.remove()
+  }
+  button.textContent = isCopied ? '✓ Kopieret' : 'Kunne ikke kopiere'
+  setTimeout(() => (button.textContent = '📋 Kopiér'), 2000)
+})
 
 const tile = (value, text) => el('div', { className: 'tile' }, [el('strong', {}, [value]), el('span', {}, [text])])
 const weekday = day => new Date(`${day}T12:00:00`).toLocaleDateString('da-DK', { weekday: 'narrow' })
@@ -54,6 +101,7 @@ export const renderProgress = () => {
     el('p', { className: 'hint' }, [
       g.streak?.isToday ? `Dagens bonus er tjent: +${number(g.streak.bonus)} kr. I morgen giver den første linje +${number(g.streak.next)} kr.` : `Den første linje i dag giver en bonus på +${number(g.streak?.next ?? 25)} kr.`,
     ]),
+    ...todayList(today),
     el('h3', {}, ['De sidste 14 dage']),
     bars(days),
     el('p', { className: 'hint' }, [`Bedste dag: ${number(best.added)} linjer · ${daysActive} ${daysActive === 1 ? 'dag' : 'dage'} med arbejde`]),

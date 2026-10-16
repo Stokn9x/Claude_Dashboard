@@ -15,7 +15,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-const VERSION = '0.21.0'
+const VERSION = '0.22.0'
 const HOST = '127.0.0.1'
 const PORT = Number(process.env.AGENT_KONTOR_PORT || 4747)
 const HERE = path.dirname(fileURLToPath(import.meta.url))
@@ -372,6 +372,35 @@ const pruneDays = () => {
     delete game.days[day]
     isGameChanged = true
   }
+  // The tasks of a day are kept a week; the counts much longer.
+  for (const day of days.slice(0, Math.max(0, days.length - TASK_DAYS_KEPT))) {
+    if (game.days[day]?.tasks) {
+      delete game.days[day].tasks
+      isGameChanged = true
+    }
+  }
+}
+
+// ── The day's tasks ─────────────────────────────────────────────────────
+// Each task a helper hands over (or gets stuck on) is noted once, for the
+// day's summary on the page: when, who, what and in which project. At most
+// a hundred a day, kept for a week.
+const TASK_DAYS_KEPT = 7
+const TASKS_PER_DAY = 100
+const noteTasks = (status, now) => {
+  if (!status.key || !Array.isArray(status.subs)) return
+  for (const sub of status.subs) {
+    if (sub?.phase !== 'delivering' || typeof sub.id !== 'string' || sub.id.startsWith('demo-')) continue
+    const at = Number(sub.since) || now
+    const day = dayOf(at)
+    game.days ??= {}
+    game.days[day] ??= {}
+    const tasks = (game.days[day].tasks ??= [])
+    const id = `${status.key}/${sub.id}/${at}`
+    if (tasks.length >= TASKS_PER_DAY || tasks.some(t => t.id === id)) continue
+    tasks.push({ id, at, name: String(sub.name ?? '').slice(0, 30), task: String(sub.task ?? '').slice(0, 100), project: String(status.project ?? '').slice(0, 60), ...(sub.outcome === 'failed' ? { failed: true } : {}) })
+    isGameChanged = true
+  }
 }
 
 // A session not seen for a week is retired to a short list of its counts
@@ -520,11 +549,12 @@ const statsView = () => {
   for (let i = 13; i >= 0; i--) {
     const day = daysBefore(now, i)
     const d = game.days?.[day] ?? {}
-    days.push({ day, added: d.added ?? 0, delivered: d.delivered ?? 0, kroner: Math.floor(d.kroner ?? 0) })
+    days.push({ day, added: d.added ?? 0, removed: d.removed ?? 0, delivered: d.delivered ?? 0, tests: d.tests ?? 0, commits: d.commits ?? 0, prs: d.prs ?? 0, kroner: Math.floor(d.kroner ?? 0) })
   }
+  const tasks = (game.days?.[dayOf(now)]?.tasks ?? []).map(({ id, ...task }) => task)
   return {
     days,
-    today: days[days.length - 1],
+    today: { ...days[days.length - 1], tasks },
     best: { added: bestDay('added') },
     totals: { added: total('added'), removed: total('removed'), delivered: total('delivered'), tests: total('tests'), commits: total('commits'), prs: total('prs'), kroner: Math.floor(total('kroner')), bonus: total('bonus') },
     daysActive: daysActive(),
@@ -564,6 +594,7 @@ const readSessions = () => {
       status = previous.get(name) ?? null
     }
     if (status) credit(status, now)
+    if (status) noteTasks(status, now)
     if (status && (status.ended || now - (status.updatedAt ?? 0) > FORGET_MS)) forget(name)
     if (!status || status.ended || !status.main || now - (status.updatedAt ?? 0) > STALE_MS) continue
     sessions.push(status)

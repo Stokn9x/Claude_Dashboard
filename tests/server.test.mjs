@@ -359,3 +359,21 @@ test("today's backup is the game as the day began: a restart keeps it", async ()
     await stop(second)
   }
 })
+
+test("the day's tasks are noted once each, for the summary", async () => {
+  const home = newHome()
+  const child = await start(home)
+  const file = path.join(home, '.claude', 'agent-kontor', 'sessions', 'st.json')
+  const status = subs => JSON.stringify({ v: 2, key: 'st', project: 'kontor', updatedAt: Date.now(), main: { state: 'idle', detail: 'x' }, subs, earned: { added: 0, removed: 0, delivered: 0, tests: 0, commits: 0, prs: 0 } })
+  const since = Date.now() - 1000
+  try {
+    fs.writeFileSync(file, status([{ id: 'a1', name: 'Freja', task: 'Kortlæg API’et', phase: 'delivering', since, seat: 0 }, { id: 'demo-1', name: 'Oskar', task: 'Demo', phase: 'delivering', since, seat: 1 }]))
+    await sleep(900)
+    fs.writeFileSync(file, status([{ id: 'a1', name: 'Freja', task: 'Kortlæg API’et', phase: 'delivering', since, seat: 0 }, { id: 'a2', name: 'Ida', task: 'Find fejlen', phase: 'delivering', since, seat: 2, outcome: 'failed' }]))
+    await sleep(900)
+    const { tasks } = JSON.parse((await get('/api/state')).body).game.stats.today
+    assert.deepEqual(tasks.map(t => [t.name, t.task, t.project, !!t.failed]), [['Freja', 'Kortlæg API’et', 'kontor', false], ['Ida', 'Find fejlen', 'kontor', true]])
+  } finally {
+    await stop(child)
+  }
+})

@@ -152,6 +152,18 @@ button.chip { cursor: pointer; }
 .bar span { width: 100%; border-radius: 3px 3px 1px 1px; background: color-mix(in srgb, var(--accent) 55%, transparent); }
 .bar.is-today span { background: var(--accent); }
 .bar small { font-size: 9px; color: var(--faint); }
+.today-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.today-head h3 { margin-top: 0; }
+.copy { border: 1px solid var(--line); border-radius: 8px; background: var(--surface-2); color: var(--soft); font-size: 12px; padding: 4px 10px; cursor: pointer; }
+.copy:hover { color: var(--ink); border-color: var(--faint); }
+.tasks { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.tasks li { display: grid; grid-template-columns: 40px 1fr auto; gap: 8px; align-items: baseline; padding: 6px 10px; border-radius: 10px; background: var(--surface-2); font-size: 12px; }
+.tasks .task-time { color: var(--faint); font-variant-numeric: tabular-nums; }
+.tasks .task-what { color: var(--soft); min-width: 0; overflow-wrap: anywhere; }
+.tasks .task-what strong { color: var(--ink); font-weight: 600; }
+.tasks .task-what em { font-style: normal; color: var(--faint); }
+.tasks .task-mark { color: var(--good); font-weight: 700; }
+.tasks .is-stuck .task-mark { color: var(--warn); }
 .totals { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 4px 12px; font-size: 13px; }
 .totals strong { margin-right: 6px; font-variant-numeric: tabular-nums; }
 .achievements { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
