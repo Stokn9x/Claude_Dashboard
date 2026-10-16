@@ -96,8 +96,11 @@ const renderChips = () => {
   }
 }
 
+// The tabs stand in the order the sessions started, oldest first: the server
+// lists them by their latest write, which every heartbeat changes.
+const byStart = (a, b) => (a.startedAt ?? 0) - (b.startedAt ?? 0) || (a.key < b.key ? -1 : a.key > b.key ? 1 : 0)
 const renderTabs = s => {
-  const sessions = store.state.sessions
+  const sessions = [...store.state.sessions].sort(byStart)
   const key = JSON.stringify([sessions.map(x => [x.key, x.project, x.main.state]), s?.key])
   if (key === tabsKey) return
   tabsKey = key

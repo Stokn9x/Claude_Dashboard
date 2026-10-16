@@ -17,7 +17,9 @@ const engine = (on: On, toolCall?: ToolBottom) => {
   on('classic.PermissionRequest', () => ({}) as never)
   on('agent.spawn', (_, e) => ({ model: 'claude-haiku-5-5', agentId: `sub-${e.tool_use_id}` }) as never)
   on('tool.call', async (_, e) => {
-    await toolCall?.(e)
+    // A test's own answer for a call, when it gives one.
+    const own = await toolCall?.(e)
+    if (own) return own as never
     return e.tool === 'Edit'
       ? ({ result: { filePath: 'C:/p/a.ts', structuredPatch: [{ lines: ['+a', '+b', '-c'] }] } } as never)
       : ({ result: {} } as never)
@@ -597,4 +599,110 @@ test('the panel shows the saldo, wellbeing and streak once the office is open', 
   expect(drawn).toContain('Trivsel 62')
   expect(drawn).toContain('3 dage i træk')
   expect(drawn).toContain('1 af 2')
+})
+
+test('a subagent sent to the background mid-call is delivered once, when it stops', async ($, on) => {
+  const clock = engine(on, async e => {
+    if (e.tool !== 'Agent') return undefined
+    await $.agent.spawn({ tool_use_id: e.tool_use_id, prompt: 'p', description: 'Læs README', subagentType: 'Explore', parentModel: 'm', background: false } as never)
+    // Ctrl+B: the call returns, and the subagent works on.
+    return { result: { status: 'async_launched', agentId: `sub-${e.tool_use_id}` } }
+  })
+  const file = statusFile(on)
+  on('agent.list', () => ({ value: [agentEntry('sub-k1', 'running')] }) as never)
+  on('classic.SubagentStop', () => ({}) as never)
+  await $.session.start(start())
+  const earned = () => (JSON.parse(JSON.stringify(file.last())) as { earned: Record<string, number> }).earned
+
+  await $.tool.call({ tool: 'Agent', prompt: 'p', description: 'Læs README', tool_use_id: 'k1' } as never)
+  await clock.advance(13_000)
+  expect(file.last()?.subs[0]?.phase).toBe('working')
+  expect(earned().delivered).toBe(0)
+
+  await $.tool.call({ tool: 'Read', file_path: 'C:/x/README.md', tool_use_id: 'r1', agentId: 'sub-k1' } as never)
+  await $.classic.SubagentStop({ agent_id: 'sub-k1', agent_type: 'Explore', stop_hook_active: false, agent_transcript_path: '' } as never)
+  await clock.advance(600)
+  expect(file.last()?.subs[0]?.phase).toBe('delivering')
+  expect(earned().delivered).toBe(1)
+})
+
+test('a helper the engine never lists stays at work while it works, and is delivered once when quiet', async ($, on) => {
+  const clock = engine(on)
+  const file = statusFile(on)
+  on('agent.list', () => ({ value: [] }) as never)
+  await $.session.start(start())
+  const earned = () => (JSON.parse(JSON.stringify(file.last())) as { earned: Record<string, number> }).earned
+
+  // A workflow's agent: only its tool calls are seen.
+  for (let i = 0; i < 5; i++) {
+    await $.tool.call({ tool: 'Read', file_path: 'C:/x/a.ts', tool_use_id: `w${i}`, agentId: 'wf-1' } as never)
+    await clock.advance(30_000)
+  }
+  expect(file.last()?.subs[0]?.phase).toBe('working')
+  expect(earned().delivered).toBe(0)
+
+  await clock.advance(40_000)
+  expect(file.last()?.subs[0]?.phase).toBe('delivering')
+  expect(earned().delivered).toBe(1)
+  await clock.advance(5 * 60_000)
+  expect(earned().delivered).toBe(1)
+})
+
+test('a test word in a commit message is a commit, and a command doing both pays for both', async ($, on) => {
+  const clock = engine(on)
+  const file = statusFile(on)
+  on('process.run', () => ({ value: { exitCode: 0, stdout: '', stderr: '' } }) as never)
+  await $.session.start(start())
+  const earned = () => (JSON.parse(JSON.stringify(file.last())) as { earned: Record<string, number> }).earned
+
+  await $.tool.call({ tool: 'Bash', command: 'git commit -m "Fix jest config and node --test"', tool_use_id: 'c1' } as never)
+  await $.tool.call({ tool: 'Bash', command: "git commit -m 'npm test is green'", tool_use_id: 'c2' } as never)
+  await clock.advance(600)
+  expect(earned().commits).toBe(2)
+  expect(earned().tests).toBe(0)
+
+  await $.tool.call({ tool: 'Bash', command: 'npm test && git commit -m x', tool_use_id: 'c3' } as never)
+  await clock.advance(600)
+  expect(earned().commits).toBe(3)
+  expect(earned().tests).toBe(1)
+})
+
+test('commit lines: a partial commit leaves the rest counted, an amend counts only its change, git looks in the right repo', async ($, on) => {
+  const clock = engine(on)
+  const file = statusFile(on)
+  let numstat = ''
+  const runs: { argv: string[]; cwd?: string }[] = []
+  on('process.run', (_, e) => {
+    if (e.argv[0] === 'git') runs.push({ argv: [...e.argv], cwd: e.init?.cwd })
+    return { value: { exitCode: 0, stdout: e.argv[0] === 'git' ? numstat : '', stderr: '' } } as never
+  })
+  await $.session.start(start())
+  const earned = () => (JSON.parse(JSON.stringify(file.last())) as { earned: Record<string, number> }).earned
+
+  // Three edits of +2 −1: +6 −3 counted already.
+  for (const id of ['e1', 'e2', 'e3']) await $.tool.call({ tool: 'Edit', file_path: 'C:/p/a.ts', old_string: 'a', new_string: 'b', tool_use_id: id } as never)
+  // A partial commit holds two of them; the third is committed next.
+  numstat = '4\t2\ta.ts\n'
+  await $.tool.call({ tool: 'Bash', command: 'git commit -m first', tool_use_id: 'c1' } as never)
+  numstat = '2\t1\ta.ts\n'
+  await $.tool.call({ tool: 'Bash', command: 'git commit -m second', tool_use_id: 'c2' } as never)
+  await clock.advance(600)
+  expect(earned().added).toBe(6)
+  expect(earned().removed).toBe(3)
+
+  // An amend asks git for what changed since the commit it replaced.
+  numstat = '10\t0\tb.ts\n'
+  await $.tool.call({ tool: 'Bash', command: 'git commit --amend --no-edit', tool_use_id: 'c3' } as never)
+  await clock.advance(600)
+  expect(runs.at(-1)?.argv).toEqual(['git', 'diff', '--numstat', 'HEAD@{1}', 'HEAD'])
+  expect(earned().added).toBe(16)
+
+  // git -C, PowerShell's Set-Location and a cd later in the command.
+  numstat = ''
+  await $.tool.call({ tool: 'Bash', command: 'git -C ../andet commit -m x', tool_use_id: 'c4' } as never)
+  expect(runs.at(-1)?.argv.slice(0, 3)).toEqual(['git', '-C', '../andet'])
+  await $.tool.call({ tool: 'PowerShell', command: 'Set-Location "C:\\kode\\tredje"; git add .; git commit -m x', tool_use_id: 'c5' } as never)
+  expect(runs.at(-1)?.cwd).toBe('C:/kode/tredje')
+  await $.tool.call({ tool: 'Bash', command: 'npm test && cd /c/kode/fjerde && git commit -m "cd nowhere"', tool_use_id: 'c6' } as never)
+  expect(runs.at(-1)?.cwd).toBe('c:/kode/fjerde')
 })

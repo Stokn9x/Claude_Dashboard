@@ -57,10 +57,20 @@ const connect = () => {
   events.onerror = () => setConnection('lost', 'Forbindelsen er tabt')
 }
 
+// The next frame is asked for first, so one frame that throws (say, drawn
+// while the window had no size) cannot stop the office for good; the error
+// is logged once, not sixty times a second.
+let lastError = ''
 const frame = () => {
-  draw()
-  placeCard()
   requestAnimationFrame(frame)
+  try {
+    draw()
+    placeCard()
+  } catch (error) {
+    const text = String(error?.stack ?? error)
+    if (text !== lastError) console.error(error)
+    lastError = text
+  }
 }
 
 fit()

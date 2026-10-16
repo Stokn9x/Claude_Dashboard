@@ -15,7 +15,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-const VERSION = '0.19.1'
+const VERSION = '0.19.2'
 const HOST = '127.0.0.1'
 const PORT = Number(process.env.AGENT_KONTOR_PORT || 4747)
 const HERE = path.dirname(fileURLToPath(import.meta.url))
@@ -55,8 +55,12 @@ const RATES = { added: 0.25, removed: 0.1, delivered: 10, tests: 20, commits: 15
 // not a single desk. Everything else is earned. An office saved earlier
 // keeps the desks it has.
 const START = { desks: 0, rooms: ['claude', 'team'] }
-// A session's credited counts are kept this long after it was last seen.
+// A session's credited counts are kept whole this long after it was last
+// seen, then as a short list of numbers (`retired`) for a good while more,
+// so a session resumed weeks later is not paid again from nothing.
 const CREDIT_KEEP_MS = 7 * 24 * 60 * 60_000
+const RETIRED_KEEP_MS = 400 * 24 * 60 * 60_000
+const COUNTS = Object.keys(RATES)
 
 // The floor plan the saved game is drawn for: 2 is the plan with the
 // corridor and rooms that grow in steps (0.19.0).
@@ -206,19 +210,40 @@ const floorSittersIn = sessions => {
   return most
 }
 
+// What a session has been paid for so far: its whole entry, or one that was
+// retired and is brought back now that the session is seen again.
+const creditedOf = key => {
+  if (game.credited[key]) return game.credited[key].earned
+  const retired = game.retired?.[key]
+  if (!retired) return {}
+  return Object.fromEntries(COUNTS.map((k, i) => [k, Number(retired[i]) || 0]))
+}
+
+// A session's counts only ever grow, so only what lies above the highest
+// count paid for is new. A count below it is an older status file read late
+// (two writes overtaking each other), never a count started over: a new
+// start has a new key.
 const credit = (status, now) => {
   const earned = status.earned
   if (!status.key || !earned || typeof earned !== 'object') return
-  const before = game.credited[status.key]?.earned ?? {}
+  const before = creditedOf(status.key)
+  const grown = {}
   let kroner = 0
   for (const [k, rate] of Object.entries(RATES)) {
     const count = Number(earned[k]) || 0
     const was = Number(before[k]) || 0
-    // A count that went down was started over: all of it is new.
-    kroner += (count >= was ? count - was : count) * rate
+    grown[k] = Math.max(0, count - was)
+    kroner += grown[k] * rate
   }
-  const isNewCount = Object.keys(RATES).some(k => (Number(earned[k]) || 0) !== (Number(before[k]) || 0))
+  const isNewCount = COUNTS.some(k => grown[k] > 0)
   if (!isNewCount) {
+    if (!game.credited[status.key]) {
+      // A retired session seen again is kept whole, as before.
+      game.credited[status.key] = { earned: { ...before }, at: now }
+      delete game.retired?.[status.key]
+      isGameChanged = true
+      return
+    }
     // Still around: kept from being pruned, noted once a day.
     const seen = game.credited[status.key]
     if (seen && now - (seen.at ?? 0) > 24 * 60 * 60_000) {
@@ -234,16 +259,15 @@ const credit = (status, now) => {
   game.totals ??= {}
   game.days ??= {}
   game.days[day] ??= {}
-  for (const k of Object.keys(RATES)) {
-    const count = Number(earned[k]) || 0
-    const was = Number(before[k]) || 0
-    const grew = count >= was ? count - was : count
-    game.totals[k] = (game.totals[k] ?? 0) + grew
-    game.days[day][k] = (game.days[day][k] ?? 0) + grew
+  for (const k of COUNTS) {
+    game.totals[k] = (game.totals[k] ?? 0) + grown[k]
+    game.days[day][k] = (game.days[day][k] ?? 0) + grown[k]
   }
   game.totals.kroner = (game.totals.kroner ?? 0) + gained
   game.days[day].kroner = (game.days[day].kroner ?? 0) + gained
-  game.credited[status.key] = { earned: { ...earned }, at: now }
+  const highest = Object.fromEntries(COUNTS.map(k => [k, Math.max(Number(earned[k]) || 0, Number(before[k]) || 0)]))
+  game.credited[status.key] = { earned: highest, at: now }
+  delete game.retired?.[status.key]
   if (gained > 0) payDailyBonus(day, now)
   isGameChanged = true
 }
@@ -285,10 +309,20 @@ const pruneDays = () => {
   }
 }
 
+// A session not seen for a week is retired to a short list of its counts
+// and the time it was last seen; after RETIRED_KEEP_MS it is forgotten.
 const pruneCredited = now => {
   for (const [key, entry] of Object.entries(game.credited)) {
     if (now - (entry.at ?? 0) > CREDIT_KEEP_MS) {
+      game.retired ??= {}
+      game.retired[key] = [...COUNTS.map(k => Number(entry.earned?.[k]) || 0), entry.at ?? now]
       delete game.credited[key]
+      isGameChanged = true
+    }
+  }
+  for (const [key, list] of Object.entries(game.retired ?? {})) {
+    if (now - (Number(list[COUNTS.length]) || 0) > RETIRED_KEEP_MS) {
+      delete game.retired[key]
       isGameChanged = true
     }
   }

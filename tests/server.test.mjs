@@ -268,3 +268,49 @@ test('a game saved for the old floor plan is moved over, and nobody loses anythi
     await stop(third)
   }
 })
+
+test('a count read late, lower than before, is not paid again', async () => {
+  const home = newHome()
+  const child = await start(home)
+  const added = async () => JSON.parse((await get('/api/state')).body).game.stats.totals.added
+  try {
+    work(home, 100)
+    await sleep(900)
+    assert.equal(await added(), 100)
+    work(home, 90)
+    await sleep(900)
+    assert.equal(await added(), 100, 'an older status file pays nothing')
+    work(home, 120)
+    await sleep(900)
+    assert.equal(await added(), 120, 'only what lies above the highest count is new')
+  } finally {
+    await stop(child)
+  }
+})
+
+test('a session not seen for a week is retired, and not paid again when it comes back', async () => {
+  const home = newHome()
+  const day = 24 * 60 * 60_000
+  const counts = (added, at) => ({ earned: { added, removed: 0, delivered: 0, tests: 0, commits: 0, prs: 0 }, at })
+  fs.writeFileSync(
+    gameFile(home),
+    JSON.stringify({ v: 1, plan: 2, kroner: 0, owned: { desks: 0, rooms: ['claude', 'team'] }, credited: { sw: counts(500, Date.now() - 8 * day), sx: counts(40, Date.now() - day) }, retired: { gone: [1, 0, 0, 0, 0, 0, Date.now() - 500 * day] } }),
+  )
+  const child = await start(home)
+  try {
+    await sleep(900)
+    const saved = JSON.parse(fs.readFileSync(gameFile(home), 'utf8'))
+    assert.equal(saved.credited.sw, undefined)
+    assert.deepEqual(saved.retired.sw.slice(0, 6), [500, 0, 0, 0, 0, 0])
+    assert.ok(saved.credited.sx, 'a session seen yesterday is kept whole')
+    assert.equal(saved.retired.gone, undefined, 'a long retired session is forgotten')
+    work(home, 520)
+    await sleep(900)
+    assert.equal(JSON.parse((await get('/api/state')).body).game.stats.totals.added, 20)
+    const back = JSON.parse(fs.readFileSync(gameFile(home), 'utf8'))
+    assert.equal(back.credited.sw.earned.added, 520)
+    assert.equal(back.retired.sw, undefined)
+  } finally {
+    await stop(child)
+  }
+})

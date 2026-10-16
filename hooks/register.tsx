@@ -252,9 +252,10 @@ const tidy = async ($: $) => {
 
 // Some ends raise no event: a subagent that fails (a rate limit, a stall) or
 // is stopped. The engine's list of agents says how each loop stands; one that
-// has ended goes home, and so does one the list no longer has (it drops ended
-// loops after a while, and a reload forgets the rest) once it has had a minute
-// to appear there.
+// has ended goes home, and so does one the list does not have (it drops ended
+// loops after a while, a reload forgets the rest, and a workflow's agents and
+// the engine's own forks are never on it) once it has been quiet for a minute:
+// one that is still making tool calls is still at work.
 const ENDED = new Set(['completed', 'failed', 'killed'])
 const UNLISTED_MS = 60_000
 
@@ -267,41 +268,66 @@ const sweepAgents = async ($: $) => {
   for (const s of desks) {
     const agent = agents.find(a => a.id === s.id)
     if (agent && ENDED.has(agent.status)) await deliver($, s.id, agent.status === 'completed' ? undefined : 'failed')
-    else if (!agent && now - s.since > UNLISTED_MS) await deliver($, s.id)
+    else if (!agent && now - Math.max(s.since, s.recent?.at(-1)?.at ?? 0) > UNLISTED_MS) await deliver($, s.id)
   }
 }
 
 // Tests, commits and pull requests, recognised by the command that ran them.
 const TESTS = /\b(npm|pnpm|yarn|bun)\s+(run\s+)?test\b|\bnpx\s+(jest|vitest|playwright)\b|\b(pytest|jest|vitest)\b|\b(cargo|go|dotnet)\s+test\b|\bplugin\s+test\b|\bnode\s+--test\b|\bdeno\s+test\b/
-const COMMIT = /\bgit\s+commit\b/
+// `git commit`, also with git's own options first (`git -C ../x commit`).
+const COMMIT = /\bgit(?:\s+-[cC]\s+(?:"[^"]*"|\S+))*\s+commit\b/
 const PULL = /\bgh\s+pr\s+create\b/
 const PARTY_MS = 5000
 
-const partyFor = (command: string, isOk: boolean): Pick<Party, 'kind' | 'label'> | null => {
-  if (TESTS.test(command)) return isOk ? { kind: 'confetti', label: 'Testene er grønne' } : { kind: 'rain', label: 'Testene fejler' }
-  if (!isOk) return null
-  if (PULL.test(command)) return { kind: 'balloons', label: 'Pull request åbnet' }
-  if (COMMIT.test(command)) return { kind: 'balloons', label: 'Committet' }
-  return null
+// A command with its quoted text blanked out (the same length, so a place in
+// it is a place in the command): a commit message such as "Fix jest config"
+// names no test run, and a quoted path no commit.
+const QUOTED = /"(?:[^"\\]|\\.)*"|'[^']*'/g
+const unquoted = (command: string) => command.replace(QUOTED, q => `"${' '.repeat(q.length - 2)}"`)
+
+// What a command did, in the order it is celebrated: tests first, then a
+// commit, then a pull request, so `npm test && git commit` pays for both. A
+// command that failed only rains on its tests.
+const partiesFor = (command: string, isOk: boolean): Pick<Party, 'kind' | 'label'>[] => {
+  const bare = unquoted(command)
+  const parties: Pick<Party, 'kind' | 'label'>[] = []
+  if (TESTS.test(bare)) parties.push(isOk ? { kind: 'confetti', label: 'Testene er grønne' } : { kind: 'rain', label: 'Testene fejler' })
+  if (!isOk) return parties
+  if (COMMIT.test(bare)) parties.push({ kind: 'balloons', label: 'Committet' })
+  if (PULL.test(bare)) parties.push({ kind: 'balloons', label: 'Pull request åbnet' })
+  return parties
 }
 
 // A commit earns the lines in it that Edit and Write did not count: made
 // by a script, a formatter, sed. At most this many each way per commit, so
-// committing a generated file does not buy the office.
+// committing a generated file does not buy the office. Edits the commit left
+// out (a partial commit) stay counted for the next one.
 const COMMIT_LINES_MAX = 400
 
-// The folder a command like `cd "C:/kode/x" && git commit …` ran in, or
-// undefined for the session's own. Git Bash's /c/… is the engine's C:/….
-const commandDir = (command: string) => {
-  const m = /^\s*cd\s+(?:"([^"]+)"|'([^']+)'|(\S+))\s*(?:&&|;)/.exec(command)
+// Where a commit ran: the last change of folder before `git commit` in the
+// command (`cd`, `pushd`, PowerShell's `Set-Location`), and git's own `-C`.
+// Undefined for the session's own folder. Git Bash's /c/… is the engine's C:/….
+const PATH = String.raw`(?:"([^"]+)"|'([^']+)'|([^\s;&|]+))`
+const CHANGE_DIR = new RegExp(String.raw`(?:^|&&|\|\||;|\n)\s*(?:cd|chdir|pushd|Set-Location|sl|Push-Location)\s+(?:/d\s+)?(?:-(?:Literal)?Path\s+)?${PATH}`, 'gi')
+const GIT_DIR = new RegExp(String.raw`\bgit(?:\s+-c\s+\S+)*\s+-C\s+${PATH}(?:\s+-[cC]\s+\S+)*\s+commit\b`)
+const pathOf = (m: RegExpExecArray | null) => {
   const dir = m ? (m[1] ?? m[2] ?? m[3]) : undefined
   return dir ? slashed(dir).replace(/^\/([a-z])\//i, '$1:/') : undefined
 }
+const commandDir = (command: string) => {
+  const at = unquoted(command).search(COMMIT)
+  const before = at < 0 ? command : command.slice(0, at)
+  return [...before.matchAll(CHANGE_DIR)].map(m => pathOf(m)).at(-1)
+}
+const gitDir = (command: string) => pathOf(GIT_DIR.exec(command))
 
-// Added and removed lines in the commit just made, from git itself.
+// Added and removed lines in the commit just made, from git itself. An
+// amended commit counts only what the amend changed.
 const commitLines = async ($: $, command: string) => {
   const cwd = commandDir(command)
-  const run = await $.process.run(['git', 'show', '--numstat', '--format=', 'HEAD'], { timeoutMs: 10_000, ...(cwd ? { cwd } : {}) }).catch(() => null)
+  const repo = gitDir(command)
+  const what = /--amend\b/.test(unquoted(command)) ? ['diff', '--numstat', 'HEAD@{1}', 'HEAD'] : ['show', '--numstat', '--format=', 'HEAD']
+  const run = await $.process.run(['git', ...(repo ? ['-C', repo] : []), ...what], { timeoutMs: 10_000, ...(cwd ? { cwd } : {}) }).catch(() => null)
   if (!run || run.exitCode !== 0) return null
   let added = 0
   let removed = 0
@@ -323,7 +349,8 @@ const creditCommit = async ($: $, command: string) => {
     const before = o.editedSinceCommit ?? { added: 0, removed: 0 }
     const added = Math.min(COMMIT_LINES_MAX, Math.max(0, lines.added - before.added))
     const removed = Math.min(COMMIT_LINES_MAX, Math.max(0, lines.removed - before.removed))
-    return { ...o, linesAdded: o.linesAdded + added, linesRemoved: o.linesRemoved + removed, earned: earn(o.earned, { added, removed }), editedSinceCommit: { added: 0, removed: 0 } }
+    const left = { added: Math.max(0, before.added - lines.added), removed: Math.max(0, before.removed - lines.removed) }
+    return { ...o, linesAdded: o.linesAdded + added, linesRemoved: o.linesRemoved + removed, earned: earn(o.earned, { added, removed }), editedSinceCommit: left }
   })
 }
 
@@ -717,10 +744,14 @@ export const register: Register = on => {
     if (activity !== thinking) await quietly(noteTool($, e.agentId, activity))
     const ran = await next(e)
 
+    // A call that returns with its subagent sent to the background (Ctrl+B)
+    // did not finish it: SubagentStop delivers it when it is done.
     const sub = spawned.get(e.tool_use_id)
     if (sub) {
       spawned.delete(e.tool_use_id)
-      if (!sub.isBackground) await quietly(deliver($, sub.agentId))
+      const status = 'result' in ran ? (ran.result as { status?: string } | undefined)?.status : undefined
+      const isSentAway = status === 'async_launched' || status === 'remote_launched'
+      if (!sub.isBackground && !isSentAway) await quietly(deliver($, sub.agentId))
     }
     if (!('deny' in ran && ran.deny) && 'result' in ran && ran.result && !ran.isError && (e.tool === 'Edit' || e.tool === 'Write')) {
       const r = ran.result as { structuredPatch?: Patch; staged?: boolean; type?: string; content?: string; originalFile?: string | null }
@@ -745,9 +776,9 @@ export const register: Register = on => {
     if ((e.tool === 'Bash' || e.tool === 'PowerShell') && 'result' in ran && ran.result) {
       const result = ran.result as { interrupted?: boolean; backgroundTaskId?: string }
       const command = String((e as unknown as { command?: unknown }).command ?? '')
-      const party = result.backgroundTaskId || result.interrupted ? null : partyFor(command, !ran.isError)
-      if (party) await quietly(celebrate($, e.agentId ?? 'main', party))
-      if (party?.label === 'Committet') await quietly(creditCommit($, command))
+      const parties = result.backgroundTaskId || result.interrupted ? [] : partiesFor(command, !ran.isError)
+      for (const party of parties) await quietly(celebrate($, e.agentId ?? 'main', party))
+      if (parties.some(party => party.label === 'Committet')) await quietly(creditCommit($, command))
     }
     if (!sub) await quietly(setActivity($, e.agentId, thinking))
 

@@ -566,6 +566,8 @@ const drawSpeech = frame => {
 }
 
 export const draw = () => {
+  // A window with no size (minimised, or a hidden pane) has nothing to draw on.
+  if (!canvas.width || !canvas.height || !background.width || !background.height) return
   const now = Date.now()
   const t = performance.now()
   const s = focused()

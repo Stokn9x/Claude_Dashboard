@@ -28,6 +28,7 @@ Status: ✅ lavet · 🟡 delvist · ⬜ ikke lavet · ⏸️ parkeret · ➖ ik
 | 0.11.1 | Fejlrettelser: ingen går gennem væggene (døre forbinder rummene i rutegitteret, og der er fri vej ud af Claudes kontor), nyt toilet med døren ud til et frit område, ingen fliser i væggene; langsommere indtjening og højere priser, så kontoret bygges over uger |
 | 0.12.0 | En lækrere side rundt om kontoret: topbjælke med ikon, trivsel, saldo og forbindelsesprik; kort med pixel-portræt og statuspille i listen; venteboks med "Gå til"; butik med ikoner og fremdrift; kun mørkt tema |
 | 0.13.0 | Spillets fase 4: pynt og opgraderinger i butikken, 17 præstationer med belønning og notifikation, statistik i den nye fane Fremskridt |
+| 0.19.2 | Pengene tælles rigtigt: en statusfil, der læses for sent, betaler ikke igen; en session, der genoptages efter mere end en uge, betales ikke forfra; en subagent sendt i baggrunden (Ctrl+B) og agenter, som motorens liste ikke kender (fx workflow-agenter), afleveres én gang, når de er færdige; et testord i en commit-besked gør den ikke til en testkørsel, og `npm test && git commit` tæller begge dele; delvise commits og `--amend` tæller ikke linjer dobbelt, og `git -C`, `Set-Location` og en `cd` midt i kommandoen læser det rigtige repo. Desuden: kontoret går ikke længere i stå og viser kun græs, hvis et enkelt billede fejler (fx åbnet i et vindue uden størrelse), og fanerne øverst står i fast rækkefølge i stedet for at bytte plads |
 | 0.19.1 | Ingen figurer springer længere: et faseskift, der kommer lidt for sent, begynder, når siden ser det; hvem der skal til pause eller møde, ligger fast fra starten; ingen pause lige omkring et møde; hjælpere med fri tager ikke en plads, en pause bruger; og skal en figur alligevel pludselig et andet sted hen (fx Claude fra mødet til skrivebordet), går den derhen ad gangen. Længere ture i det store hus går i almindeligt tempo |
 | 0.19.0 | Den nye grundplan: en bred hovedgang med alle rum på hver sin side, Claude midt i huset over receptionen, have mellem huset og vejen. Teamrum, køkken, lounge og toilet starter små og vokser i trin (teamrummene mod vest, loungen og toilettet mod øst, køkkenet og loungen ind i et depot); 22 skriveborde i alt. Hjælperne går rum for rum: ud ad døren, i højre side af gangen og ind ad den næste dør, lige gennem dørene og i lige linjer inde i rummene, i samme tempo overalt. Bordtennisbordet står i loungen. Gemte spil flyttes over uden at miste noget |
 | 0.18.0 | Fase 5: teamrum 2 med seks skriveborde mere, en lounge med pool, bar, spillekonsol, dart, arkademaskine, jukebox, guitar og sofa, hvor hjælperne med fri slapper af, og en større reception foran hoveddøren, som står tom til den bliver indrettet, og hvor Bodil byder velkommen; vores egne tooltips i stedet for browserens; mødelokalets skærm hang under døren og er flyttet |
@@ -176,12 +177,12 @@ En samlet gennemgang før nye ting: koden læst igennem (mod, server og side), a
 
 | # | Hvad | Str. | Status |
 |---|---|---|---|
-| 75 | **En tæller, der går ned, krediteres igen fuldt ud.** En forsinket statusfil med lidt lavere tal (to skrivninger, der overhaler hinanden) tolkes som "startet forfra", så hele tælleren betales igen: ved 5.000 linjer ca. 1.250 kr for meget. Rettelse: kreditér kun det, der ligger over det højeste set. | S | ⬜ |
-| 76 | **En subagent, der sendes i baggrunden undervejs (Ctrl+B), afleveres to gange:** én gang når kaldet vender tilbage, og igen når den er færdig. | S | ⬜ |
-| 77 | **Agenter, som motorens liste aldrig viser** (workflow-agenter, motorens egne forks), "afleveres" efter et minut, mens de stadig arbejder, og igen og igen, cirka hvert 70. sekund. | S | ⬜ |
-| 78 | **Et testord i en commit-besked** (fx "Fix jest config" eller "node --test") tæller som en testkørsel og ikke som en commit, så commit-kronerne og -linjerne udebliver. | S | ⬜ |
-| 79 | **Commit-linjer tælles dobbelt** ved delvise commits og `git commit --amend`, og `git -C` eller `Set-Location` får mod'en til at læse det forkerte repo. | S | ⬜ |
-| 80 | **Krediterede sessioner glemmes efter 7 dage**, så en session, der genoptages senere, kan blive krediteret forfra. | S | ⬜ |
+| 75 | **En tæller, der går ned, krediteres igen fuldt ud.** En forsinket statusfil med lidt lavere tal (to skrivninger, der overhaler hinanden) tolkes som "startet forfra", så hele tælleren betales igen: ved 5.000 linjer ca. 1.250 kr for meget. Rettelse: kreditér kun det, der ligger over det højeste set. | S | ✅ |
+| 76 | **En subagent, der sendes i baggrunden undervejs (Ctrl+B), afleveres to gange:** én gang når kaldet vender tilbage, og igen når den er færdig. | S | ✅ |
+| 77 | **Agenter, som motorens liste aldrig viser** (workflow-agenter, motorens egne forks), "afleveres" efter et minut, mens de stadig arbejder, og igen og igen, cirka hvert 70. sekund. | S | ✅ |
+| 78 | **Et testord i en commit-besked** (fx "Fix jest config" eller "node --test") tæller som en testkørsel og ikke som en commit, så commit-kronerne og -linjerne udebliver. | S | ✅ |
+| 79 | **Commit-linjer tælles dobbelt** ved delvise commits og `git commit --amend`, og `git -C` eller `Set-Location` får mod'en til at læse det forkerte repo. | S | ✅ |
+| 80 | **Krediterede sessioner glemmes efter 7 dage**, så en session, der genoptages senere, kan blive krediteret forfra. | S | ✅ |
 
 ### Bevægelser og hvor folk står
 
@@ -210,7 +211,7 @@ En samlet gennemgang før nye ting: koden læst igennem (mod, server og side), a
 ### Forslag til rækkefølge
 
 1. **Bevægelserne:** 81-88, lavet i 0.19.1.
-2. **Pengene:** 75-80, så ingen tjener for meget eller for lidt.
+2. **Pengene:** 75-80, så ingen tjener for meget eller for lidt. Lavet i 0.19.2.
 3. **Robusthed:** 90-93.
 4. **Småting:** 89 og 94.
 
