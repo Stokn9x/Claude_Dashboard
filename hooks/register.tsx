@@ -1,7 +1,7 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register, RenderElement } from 'claude-code'
 
-import type { Activity, AgentState, Office, Other, Party, Phase, Sub } from '../types'
+import type { Activity, AgentState, Office, Other, Party, Phase, Step, Sub } from '../types'
 
 // A pixel office, seen from above: Claude at the big desk, its subagents at
 // the six desks of the team room. This module keeps track of who is where and
@@ -34,6 +34,8 @@ const emptyOffice: Office = {
   linesRemoved: 0,
   fiveHour: null,
   isOfficeOpen: false,
+  tools: 0,
+  recent: [],
 }
 const office = atom({ plugin: 'agent-kontor', key: 'office' } as const, emptyOffice)
 
@@ -120,6 +122,11 @@ const newSub = (id: string, task: string, activity: Activity, phase: Phase, now:
   phase,
   since: now,
   activity,
+  startedAt: now,
+  tools: 0,
+  linesAdded: 0,
+  linesRemoved: 0,
+  recent: [],
 })
 
 const setActivity = async ($: $, agentId: string | undefined, activity: Activity) => {
@@ -130,6 +137,20 @@ const setActivity = async ($: $, agentId: string | undefined, activity: Activity
     o.subs.some(s => s.id === agentId)
       ? { ...o, subs: o.subs.map(s => (s.id === agentId && (s.phase === 'arriving' || s.phase === 'working') ? { ...s, activity } : s)) }
       : { ...o, subs: [...o.subs, newSub(agentId, 'Hjælper', activity, 'working', now, o.subs)] },
+  )
+}
+
+// A tool call, counted and remembered for the details card, on whoever made
+// it: a helper by its agent id, or Claude.
+const RECENT = 6
+const remember = (recent: Step[] | undefined, step: Step) => [...(recent ?? []), step].slice(-RECENT)
+
+const noteTool = async ($: $, agentId: string | undefined, activity: Activity) => {
+  const step = { at: await $.clock.now(), detail: activity.detail }
+  await update($, office, o =>
+    agentId
+      ? { ...o, subs: o.subs.map(s => (s.id === agentId ? { ...s, tools: (s.tools ?? 0) + 1, recent: remember(s.recent, step) } : s)) }
+      : { ...o, tools: (o.tools ?? 0) + 1, recent: remember(o.recent, step) },
   )
 }
 
@@ -347,7 +368,7 @@ const statusOf = (o: Office) => ({
   main: o.main,
   subs: o.subs,
   party: o.party,
-  stats: { linesAdded: o.linesAdded, linesRemoved: o.linesRemoved, costUsd: o.costUsd, fiveHour: o.fiveHour, model: o.model },
+  stats: { linesAdded: o.linesAdded, linesRemoved: o.linesRemoved, costUsd: o.costUsd, fiveHour: o.fiveHour, model: o.model, tools: o.tools, recent: o.recent },
 })
 
 // Written when it changes, and now and then besides so the server knows the
@@ -535,7 +556,9 @@ export const register: Register = on => {
   })
 
   on('tool.call', async ($, e, next) => {
-    await quietly(setActivity($, e.agentId, activityFor(e.tool, e as unknown as Record<string, unknown>)))
+    const activity = activityFor(e.tool, e as unknown as Record<string, unknown>)
+    await quietly(setActivity($, e.agentId, activity))
+    if (activity !== thinking) await quietly(noteTool($, e.agentId, activity))
     const ran = await next(e)
 
     const sub = spawned.get(e.tool_use_id)
@@ -549,7 +572,16 @@ export const register: Register = on => {
         const counted = e.tool === 'Write' && (r.type === 'create' || (r.structuredPatch?.length === 0 && r.originalFile === null))
           ? { added: countLines(r.content ?? ''), removed: 0 }
           : countPatch(r.structuredPatch)
-        await quietly(update($, office, o => ({ ...o, linesAdded: o.linesAdded + counted.added, linesRemoved: o.linesRemoved + counted.removed })))
+        await quietly(
+          update($, office, o => ({
+            ...o,
+            linesAdded: o.linesAdded + counted.added,
+            linesRemoved: o.linesRemoved + counted.removed,
+            subs: o.subs.map(s =>
+              s.id === e.agentId ? { ...s, linesAdded: (s.linesAdded ?? 0) + counted.added, linesRemoved: (s.linesRemoved ?? 0) + counted.removed } : s,
+            ),
+          })),
+        )
       }
     }
     if ((e.tool === 'Bash' || e.tool === 'PowerShell') && 'result' in ran && ran.result) {

@@ -40,7 +40,7 @@
       grid-template-columns: minmax(0, 1fr) var(--side);
       max-width: calc((100vh - var(--top) - 16px) * var(--office) + var(--side) + 48px);
     }
-    .stage { min-width: 0; min-height: 0; display: flex; align-items: flex-start; justify-content: flex-end; }
+    .stage { position: relative; min-width: 0; min-height: 0; display: flex; align-items: flex-start; justify-content: flex-end; }
     canvas { display: block; border-radius: 12px; image-rendering: pixelated; }
     aside { min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
     @media (max-width: 720px) {
@@ -48,6 +48,23 @@
       .stage { aspect-ratio: var(--office); max-height: 78vh; justify-content: center; }
       aside { overflow: visible; }
     }
+
+    /* The details card over the office, next to the figure it is about. */
+    .card {
+      position: absolute; left: 0; top: 0; width: 240px; padding: 10px 12px 12px; border-radius: 10px;
+      background: var(--chip); color: var(--ink); border: 1px solid var(--line);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25); font-size: 13px; pointer-events: auto; z-index: 2;
+    }
+    .card[hidden] { display: none; }
+    .card-head { display: flex; align-items: center; gap: 8px; font-size: 14px; }
+    .card-close { margin-left: auto; border: 0; background: none; color: var(--soft); font-size: 18px; line-height: 1; cursor: pointer; padding: 0 2px; }
+    .card-task { color: var(--soft); margin-top: 2px; }
+    .card-now { margin-top: 8px; font-weight: 600; }
+    .card-note { color: var(--soft); }
+    .card-facts { margin-top: 6px; color: var(--soft); font-size: 12px; }
+    .card-label { margin-top: 10px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--soft); }
+    .card-steps { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 2px; }
+    .card-steps time { color: var(--soft); font-variant-numeric: tabular-nums; margin-right: 8px; }
 
     .alert { border: 1px solid var(--alert); color: var(--alert); border-radius: 10px; padding: 8px 12px; }
     .alert:empty { display: none; }
@@ -69,7 +86,8 @@
   </header>
   <main>
     <div class="stage" id="stage">
-      <canvas id="office" aria-label="Kontoret set ovenfra"></canvas>
+      <canvas id="office" aria-label="Kontoret set ovenfra. Klik på en figur for at se, hvad den laver."></canvas>
+      <div class="card" id="card" role="dialog" aria-label="Detaljer" hidden></div>
     </div>
     <aside>
       <div class="alert" id="alert" role="status"></div>

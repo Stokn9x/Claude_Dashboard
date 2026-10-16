@@ -382,3 +382,27 @@ test('a seventh helper waits by the door and takes the first desk that comes fre
   expect(seventh()?.seat).toBe(1)
   expect(file.last()?.subs.some(s => JSON.stringify(s).includes('sub-b2'))).toBe(false)
 })
+
+test('each helper keeps its own count of tools, lines and latest steps for its card', async ($, on) => {
+  const clock = backgroundHelper(on, $)
+  const file = statusFile(on)
+  on('agent.list', () => ({ value: [agentEntry('sub-b1', 'running')] }) as never)
+  await $.session.start(start())
+
+  await $.tool.call({ tool: 'Agent', prompt: 'p', description: 'Læs README', tool_use_id: 'b1', run_in_background: true } as never)
+  await $.tool.call({ tool: 'Read', file_path: 'C:/x/api.ts', tool_use_id: 'r1', agentId: 'sub-b1' } as never)
+  await $.tool.call({ tool: 'Edit', file_path: 'C:/x/api.ts', old_string: 'a', new_string: 'b', tool_use_id: 'e1', agentId: 'sub-b1' } as never)
+  await clock.advance(600)
+
+  const helper = JSON.parse(JSON.stringify(file.last()?.subs[0])) as { tools: number; linesAdded: number; linesRemoved: number; recent: { detail: string }[]; startedAt: number }
+  expect(helper.tools).toBe(2)
+  expect(helper.linesAdded).toBe(2)
+  expect(helper.linesRemoved).toBe(1)
+  expect(helper.recent.map(r => r.detail)).toEqual(['Læser api.ts', 'Skriver api.ts'])
+  expect(helper.startedAt).toBe(Date.UTC(2026, 9, 15, 10))
+
+  // Claude's own calls are Claude's: the Agent call that sent the helper.
+  const stats = JSON.parse(JSON.stringify(file.last())).stats as { tools: number; recent: { detail: string }[] }
+  expect(stats.tools).toBe(1)
+  expect(stats.recent[0]?.detail).toBe('Sender en hjælper afsted')
+})

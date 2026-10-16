@@ -17,6 +17,7 @@ Status: ✅ lavet · 🟡 delvist · ⬜ ikke lavet · ➖ ikke længere relevan
 | 0.7.3 | Kontoret fylder vinduet i både bredde og højde, er skarpt på alle skærme, og listen står ved siden af |
 | 0.7.4 | Hjælpere, der fejler eller stoppes, går hjem; serveren startes igen efter dvale; serveren er gjort mere robust |
 | 0.7.5 | Ventende hjælpere får et skrivebord, ingen hænger fast efter en genindlæsning, tavle med dagens tal og vægur |
+| 0.7.6 | Klik på en figur for at se detaljer om den |
 
 ## 🔧 Fejl og ting der driller
 
@@ -40,7 +41,7 @@ Status: ✅ lavet · 🟡 delvist · ⬜ ikke lavet · ➖ ikke længere relevan
 |---|---|---|---|
 | 9 | **Afprøv med rigtige subagenter.** | S | ✅ |
 | 10 | **Alle dine sessioner i ét kontor.** Nu med faner på siden. | M | ✅ |
-| 11 | **Klik på en figur for detaljer:** tid, værktøjer, linjer og hvad den sidst lavede. På canvas kan det nu laves som et lille kort ved figuren. | M | ⬜ |
+| 11 | **Klik på en figur for detaljer:** et kort med opgaven, hvad den laver nu, hvor længe den har været i gang, antal værktøjer, linjer og de seneste skridt. Klik på en anden session i projektrummet skifter til den. | M | ✅ |
 | 12 | **Aktivitetslog** under kontoret, fx "10:42 Freja læste api.ts", "10:43 Oskar afleverede". | S | ⬜ |
 | 13 | **Indstillinger:** lyd til/fra, gå-tempo, om knappen over chatboksen skal vises. | S | ⬜ |
 | 14 | **README med GIF** af kontoret i gang. | S | ⬜ |

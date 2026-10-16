@@ -2,6 +2,9 @@ export type AgentState = 'working' | 'reading' | 'editing' | 'running' | 'browsi
 
 export type Activity = { state: AgentState; detail: string }
 
+// One step someone took, for the details card: "10:42 Læser api.ts".
+export type Step = { at: number; detail: string }
+
 // A subagent's walk through the office: in by the door, at a desk, over to
 // the main desk with its result, and out again.
 export type Phase = 'arriving' | 'working' | 'delivering' | 'leaving'
@@ -16,6 +19,12 @@ export type Sub = {
   activity: Activity
   // Set when the helper's loop failed or was stopped instead of finishing.
   outcome?: 'failed'
+  // For the details card. Absent on helpers an older version seated.
+  startedAt?: number
+  tools?: number
+  linesAdded?: number
+  linesRemoved?: number
+  recent?: Step[]
 }
 
 // Another Claude session on this computer, as its own status file says.
@@ -51,6 +60,9 @@ export type Office = {
   fiveHour: number | null
   // The office was opened in this session: its server is kept running.
   isOfficeOpen: boolean
+  // Claude's own count of tool calls and latest steps, for its details card.
+  tools: number
+  recent: Step[]
 }
 
 declare module 'claude-code' {

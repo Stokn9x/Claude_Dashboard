@@ -522,6 +522,10 @@ const drawBuilding = (project, hour) => {
   }
 }
 
+// ── Clicking on someone ──────────────────────────────────────────────────
+const seatedBox = (cx, dy) => ({ x0: cx - 22, y0: dy - 30, x1: cx + 22, y1: dy + 42 })
+const standingBox = (x, y) => ({ x0: x - 17, y0: y - 46, x1: x + 17, y1: y + 15 })
+
 // ── Celebrations ─────────────────────────────────────────────────────────
 const party = (p, spot, t) => {
   const age = (t - p.at) / 1000
@@ -575,10 +579,16 @@ let isChosen = focusKey !== null
 
 const focused = () => state.sessions.find(s => s.key === focusKey) ?? state.sessions[0] ?? null
 
+// Where each figure stood in the last frame, for clicks: { kind, id, x0, y0, x1, y1 }
+// in scene units, later entries drawn on top.
+let hits = []
+let selected = null // { kind: 'claude' | 'sub', id }
+
 const draw = () => {
   const now = Date.now()
   const t = performance.now()
   const s = focused()
+  const frameHits = []
   const hour = new Date().getHours()
   drawBuilding(s?.project ?? '', hour)
   ctx.setTransform(1, 0, 0, 1, 0, 0)
@@ -601,7 +611,9 @@ const draw = () => {
   if (!isOut) {
     hands(MAIN.cx, MAIN.dy, claudeLook, main.state !== 'waiting', t)
     tag(MAIN.cx, MAIN.dy + 30, 'Claude', '#C8643B')
+    frameHits.push({ kind: 'claude', id: 'claude', ...seatedBox(MAIN.cx, MAIN.dy) })
   } else {
+    frameHits.push({ kind: 'claude', id: 'claude', ...standingBox(KITCHEN_SEAT.x, KITCHEN_SEAT.y) })
     standing(KITCHEN_SEAT.x, KITCHEN_SEAT.y, claudeLook, 'front', false, t)
     // The mug, and its steam
     const mx = KITCHEN_SEAT.x + 15
@@ -628,6 +640,7 @@ const draw = () => {
     if (sub) {
       hands(cx, dy, lookFor(sub.id), sub.activity.state !== 'waiting', t + seat * 37)
       tag(cx, dy + 30, sub.name, '#4A5868')
+      frameHits.push({ kind: 'sub', id: sub.id, ...seatedBox(cx, dy) })
     }
   }
   for (const sub of subs) {
@@ -638,6 +651,7 @@ const draw = () => {
   for (const { sub, pose } of walkers) {
     standing(pose.x, pose.y, lookFor(sub.id), pose.facing, pose.isWalking, t)
     tag(pose.x, pose.y + 3, sub.name, '#4A5868')
+    frameHits.push({ kind: 'sub', id: sub.id, ...standingBox(pose.x, pose.y) })
   }
 
   // The project room: the other sessions
@@ -653,6 +667,7 @@ const draw = () => {
     if (!away) hands(cx, dy, look, o.main.state !== 'waiting', t + i * 51)
     tag(cx, dy + 30, clip(o.project, 16), '#C8643B')
     if (o.subs?.length) tag(cx + 30, dy + 44, `+${o.subs.length}`, '#4A5868')
+    frameHits.push({ kind: 'session', id: o.key, x0: cx - 42, y0: dy - 40, x1: cx + 42, y1: dy + 44 })
   })
   for (let i = others.length; i < 4; i++) {
     chair(72 + i * 112, 440)
@@ -680,6 +695,15 @@ const draw = () => {
     if (o.main.state === 'idle') tag(72 + i * 112, 418, 'Holder pause', '#8A94A0')
     else bubble(72 + i * 112, 410, o.main.detail, o.main.state === 'waiting', t)
   })
+  // The one whose card is open, ringed.
+  const ring = selected && frameHits.find(h => h.kind === selected.kind && h.id === selected.id)
+  if (ring) {
+    ctx.setLineDash([3, 2])
+    rounded(ring.x0, ring.y0, ring.x1 - ring.x0, ring.y1 - ring.y0, 6, 'rgba(47,134,214,0.08)', '#2F86D6', 1.2)
+    ctx.setLineDash([])
+  }
+  hits = frameHits
+
   const waitingAtDoor = subs.filter(x => x.seat < 0).length
   if (waitingAtDoor) tag(DOOR.x - 40, 230, `+${waitingAtDoor} venter ved døren`, '#C8643B')
 
@@ -739,6 +763,154 @@ const renderPage = () => {
   )
 }
 
+// ── The details card ─────────────────────────────────────────────────────
+const card = document.getElementById('card')
+
+const sceneAt = e => {
+  const box = canvas.getBoundingClientRect()
+  return { x: ((e.clientX - box.left) / box.width) * W, y: ((e.clientY - box.top) / box.height) * H }
+}
+const hitAt = e => {
+  const { x, y } = sceneAt(e)
+  for (let i = hits.length - 1; i >= 0; i--) {
+    const h = hits[i]
+    if (x >= h.x0 && x <= h.x1 && y >= h.y0 && y <= h.y1) return h
+  }
+  return null
+}
+
+const ago = (now, at) => {
+  const minutes = Math.floor((now - at) / 60_000)
+  if (minutes < 1) return 'under et minut'
+  if (minutes < 60) return `${minutes} min`
+  const hours = Math.floor(minutes / 60)
+  return `${hours} t ${minutes % 60} min`
+}
+const clockTime = at => new Date(at).toLocaleTimeString('da-DK', { hour: '2-digit', minute: '2-digit' })
+const phaseNote = sub =>
+  sub.outcome === 'failed' && (sub.phase === 'delivering' || sub.phase === 'leaving')
+    ? 'Gik i stå'
+    : { arriving: 'På vej ind', working: sub.seat < 0 ? 'Venter ved døren' : null, delivering: 'Afleverer', leaving: 'Går igen' }[sub.phase] ?? null
+
+// Who the card is about, as the newest state says; null once they are gone.
+const subject = () => {
+  const s = focused()
+  if (!selected || !s) return null
+  if (selected.kind === 'claude') {
+    const stats = s.stats ?? {}
+    return {
+      name: 'Claude',
+      task: s.project,
+      activity: s.main,
+      startedAt: s.startedAt,
+      tools: stats.tools,
+      linesAdded: stats.linesAdded,
+      linesRemoved: stats.linesRemoved,
+      note: typeof stats.costUsd === 'number' ? `$${stats.costUsd.toFixed(2)} i denne session` : null,
+      recent: stats.recent,
+    }
+  }
+  const sub = (s.subs ?? []).find(x => x.id === selected.id)
+  if (!sub) return null
+  return { ...sub, note: phaseNote(sub) }
+}
+
+const renderCard = () => {
+  const who = subject()
+  if (!who) {
+    selected = null
+    card.hidden = true
+    return
+  }
+  const now = Date.now()
+  const facts = [
+    who.startedAt ? `I gang i ${ago(now, who.startedAt)}` : null,
+    typeof who.tools === 'number' ? `${who.tools} ${who.tools === 1 ? 'værktøj' : 'værktøjer'}` : null,
+    who.linesAdded || who.linesRemoved ? `+${who.linesAdded ?? 0} −${who.linesRemoved ?? 0} linjer` : null,
+  ].filter(Boolean)
+  const steps = [...(who.recent ?? [])].reverse()
+  card.replaceChildren(
+    el('div', { className: 'card-head' }, [
+      dot(who.activity.state),
+      el('strong', {}, [who.name]),
+      el('button', { className: 'card-close', type: 'button', ariaLabel: 'Luk', onclick: () => select(null) }, ['×']),
+    ]),
+    ...(who.task ? [el('div', { className: 'card-task' }, [who.task])] : []),
+    el('div', { className: 'card-now', style: `color:${stateColor[who.activity.state] ?? 'inherit'}` }, [who.activity.detail]),
+    ...(who.note ? [el('div', { className: 'card-note' }, [who.note])] : []),
+    ...(facts.length ? [el('div', { className: 'card-facts' }, [facts.join(' · ')])] : []),
+    ...(steps.length
+      ? [
+          el('div', { className: 'card-label' }, ['Seneste']),
+          el('ol', { className: 'card-steps' }, steps.map(step => el('li', {}, [el('time', {}, [clockTime(step.at)]), step.detail]))),
+        ]
+      : []),
+  )
+  card.hidden = false
+  placeCard()
+}
+
+// Beside the figure, inside the picture; above it when there is no room below.
+const placeCard = () => {
+  const h = selected && hits.find(x => x.kind === selected.kind && x.id === selected.id)
+  if (!h || card.hidden) return
+  const box = canvas.getBoundingClientRect()
+  const stageBox = stage.getBoundingClientRect()
+  const scale = box.width / W
+  const left = box.left - stageBox.left
+  const top = box.top - stageBox.top
+  const cardWidth = card.offsetWidth
+  const cardHeight = card.offsetHeight
+  const right = left + h.x1 * scale + 8
+  const leftSide = left + h.x0 * scale - cardWidth - 8
+  let x
+  let y
+  if (right + cardWidth <= left + box.width || leftSide >= left) {
+    x = right + cardWidth <= left + box.width ? right : leftSide
+    y = top + h.y0 * scale
+  } else {
+    // No room beside it (a narrow window): under the figure, over it if
+    // there is room there, or else on under the picture, but never over it.
+    x = left + ((h.x0 + h.x1) / 2) * scale - cardWidth / 2
+    const below = top + h.y1 * scale + 6
+    const above = top + h.y0 * scale - cardHeight - 6
+    y = below + cardHeight <= top + box.height || above < top ? below : above
+    card.style.transform = `translate(${Math.round(Math.max(left + 4, Math.min(x, left + box.width - cardWidth - 4)))}px, ${Math.round(y)}px)`
+    return
+  }
+  x = Math.max(left + 4, Math.min(x, left + box.width - cardWidth - 4))
+  y = Math.max(top + 4, Math.min(y, top + box.height - cardHeight - 4))
+  card.style.transform = `translate(${Math.round(x)}px, ${Math.round(y)}px)`
+}
+
+const select = next => {
+  selected = next
+  renderCard()
+}
+
+canvas.addEventListener('click', e => {
+  const h = hitAt(e)
+  if (h?.kind === 'session') {
+    select(null)
+    choose(h.id)
+  } else {
+    select(h && !(selected && selected.kind === h.kind && selected.id === h.id) ? { kind: h.kind, id: h.id } : null)
+  }
+})
+canvas.addEventListener('mousemove', e => {
+  canvas.style.cursor = hitAt(e) ? 'pointer' : 'default'
+})
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') select(null)
+})
+// Times move on, and walkers move the card with them.
+setInterval(() => selected && renderCard(), 1000)
+const follow = () => {
+  placeCard()
+  requestAnimationFrame(follow)
+}
+requestAnimationFrame(follow)
+
 const choose = key => {
   focusKey = key
   isChosen = true
@@ -750,6 +922,7 @@ const choose = key => {
 
 const receive = next => {
   state = next
+  if (selected) renderCard()
   // A session picked by hand stays in view while it lives. Until then the
   // view follows the work: away from a session on a break to one that isn't.
   const current = state.sessions.find(x => x.key === focusKey)
