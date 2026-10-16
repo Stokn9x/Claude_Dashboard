@@ -361,3 +361,24 @@ test('once the office is open, a server that stopped is started again', async ($
   await clock.advance(61_000)
   expect(starts).toBe(2)
 })
+
+test('a seventh helper waits by the door and takes the first desk that comes free', async ($, on) => {
+  const clock = backgroundHelper(on, $)
+  const file = statusFile(on)
+  on('classic.SubagentStop', () => ({}) as never)
+  on('agent.list', () => ({ value: ['1', '2', '3', '4', '5', '6', '7'].map(n => agentEntry(`sub-b${n}`, 'running')) }) as never)
+  await $.session.start(start())
+
+  for (const n of ['1', '2', '3', '4', '5', '6', '7']) {
+    await $.tool.call({ tool: 'Agent', prompt: 'p', description: 'Læs README', tool_use_id: `b${n}`, run_in_background: true } as never)
+  }
+  await clock.advance(9000)
+  const seventh = () => file.last()?.subs.find(s => s.name && JSON.stringify(s).includes('sub-b7'))
+  expect(seventh()?.seat).toBe(-1)
+
+  // The second helper is done: once it is out of the door, its desk is free.
+  await $.classic.SubagentStop({ agent_id: 'sub-b2', agent_type: 'Explore', stop_hook_active: false, agent_transcript_path: '' } as never)
+  await clock.advance(20_000)
+  expect(seventh()?.seat).toBe(1)
+  expect(file.last()?.subs.some(s => JSON.stringify(s).includes('sub-b2'))).toBe(false)
+})

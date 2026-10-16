@@ -309,6 +309,51 @@ const plant = (x, y, big = false) => {
   circle(x + r / 3, y - r, r / 3, '#6CC082')
 }
 
+// ── Things on the walls that change ──────────────────────────────────────
+const BOARD = { x: 196, y: 46, w: 44, h: 30 }
+const CLOCK = { x: 461, y: 8, r: 6 }
+
+// The day's numbers on Claude's whiteboard, in marker.
+const board = stats => {
+  const left = BOARD.x + 4
+  label('I dag', left, BOARD.y + 7, 5.5, '#5B6672', 700, 'left')
+  if (!stats || (!stats.linesAdded && !stats.linesRemoved && typeof stats.costUsd !== 'number')) {
+    rect(left, BOARD.y + 12, 26, 1.5, '#3E7CC9')
+    rect(left, BOARD.y + 17, 18, 1.5, '#E07A4F')
+    return
+  }
+  label(`+${stats.linesAdded ?? 0}`, left, BOARD.y + 15, 7, '#2E9E8F', 700, 'left')
+  ctx.font = `700 7px ${FONT}`
+  const shift = ctx.measureText(`+${stats.linesAdded ?? 0} `).width
+  label(`−${stats.linesRemoved ?? 0}`, left + shift, BOARD.y + 15, 7, '#E5484D', 700, 'left')
+  if (typeof stats.costUsd === 'number') label(`$${stats.costUsd.toFixed(2)}`, left, BOARD.y + 24, 7, '#3E7CC9', 700, 'left')
+}
+
+// A wall clock showing the time it is.
+const clock = date => {
+  const { x, y, r } = CLOCK
+  circle(x, y, r + 1, OUTLINE)
+  circle(x, y, r, '#FFFFFF')
+  for (let i = 0; i < 12; i += 3) {
+    const a = (i / 12) * Math.PI * 2
+    rect(x + Math.sin(a) * (r - 1.5) - 0.5, y - Math.cos(a) * (r - 1.5) - 0.5, 1, 1, '#8A94A0')
+  }
+  const hand = (turn, length, width, colour) => {
+    const a = turn * Math.PI * 2
+    ctx.beginPath()
+    ctx.moveTo(x, y)
+    ctx.lineTo(x + Math.sin(a) * length, y - Math.cos(a) * length)
+    ctx.lineWidth = width
+    ctx.lineCap = 'round'
+    ctx.strokeStyle = colour
+    ctx.stroke()
+  }
+  const minutes = date.getMinutes() + date.getSeconds() / 60
+  hand(((date.getHours() % 12) + minutes / 60) / 12, r * 0.5, 1.2, OUTLINE)
+  hand(minutes / 60, r * 0.8, 0.8, OUTLINE)
+  hand(date.getSeconds() / 60, r * 0.85, 0.4, '#E5484D')
+}
+
 // ── The building, drawn once per light ───────────────────────────────────
 const WALL = '#3E4852'
 const WALL_TOP = '#5A6672'
@@ -408,11 +453,12 @@ const drawBuilding = (project, hour) => {
   fill(196, 112, 26, 18, OUTLINE)
   fill(198, 114, 22, 14, '#C8643B')
   fill(200, 116, 18, 4, '#E3875E')
-  fill(200, 54, 34, 18, OUTLINE)
-  fill(201, 55, 32, 16, '#F6F7F8')
-  fill(204, 59, 18, 1.5, '#3E7CC9')
-  fill(204, 63, 24, 1.5, '#E07A4F')
-  fill(204, 67, 12, 1.5, '#2E9E8F')
+  // The whiteboard; board() writes the day's numbers on it
+  fill(BOARD.x - 1, BOARD.y - 1, BOARD.w + 2, BOARD.h + 2, OUTLINE)
+  fill(BOARD.x, BOARD.y, BOARD.w, BOARD.h, '#F6F7F8')
+  fill(BOARD.x + 2, BOARD.y + BOARD.h - 1, BOARD.w - 4, 2, '#B9C3CC')
+  fill(BOARD.x + 6, BOARD.y + BOARD.h - 1.5, 5, 1.5, '#E5484D')
+  fill(BOARD.x + 13, BOARD.y + BOARD.h - 1.5, 5, 1.5, '#3E7CC9')
 
   // Kitchen
   fill(256, 18, 150, 16, OUTLINE)
@@ -544,6 +590,9 @@ const draw = () => {
   const main = s?.main ?? { state: 'idle', detail: 'Ingen session' }
   const isOut = main.state === 'idle'
   const subs = s?.subs ?? []
+
+  board(s?.stats)
+  clock(new Date())
 
   // Claude
   chair(MAIN.cx, MAIN.dy)

@@ -133,44 +133,60 @@ const setActivity = async ($: $, agentId: string | undefined, activity: Activity
   )
 }
 
+// In by the door; tidy() sits it down when its walk is over.
 const arrive = async ($: $, id: string, task: string, activity: Activity) => {
   const now = await $.clock.now()
-  const after = await update($, office, o => (o.subs.some(s => s.id === id) ? o : { ...o, subs: [...o.subs, newSub(id, task, activity, 'arriving', now, o.subs)] }))
-  const seat = after.subs.find(s => s.id === id)?.seat ?? -1
-  const sitDown = () => void quietly(update($, office, o => ({ ...o, subs: o.subs.map(s => (s.id === id && s.phase === 'arriving' ? { ...s, phase: 'working' as Phase } : s)) })))
-  // A helper with no free desk waits by the door; it does not walk.
-  if (seat < 0) return sitDown()
-  $.clock.after(walkMs(arrivePath(seat)), sitDown)
+  await update($, office, o => (o.subs.some(s => s.id === id) ? o : { ...o, subs: [...o.subs, newSub(id, task, activity, 'arriving', now, o.subs)] }))
 }
 
-// Done: walk the result over to Claude, hand it over, then out of the door.
-// A helper whose loop failed or was stopped walks the same way, empty-handed.
+// Done: walk the result over to Claude, hand it over, then out of the door;
+// tidy() moves it on. A helper whose loop failed or was stopped walks the
+// same way, empty-handed.
 const deliver = async ($: $, id: string, outcome?: 'failed') => {
   const now = await $.clock.now()
-  let seat: number | null = null
   await update($, office, o => ({
     ...o,
     subs: o.subs.map(s => {
       if (s.id !== id || (s.phase !== 'arriving' && s.phase !== 'working')) return s
-      seat = s.seat
       const detail = outcome === 'failed' ? `Gik i stå: ${s.task}` : `Afleverer: ${s.task}`
       return { ...s, phase: 'delivering' as Phase, since: now, outcome, activity: { state: 'working' as AgentState, detail } }
     }),
   }))
-  if (seat === null) return
-  const gone = () => void quietly(update($, office, x => ({ ...x, subs: x.subs.filter(s => s.id !== id) })))
-  if (seat < 0) {
-    $.clock.after(HANDOVER_MS, gone)
-    return
+}
+
+// Every walk is worked out from when it began, never from a timer, so a
+// reload of the mod or a sleeping computer cannot leave anyone stuck: a walk
+// that is over is over. A helper waiting by the door takes the first desk
+// that comes free.
+const TIDY_MS = 500
+
+const nextPhase = (s: Sub, now: number): Sub | null => {
+  const elapsed = now - s.since
+  if (s.phase === 'arriving') {
+    return s.seat < 0 || elapsed >= walkMs(arrivePath(s.seat)) ? { ...s, phase: 'working' } : s
   }
-  $.clock.after(walkMs(deliverPath(seat)) + HANDOVER_MS, () => {
-    void quietly(
-      (async () => {
-        const later = await $.clock.now()
-        await update($, office, o => ({ ...o, subs: o.subs.map(s => (s.id === id ? { ...s, phase: 'leaving' as Phase, since: later } : s)) }))
-        $.clock.after(walkMs(leavePath(seat as number)), gone)
-      })(),
-    )
+  if (s.phase === 'delivering') {
+    const handedOver = s.seat < 0 ? HANDOVER_MS : walkMs(deliverPath(s.seat)) + HANDOVER_MS
+    if (elapsed < handedOver) return s
+    return s.seat < 0 ? null : { ...s, phase: 'leaving', since: s.since + handedOver }
+  }
+  if (s.phase === 'leaving') return elapsed >= walkMs(leavePath(s.seat)) ? null : s
+  return s
+}
+
+const tidy = async ($: $) => {
+  const now = await $.clock.now()
+  await update($, office, o => {
+    let subs = o.subs.map(s => nextPhase(s, now)).filter((s): s is Sub => s !== null)
+    for (const waiting of subs.filter(s => s.seat < 0 && s.phase === 'working')) {
+      const seat = freeSeat(subs)
+      if (seat < 0) break
+      subs = subs.map(s => (s.id === waiting.id ? { ...s, seat, phase: 'arriving', since: now } : s))
+    }
+    // A party whose timer a reload lost ends all the same.
+    const party = o.party && now - o.party.at > PARTY_MS ? null : o.party
+    const isSame = party === o.party && subs.length === o.subs.length && subs.every((s, i) => s === o.subs[i])
+    return isSame ? o : { ...o, subs, party }
   })
 }
 
@@ -442,6 +458,7 @@ export const register: Register = on => {
     const now = await $.clock.now()
     const key = `s${Math.random().toString(36).slice(2, 10)}${Math.random().toString(36).slice(2, 6)}`
     await update($, office, o => ({ ...o, sessionKey: o.sessionKey || key, project: base(e.cwd) || 'Kontoret', startedAt: o.startedAt || now, main: pause, subs: [] }))
+    $.clock.every(TIDY_MS, () => void quietly(tidy($)))
     $.clock.every(WRITE_MS, () => void quietly(writeStatus($)))
     $.clock.every(READ_MS, () => void quietly(readOthers($)))
     $.clock.every(READ_MS, () => void quietly(sweepAgents($)))

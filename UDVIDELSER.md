@@ -16,6 +16,7 @@ Status: ✅ lavet · 🟡 delvist · ⬜ ikke lavet · ➖ ikke længere relevan
 | 0.7.2 | Knappen "🏢 Åbn kontor" over chatboksen starter serveren og åbner kontoret i din browser |
 | 0.7.3 | Kontoret fylder vinduet i både bredde og højde, er skarpt på alle skærme, og listen står ved siden af |
 | 0.7.4 | Hjælpere, der fejler eller stoppes, går hjem; serveren startes igen efter dvale; serveren er gjort mere robust |
+| 0.7.5 | Ventende hjælpere får et skrivebord, ingen hænger fast efter en genindlæsning, tavle med dagens tal og vægur |
 
 ## 🔧 Fejl og ting der driller
 
@@ -24,8 +25,8 @@ Status: ✅ lavet · 🟡 delvist · ⬜ ikke lavet · ➖ ikke længere relevan
 | 1 | **Baggrunds-subagenter går for tidligt.** De bliver nu, til subagenten selv stopper (`SubagentStop`). | M | ✅ |
 | 2 | **Hånden bliver oppe efter godkendelse.** "Venter på dig" fjernes ved næste skridt og ved afvisning, men der kommer stadig ingen hændelse lige når du klikker "Tillad". | S | 🟡 |
 | 3 | **Venter en subagent på godkendelse, ser det måske ud som om Claude venter.** Koden bruger `agent_id` fra godkendelses-hændelsen, men det er ikke set med en rigtig subagent. | S | ⬜ |
-| 4 | **Hjælper nr. 7 og videre kommer aldrig ind.** De står ved døren og tager ikke et skrivebord, når et bliver ledigt. | S | ⬜ |
-| 5 | **Genindlæses mod'en midt i en gåtur, går tidtagningen tabt,** og figuren kan hænge fast i "afleverer". Forløb, der er udløbet, bør ryddes op ved start. | S | ⬜ |
+| 4 | **Hjælper nr. 7 og videre** venter ved døren og tager det første skrivebord, der bliver ledigt. | S | ✅ |
+| 5 | **Genindlæses mod'en midt i en gåtur,** regnes turen nu ud fra hvornår den begyndte, så ingen hænger fast. | S | ✅ |
 | 6 | **Tegningen blinkede og hakkede ved hver ændring.** Løst ved at flytte tegningen til browseren. | M | ✅ |
 | 7 | **Kontorets bredde var et skøn** i panelet. Siden skalerer nu selv. | S | ➖ |
 | 36 | **Hjælpere, der fejler eller bliver stoppet, bliver siddende for evigt.** De går nu hjem, når Claudes liste over agenter siger, at de er stoppet, eller ikke længere har dem. | S | ✅ |
@@ -54,7 +55,7 @@ Status: ✅ lavet · 🟡 delvist · ⬜ ikke lavet · ➖ ikke længere relevan
 | 18 | **Udseende efter type:** Explore får forstørrelsesglas, Plan en tegnerulle. Modellen som farve på navneskiltet (Opus, Sonnet, Haiku). | M | ⬜ |
 | 19 | **Liv i pauserne:** Claude går rundt, vander planter og spiller bordtennis med hjælperne. | L | ⬜ |
 | 20 | **Grænser som rekvisitter:** kaffekanden tømmes, efterhånden som 5-timers-grænsen bruges, og en plante visner, når konteksten fyldes. | M | ⬜ |
-| 21 | **Tavle og ur på væggen:** tavlen viser dagens linjer og pris, uret det rigtige klokkeslæt. | S | ⬜ |
+| 21 | **Tavle og ur på væggen:** tavlen viser dagens linjer og pris, uret det rigtige klokkeslæt. | S | ✅ |
 | 22 | **Dag, nat og vejr:** Vinduerne skifter allerede farve efter tidspunktet; mangler mørkere lys om aftenen, tændte lamper og regn på ruderne. | M | 🟡 |
 | 23 | **Kontorhund eller -kat,** der vandrer rundt og lægger sig under et skrivebord. | M | ⬜ |
 | 24 | **Timelapse af dagen:** afspil sessionens forløb i 60× fart. Serveren kan gemme forløbet. | L | ⬜ |
