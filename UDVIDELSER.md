@@ -165,6 +165,54 @@ Fundet ved en gennemgang af koden og det, vi har set undervejs. **P1** er fejl, 
 2. **66 månedens medarbejder** og **67 tv-tilstand**.
 3. **65 indret selv**: flyt pynt og inventar med træk og slip.
 
+## 🧪 Testgennemgang 16.10.2026 (0.19.0)
+
+En samlet gennemgang før nye ting: koden læst igennem (mod, server og side), alle automatiske tests kørt, bevægelserne målt billede for billede i et testkontor med alle faser, pauser og møder, placeringerne tjekket i fire udbygninger, og rigtige subagenter fulgt i det rigtige kontor.
+
+**Det holder:** forbindelsen fra Claude til kontoret (statusfil, server, side), ingen ruter gennem vægge eller depoter i fem udbygninger, gangens vognbaner, møder og pauser, ingen pladser i vægge eller oven i hinanden, ingen møbler foran døre, køb og afslutning er beskyttet, migreringen, kapaciteten af skriveborde og alle 111 automatiske tests.
+
+### Penge og tællere
+
+| # | Hvad | Str. | Status |
+|---|---|---|---|
+| 75 | **En tæller, der går ned, krediteres igen fuldt ud.** En forsinket statusfil med lidt lavere tal (to skrivninger, der overhaler hinanden) tolkes som "startet forfra", så hele tælleren betales igen: ved 5.000 linjer ca. 1.250 kr for meget. Rettelse: kreditér kun det, der ligger over det højeste set. | S | ⬜ |
+| 76 | **En subagent, der sendes i baggrunden undervejs (Ctrl+B), afleveres to gange:** én gang når kaldet vender tilbage, og igen når den er færdig. | S | ⬜ |
+| 77 | **Agenter, som motorens liste aldrig viser** (workflow-agenter, motorens egne forks), "afleveres" efter et minut, mens de stadig arbejder, og igen og igen, cirka hvert 70. sekund. | S | ⬜ |
+| 78 | **Et testord i en commit-besked** (fx "Fix jest config" eller "node --test") tæller som en testkørsel og ikke som en commit, så commit-kronerne og -linjerne udebliver. | S | ⬜ |
+| 79 | **Commit-linjer tælles dobbelt** ved delvise commits og `git commit --amend`, og `git -C` eller `Set-Location` får mod'en til at læse det forkerte repo. | S | ⬜ |
+| 80 | **Krediterede sessioner glemmes efter 7 dage**, så en session, der genoptages senere, kan blive krediteret forfra. | S | ⬜ |
+
+### Bevægelser og hvor folk står
+
+| # | Hvad | Str. | Status |
+|---|---|---|---|
+| 81 | **Faseskift når frem op til et sekund for sent, så figuren springer.** Siden regner gåturen fra faseskiftets tidspunkt, men skiftet går gennem mod'ens oprydning, statusfilen og serveren først (målt 978 ms i dit kontor, op til ca. 80 enheder). Rettelse: siden starter en ny fase, når den ser den. | M | ⬜ |
+| 82 | **Pauser og møder regnes om hvert billede ud fra, hvem der er ledig lige nu.** Bliver én færdig midt i en pause, forsvinder dens ærinde, de andre bytter pladser, og nogle dukker op midt i en tur. Mødet forsvinder helt, hvis der bliver under tre. Rettelse: lås holdet, når pausen eller mødet begynder. | M | ⬜ |
+| 83 | **Møde og pause overlapper hvert 30. minut**, så hjælpere hopper fra køkkenet til skrivebordet og går derfra til mødet. | S | ⬜ |
+| 84 | **Hjælpere med fri og hjælpere på pause bruger de samme pladser** ved kaffen og bordtennisbordet, så to står på én plads, og med fire ved bordet er der ingen bold. | S | ⬜ |
+| 85 | **En hjælper, der afleverer, før den er nået ind** (fx fejler inden for 12 sekunder), eller som kaldes tilbage fra fri og bliver hurtigt færdig, springer til sit skrivebord. | S | ⬜ |
+| 86 | **Skifter siden session, går den forrige sessions hjælpere hjem ud ad hoveddøren** i det nye kontor, og en hjælper, der kaldes tilbage, kan starte fra plænen. | S | ⬜ |
+| 87 | **Claude hopper fra mødet eller køkkenet til skrivebordet**, når en hjælper kommer med et resultat, i stedet for at gå. | S | ⬜ |
+| 88 | **Lange ærinder går for hurtigt**, fx fra teamrum 1 til toilettet: loftet på 8 sekunder er for kort til det store hus. | S | ⬜ |
+| 89 | **Småting:** hjælpere på plænen går op til hoveddøren og ned igen, når de går hjem; skriveborde, der ikke er købt, spærrer stadig for gåture; listen over ruter vokser hele dagen; ekstra pladser på plænen og ved bænken kan stå i træerne; afleveringspladserne går igen for hver sjette hjælper; depotet mod nord mangler den tykke ydervæg. | S | ⬜ |
+
+### Serveren og mod'en
+
+| # | Hvad | Str. | Status |
+|---|---|---|---|
+| 90 | **Enhver læsefejl tolkes som et ødelagt spil.json.** Er filen bare låst et øjeblik (antivirus, OneDrive), hentes en kopi op til et døgn gammel og skrives over det gode spil. | S | ⬜ |
+| 91 | **En ekstra server, der starter samtidig med en anden, skriver filer**, før den opdager, at porten er optaget. Rettelse: lyt først, læs bagefter. | S | ⬜ |
+| 92 | **En gammel 0.18-server kan stadig sælge gamle ting** (`hobby`, sofahjørnet) efter migreringen. Rettelse: oversæt gamle id'er ved hver indlæsning. | S | ⬜ |
+| 93 | **Småting på serveren:** dagens kopi af spil.json overskrives ved hver start (også lige efter en migrering); serveren gemmer ikke, før den lukker; sommertid giver forkert "i går" for striben; et køb med et id, der ikke er tekst, går igennem (kræver dog token). | S | ⬜ |
+| 94 | **"Kører cd"** står i stedet for den rigtige kommando, når en kommando begynder med `cd …`. | S | ⬜ |
+
+### Forslag til rækkefølge
+
+1. **Pengene først:** 75-80, så ingen tjener for meget eller for lidt.
+2. **Bevægelserne:** 81-88, det man ser hver dag.
+3. **Robusthed:** 90-93.
+4. **Småting:** 89 og 94.
+
 ## 🧹 Oprydning
 
 | # | Hvad | Str. | Status |
