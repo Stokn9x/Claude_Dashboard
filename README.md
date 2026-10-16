@@ -17,8 +17,6 @@ Hver session skriver en lille statusfil i `~/.claude/agent-kontor/sessions/`. F�
 
 Kontoret er kun dit: intet login, serveren svarer kun din egen computer, og intet forlader den. Statusfilerne indeholder projektnavnet, hvad Claude og hjælperne laver lige nu (fx `Læser api.ts`), hjælpernes opgavetitler og sessionens tal. En kommando vises med programmet (`Kører npm test`), aldrig med argumenter eller miljøvariabler.
 
-Kræver [Node.js](https://nodejs.org) 18 eller nyere.
-
 Alle udvidelser, lavet og planlagt, står i [UDVIDELSER.md](UDVIDELSER.md).
 
 ## Se det fyldt
@@ -27,9 +25,31 @@ Skriv `/kontor demo`, så kommer seks hjælpere ind, arbejder et stykke tid og a
 
 ## Installér
 
-### Med Claude desktop (Windows)
+Kræver [Node.js](https://nodejs.org) 18 eller nyere til kontorets lille server.
 
-Åbn **PowerShell**, og indsæt hele blokken:
+### Med Claude desktop
+
+1. Åbn **Plugins**-fanen i Claude desktop.
+2. Indsæt adressen på dette repo, og installér:
+
+   ```
+   https://github.com/Stokn9x/Claude_Dashboard
+   ```
+
+3. Start en ny session i Code-fanen. Knappen **🏢 Åbn kontor** står over chatboksen.
+
+Opdateringer hentes samme sted, i Plugins-fanen.
+
+### Med Claude Code i terminalen
+
+```
+/plugin install agent-kontor --marketplace Stokn9x/Claude_Dashboard
+```
+
+<details>
+<summary>Virker Plugins-fanen ikke? Installér og opdatér med PowerShell (Windows)</summary>
+
+Installér:
 
 ```powershell
 $roots = @("$env:APPDATA\Claude\claude-code") + (Get-ChildItem "$env:LOCALAPPDATA\Packages" -Directory -Filter "*Claude*" -ErrorAction SilentlyContinue | ForEach-Object { "$($_.FullName)\LocalCache\Roaming\Claude\claude-code" })
@@ -38,15 +58,7 @@ if (-not $claude) { $claude = (Get-Command claude -ErrorAction SilentlyContinue)
 if ($claude) { "Fandt: $claude"; & $claude plugin marketplace add Stokn9x/Claude_Dashboard; & $claude plugin install agent-kontor@agent-kontor } else { "Fandt ingen claude.exe" }
 ```
 
-Start derefter en ny session i Code-fanen.
-
-### Med Claude Code i terminalen
-
-```
-/plugin install agent-kontor --marketplace Stokn9x/Claude_Dashboard
-```
-
-### Opdatér
+Opdatér:
 
 ```powershell
 $roots = @("$env:APPDATA\Claude\claude-code") + (Get-ChildItem "$env:LOCALAPPDATA\Packages" -Directory -Filter "*Claude*" -ErrorAction SilentlyContinue | ForEach-Object { "$($_.FullName)\LocalCache\Roaming\Claude\claude-code" })
@@ -54,6 +66,10 @@ $claude = $roots | Where-Object { Test-Path $_ } | ForEach-Object { Get-ChildIte
 if (-not $claude) { $claude = (Get-Command claude -ErrorAction SilentlyContinue).Source }
 if ($claude) { & $claude plugin marketplace update agent-kontor; & $claude plugin update agent-kontor@agent-kontor; & $claude plugin list } else { "Fandt ingen claude.exe" }
 ```
+
+</details>
+
+## Kommandoer
 
 | Kommando | Gør |
 | --- | --- |
