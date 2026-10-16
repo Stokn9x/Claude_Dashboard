@@ -28,6 +28,7 @@ Status: ✅ lavet · 🟡 delvist · ⬜ ikke lavet · ⏸️ parkeret · ➖ ik
 | 0.11.1 | Fejlrettelser: ingen går gennem væggene (døre forbinder rummene i rutegitteret, og der er fri vej ud af Claudes kontor), nyt toilet med døren ud til et frit område, ingen fliser i væggene; langsommere indtjening og højere priser, så kontoret bygges over uger |
 | 0.12.0 | En lækrere side rundt om kontoret: topbjælke med ikon, trivsel, saldo og forbindelsesprik; kort med pixel-portræt og statuspille i listen; venteboks med "Gå til"; butik med ikoner og fremdrift; kun mørkt tema |
 | 0.13.0 | Spillets fase 4: pynt og opgraderinger i butikken, 17 præstationer med belønning og notifikation, statistik i den nye fane Fremskridt |
+| 0.20.1 | Robusthed: et spil.json, der bare er låst et øjeblik (antivirus, OneDrive), prøves igen i nogle sekunder og skrives aldrig over med en ældre kopi; en ekstra server, der starter samtidig, rører ingen filer, før porten er dens; dagens kopi af spillet laves én gang om dagen og overskrives ikke ved en genstart; serveren gemmer, før den lukker; stribe og dage følger kalenderen, også når der skiftes til og fra sommertid; et gammelt lounge-id rettes ved hver start; kun et navn kan købes; og står der `cd …` først i en kommando, vises kommandoen efter den |
 | 0.20.0 | Kontoret kan læses ved normal zoom: navne, talebobler og prisskilte er altid mindst 11-12 pixel høje, ned til hele kontoret i billedet, og skrumper først med kontoret, når man zoomer længere ud. Byggegrundene har fået et skilt med ikon, navn, pris og enten "Klik for at bygge" eller hvor meget der mangler, med en bjælke, og grunden er pælet ud med reb. Hvert rum har et skilt med ikon og navn på gangen ved sin dør. Gangen har fået stenfliser langs væggene, et langt tæppe under begge vognbaner, loftslamper og planter. Tæpperne under skrivebordene købes nu i butikken (Tæpper, 800 kr, +3 trivsel), ligesom planterne. Køkkenets ur hænger på bagvæggen |
 | 0.19.2 | Pengene tælles rigtigt: en statusfil, der læses for sent, betaler ikke igen; en session, der genoptages efter mere end en uge, betales ikke forfra; en subagent sendt i baggrunden (Ctrl+B) og agenter, som motorens liste ikke kender (fx workflow-agenter), afleveres én gang, når de er færdige; et testord i en commit-besked gør den ikke til en testkørsel, og `npm test && git commit` tæller begge dele; delvise commits og `--amend` tæller ikke linjer dobbelt, og `git -C`, `Set-Location` og en `cd` midt i kommandoen læser det rigtige repo. Desuden: kontoret går ikke længere i stå og viser kun græs, hvis et enkelt billede fejler (fx åbnet i et vindue uden størrelse), og fanerne øverst står i fast rækkefølge i stedet for at bytte plads |
 | 0.19.1 | Ingen figurer springer længere: et faseskift, der kommer lidt for sent, begynder, når siden ser det; hvem der skal til pause eller møde, ligger fast fra starten; ingen pause lige omkring et møde; hjælpere med fri tager ikke en plads, en pause bruger; og skal en figur alligevel pludselig et andet sted hen (fx Claude fra mødet til skrivebordet), går den derhen ad gangen. Længere ture i det store hus går i almindeligt tempo |
@@ -203,18 +204,18 @@ En samlet gennemgang før nye ting: koden læst igennem (mod, server og side), a
 
 | # | Hvad | Str. | Status |
 |---|---|---|---|
-| 90 | **Enhver læsefejl tolkes som et ødelagt spil.json.** Er filen bare låst et øjeblik (antivirus, OneDrive), hentes en kopi op til et døgn gammel og skrives over det gode spil. | S | ⬜ |
-| 91 | **En ekstra server, der starter samtidig med en anden, skriver filer**, før den opdager, at porten er optaget. Rettelse: lyt først, læs bagefter. | S | ⬜ |
-| 92 | **En gammel 0.18-server kan stadig sælge gamle ting** (`hobby`, sofahjørnet) efter migreringen. Rettelse: oversæt gamle id'er ved hver indlæsning. | S | ⬜ |
-| 93 | **Småting på serveren:** dagens kopi af spil.json overskrives ved hver start (også lige efter en migrering); serveren gemmer ikke, før den lukker; sommertid giver forkert "i går" for striben; et køb med et id, der ikke er tekst, går igennem (kræver dog token). | S | ⬜ |
-| 94 | **"Kører cd"** står i stedet for den rigtige kommando, når en kommando begynder med `cd …`. | S | ⬜ |
+| 90 | **Enhver læsefejl tolkes som et ødelagt spil.json.** Er filen bare låst et øjeblik (antivirus, OneDrive), hentes en kopi op til et døgn gammel og skrives over det gode spil. | S | ✅ |
+| 91 | **En ekstra server, der starter samtidig med en anden, skriver filer**, før den opdager, at porten er optaget. Rettelse: lyt først, læs bagefter. | S | ✅ |
+| 92 | **En gammel 0.18-server kan stadig sælge gamle ting** (`hobby`, sofahjørnet) efter migreringen. Rettelse: oversæt gamle id'er ved hver indlæsning. | S | ✅ |
+| 93 | **Småting på serveren:** dagens kopi af spil.json overskrives ved hver start (også lige efter en migrering); serveren gemmer ikke, før den lukker; sommertid giver forkert "i går" for striben; et køb med et id, der ikke er tekst, går igennem (kræver dog token). | S | ✅ |
+| 94 | **"Kører cd"** står i stedet for den rigtige kommando, når en kommando begynder med `cd …`. | S | ✅ |
 
 ### Forslag til rækkefølge
 
 1. **Bevægelserne:** 81-88, lavet i 0.19.1.
 2. **Pengene:** 75-80, så ingen tjener for meget eller for lidt. Lavet i 0.19.2.
-3. **Robusthed:** 90-93.
-4. **Småting:** 89 og 94.
+3. **Robusthed:** 90-93. Lavet i 0.20.1.
+4. **Småting:** 89 og 94 (94 lavet i 0.20.1).
 
 ## 🧹 Oprydning
 

@@ -15,7 +15,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-const VERSION = '0.20.0'
+const VERSION = '0.20.1'
 const HOST = '127.0.0.1'
 const PORT = Number(process.env.AGENT_KONTOR_PORT || 4747)
 const HERE = path.dirname(fileURLToPath(import.meta.url))
@@ -104,19 +104,51 @@ const backupNames = () => {
   }
 }
 
+// A broken file says so with BrokenGame; anything else (locked for a moment by
+// an antivirus or OneDrive, say) is an error reading it.
+class BrokenGame extends Error {}
 const readGame = file => {
-  const saved = JSON.parse(fs.readFileSync(file, 'utf8'))
-  if (!saved || typeof saved.kroner !== 'number') throw new Error('Ikke et spil')
+  const text = fs.readFileSync(file, 'utf8')
+  let saved = null
+  try {
+    saved = JSON.parse(text)
+  } catch {
+    throw new BrokenGame('Ikke JSON')
+  }
+  if (!saved || typeof saved.kroner !== 'number') throw new BrokenGame('Ikke et spil')
   return saved
 }
 
-// A spil.json that cannot be read is kept as spil.json.broken, and the game
-// goes on from the newest backup that can; with none, from the start.
+// Waits without a timer, for the few tries at start-up.
+const pause = ms => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms)
+
+// spil.json as it is on disk. One that cannot be read just now is tried again
+// for a few seconds; still locked, the server stops rather than start over
+// from a backup and write that over the good game (a session starts it again
+// within a minute). Missing, the game starts from scratch.
+const READ_TRIES = 15
+const readSaved = () => {
+  for (let i = 1; ; i++) {
+    try {
+      return readGame(GAME)
+    } catch (err) {
+      if (err instanceof BrokenGame || err.code === 'ENOENT') throw err
+      if (i >= READ_TRIES) {
+        process.stderr.write(`Kunne ikke læse ${GAME}: ${err.message}\n`)
+        process.exit(1)
+      }
+      pause(200)
+    }
+  }
+}
+
+// A spil.json that is broken is kept as spil.json.broken, and the game goes
+// on from the newest backup that can be read; with none, from the start.
 let isRecovered = false
 const loadGame = () => {
   let saved = null
   try {
-    saved = readGame(GAME)
+    saved = readSaved()
   } catch {
     if (fs.existsSync(GAME)) {
       try {
@@ -133,13 +165,35 @@ const loadGame = () => {
   }
   if (!saved) return newGame()
   const moved = migrate(saved)
-  isMigrated = moved.isMigrated
-  return { ...newGame(), ...moved.saved, owned: { ...START, ...(moved.saved.owned ?? {}) }, credited: moved.saved.credited ?? {} }
+  const tidied = tidyOwned(moved.saved)
+  isMigrated = moved.isMigrated || tidied !== moved.saved
+  return { ...newGame(), ...tidied, owned: { ...START, ...(tidied.owned ?? {}) }, credited: tidied.credited ?? {} }
+}
+
+// An older server still running after the move to the new plan could sell
+// the old lounge ('hobby'), and a malformed buy once put a thing that is not
+// a name in the list. Both are put right whenever the game is read: the old
+// lounge becomes the new one's first two steps, paid back if those are owned
+// already.
+const OLD_LOUNGE_PRICE = 9000
+const tidyOwned = saved => {
+  const rooms = saved.owned?.rooms ?? []
+  if (rooms.every(item => typeof item === 'string' && item !== 'hobby')) return saved
+  const kept = new Set(rooms.filter(item => typeof item === 'string' && item !== 'hobby'))
+  let refund = 0
+  if (rooms.includes('hobby')) {
+    if (kept.has('lounge') && kept.has('lounge-2')) refund = OLD_LOUNGE_PRICE
+    kept.add('lounge')
+    kept.add('lounge-2')
+  }
+  return { ...saved, kroner: saved.kroner + refund, owned: { ...saved.owned, rooms: [...kept] } }
 }
 
 let isMigrated = false
-let game = loadGame()
-let isGameChanged = isRecovered || isMigrated
+// Read once the port is ours (start(), below): a second copy started at the
+// same moment stops at the port and never touches the files.
+let game = null
+let isGameChanged = false
 
 // Written whole to a side file first, then moved into place: a crash
 // half-way never leaves a broken spil.json.
@@ -159,6 +213,11 @@ let backedUpDay = ''
 const backupGame = now => {
   const day = dayOf(now)
   if (day === backedUpDay || !fs.existsSync(GAME)) return
+  // Today's copy is the game as the day began; a restart keeps it.
+  if (fs.existsSync(path.join(BACKUPS, `spil-${day}.json`))) {
+    backedUpDay = day
+    return
+  }
   try {
     fs.mkdirSync(BACKUPS, { recursive: true })
     fs.copyFileSync(GAME, path.join(BACKUPS, `spil-${day}.json`))
@@ -279,7 +338,7 @@ const STREAK_BONUS = 10
 const STREAK_MAX = 7
 const payDailyBonus = (day, now) => {
   if (game.streak?.day === day) return
-  const count = game.streak?.day === dayOf(now - 24 * 60 * 60_000) ? game.streak.count + 1 : 1
+  const count = game.streak?.day === daysBefore(now, 1) ? game.streak.count + 1 : 1
   const bonus = DAILY_BONUS + STREAK_BONUS * (Math.min(count, STREAK_MAX) - 1)
   game.kroner += bonus
   game.streak = { day, count, bonus, at: now }
@@ -291,7 +350,7 @@ const payDailyBonus = (day, now) => {
 const streakView = () => {
   const s = game.streak
   const now = Date.now()
-  const isAlive = s && (s.day === dayOf(now) || s.day === dayOf(now - 24 * 60 * 60_000))
+  const isAlive = s && (s.day === dayOf(now) || s.day === daysBefore(now, 1))
   return { count: isAlive ? s.count : 0, isToday: !!s && s.day === dayOf(now), bonus: s?.bonus ?? 0, at: s?.at ?? null, next: DAILY_BONUS + STREAK_BONUS * (Math.min(isAlive ? s.count + 1 : 1, STREAK_MAX) - 1) }
 }
 
@@ -299,6 +358,12 @@ const streakView = () => {
 const dayOf = at => {
   const d = new Date(at)
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+// The day `n` days before `at`, by the calendar: a day with a change to or
+// from summer time is 23 or 25 hours long.
+const daysBefore = (at, n) => {
+  const d = new Date(at)
+  return dayOf(new Date(d.getFullYear(), d.getMonth(), d.getDate() - n, 12).getTime())
 }
 const DAYS_KEPT = 60
 const pruneDays = () => {
@@ -376,6 +441,7 @@ const priceOf = item => {
 }
 
 const buy = item => {
+  if (typeof item !== 'string') return { status: 400, error: 'Forkert forespørgsel' }
   const price = priceOf(item)
   if (price === null) return { status: 409, error: 'Det kan ikke købes lige nu' }
   if (game.kroner < price) return { status: 409, error: `Det koster ${price} kr, og du har ${Math.floor(game.kroner)} kr` }
@@ -452,7 +518,7 @@ const statsView = () => {
   const now = Date.now()
   const days = []
   for (let i = 13; i >= 0; i--) {
-    const day = dayOf(now - i * 24 * 60 * 60_000)
+    const day = daysBefore(now, i)
     const d = game.days?.[day] ?? {}
     days.push({ day, added: d.added ?? 0, delivered: d.delivered ?? 0, kroner: Math.floor(d.kroner ?? 0) })
   }
@@ -512,10 +578,9 @@ const shapeOf = sessions => JSON.stringify([sessions.map(({ updatedAt, ...rest }
 const TOKEN = randomBytes(16).toString('hex')
 const stateOf = sessions => JSON.stringify({ sessions, game: gameView(), token: TOKEN })
 
-let sessionsNow = readSessions()
-saveGame()
-let current = stateOf(sessionsNow)
-let currentShape = shapeOf(sessionsNow)
+let sessionsNow = []
+let current = ''
+let currentShape = ''
 let lastBusyAt = Date.now()
 const listeners = new Set()
 
@@ -546,7 +611,6 @@ const publish = (isForced = false) => {
   for (const res of listeners) send(res, `data: ${current}\n\n`)
 }
 
-setInterval(publish, TICK_MS)
 
 // The folder is watched for quick news; a burst of events from one write is
 // one read. The interval does the work alone while watching fails.
@@ -568,13 +632,31 @@ const watchSessions = () => {
     setTimeout(watchSessions, 5000)
   }
 }
-watchSessions()
 
-// Off when no Claude session has run for a while. An open page does not keep
-// it on: a session that wants the office starts it again.
-setInterval(() => {
-  if (Date.now() - lastBusyAt > IDLE_EXIT_MS) process.exit(0)
-}, 60_000)
+// Saved before it stops, whatever stops it.
+const stop = () => {
+  if (game) saveGame()
+  process.exit(0)
+}
+process.on('SIGINT', stop)
+process.on('SIGTERM', stop)
+
+// The port is ours: read the game and the sessions, and start the work.
+const start = () => {
+  game = loadGame()
+  isGameChanged = isRecovered || isMigrated
+  sessionsNow = readSessions()
+  saveGame()
+  current = stateOf(sessionsNow)
+  currentShape = shapeOf(sessionsNow)
+  setInterval(publish, TICK_MS)
+  watchSessions()
+  // Off when no Claude session has run for a while. An open page does not
+  // keep it on: a session that wants the office starts it again.
+  setInterval(() => {
+    if (Date.now() - lastBusyAt > IDLE_EXIT_MS) stop()
+  }, 60_000)
+}
 
 // ── HTTP ─────────────────────────────────────────────────────────────────
 
@@ -624,6 +706,11 @@ const server = http.createServer((req, res) => {
   const url = new URL(req.url ?? '/', `http://${HOST}:${PORT}`)
   if (!isLocalHost(req.headers.host ?? '')) {
     res.writeHead(403).end()
+    return
+  }
+  // Still reading the game: a moment, please.
+  if (!game && url.pathname !== '/health') {
+    res.writeHead(503, { 'retry-after': '1' }).end()
     return
   }
   if (req.method === 'POST' && url.pathname === '/api/buy') return handleBuy(req, res)
@@ -686,5 +773,6 @@ server.on('error', err => {
 })
 
 server.listen(PORT, HOST, () => {
+  start()
   process.stdout.write(`Agent-kontor kører på http://${HOST}:${PORT}\n`)
 })

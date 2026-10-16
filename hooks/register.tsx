@@ -60,9 +60,14 @@ const base = (path: unknown) => (typeof path === 'string' ? (path.split(/[\\/]/)
 const host = (url: unknown) => (typeof url === 'string' ? (/^https?:\/\/([^/:?#]+)/i.exec(url)?.[1] ?? 'nettet') : 'nettet')
 
 // The program a shell command runs, never its arguments: `npm test`, `git status`.
+// A change of folder first (`cd x && npm test`) is skipped: the work is what
+// comes after it.
+const MOVES = /^\s*(cd|chdir|pushd|Set-Location|sl|Push-Location)\b[^;&|\n]*(&&|;|\n)\s*/i
 const program = (command: unknown) => {
   if (typeof command !== 'string') return 'en kommando'
-  const words = command.trim().split(/\s+/).filter(w => !w.includes('='))
+  let rest = command
+  while (MOVES.test(rest)) rest = rest.replace(MOVES, '')
+  const words = rest.trim().split(/\s+/).filter(w => !w.includes('='))
   const first = base(words[0] ?? '').replace(/\.(exe|cmd|ps1)$/i, '')
   const second = words[1] ?? ''
   return /^[a-z][a-z0-9:-]{1,14}$/.test(second) ? `${first} ${second}` : first || 'en kommando'

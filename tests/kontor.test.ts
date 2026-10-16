@@ -706,3 +706,21 @@ test('commit lines: a partial commit leaves the rest counted, an amend counts on
   await $.tool.call({ tool: 'Bash', command: 'npm test && cd /c/kode/fjerde && git commit -m "cd nowhere"', tool_use_id: 'c6' } as never)
   expect(runs.at(-1)?.cwd).toBe('c:/kode/fjerde')
 })
+
+test('a command that first changes folder shows the program after it', async ($, on) => {
+  const seen: string[] = []
+  let snapshot = async () => ''
+  engine(on, async e => {
+    if (e.tool === 'Bash' || e.tool === 'PowerShell') seen.push(await snapshot())
+    return undefined
+  })
+  await $.session.start(start())
+  const ui = await $.ui.mount({ plugin: 'agent-kontor', surface: 'desktop', component: 'Pane', requestId: 'kontor', props: paneProps })
+  snapshot = async () => JSON.stringify(await ui.drawn())
+
+  await $.tool.call({ tool: 'Bash', command: 'cd "/c/kode/med mellemrum" && npm test', tool_use_id: 'b1' } as never)
+  await $.tool.call({ tool: 'PowerShell', command: 'Set-Location C:\kode; git status', tool_use_id: 'b2' } as never)
+  expect(seen[0]).toContain('Kører npm test')
+  expect(seen[1]).toContain('Kører git status')
+  expect(seen.join('')).not.toContain('Kører cd')
+})

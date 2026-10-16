@@ -314,3 +314,48 @@ test('a session not seen for a week is retired, and not paid again when it comes
     await stop(child)
   }
 })
+
+test('a spil.json that cannot be read just now is never replaced by a backup', async () => {
+  const home = newHome()
+  // A folder in its place: read fails, but not because it is broken.
+  fs.mkdirSync(gameFile(home))
+  fs.mkdirSync(backupDir(home))
+  fs.writeFileSync(path.join(backupDir(home), 'spil-2020-01-01.json'), JSON.stringify({ v: 1, kroner: 100, owned: { desks: 2, rooms: ['claude', 'team'] }, credited: {} }))
+  const child = spawn(process.execPath, [SERVER], { env: { ...process.env, USERPROFILE: home, HOME: home, AGENT_KONTOR_PORT: String(PORT) }, stdio: 'ignore' })
+  const code = await new Promise(done => child.once('exit', done))
+  assert.equal(code, 1, 'it stops, to be started again later')
+  assert.ok(fs.statSync(gameFile(home)).isDirectory(), 'nothing written over it')
+  assert.ok(!fs.existsSync(`${gameFile(home)}.broken`))
+})
+
+test('the old lounge id is put right at every start, and only a name can be bought', async () => {
+  const home = newHome()
+  fs.writeFileSync(gameFile(home), JSON.stringify({ v: 1, plan: 2, kroner: 0, owned: { desks: 0, rooms: ['claude', 'team', 'lounge', 'lounge-2', 'hobby', ['desk']] }, credited: {} }))
+  const child = await start(home)
+  try {
+    const { game, token } = JSON.parse((await get('/api/state')).body)
+    assert.deepEqual([...game.owned.rooms].sort(), ['claude', 'lounge', 'lounge-2', 'team'])
+    assert.ok(game.kroner >= 9000, 'the old lounge paid back')
+    const odd = await fetch(`http://127.0.0.1:${PORT}/api/buy`, { method: 'POST', headers: { origin: `http://127.0.0.1:${PORT}`, 'x-kontor-token': token }, body: '{"item":["plants"]}' })
+    assert.equal(odd.status, 400)
+  } finally {
+    await stop(child)
+  }
+})
+
+test("today's backup is the game as the day began: a restart keeps it", async () => {
+  const home = newHome()
+  fs.writeFileSync(gameFile(home), JSON.stringify({ v: 1, plan: 2, kroner: 777, owned: { desks: 4, rooms: ['claude', 'team'] }, credited: {} }))
+  const first = await start(home)
+  await sleep(800)
+  await stop(first)
+  const today = fs.readdirSync(backupDir(home)).sort().at(-1)
+  fs.writeFileSync(gameFile(home), JSON.stringify({ v: 1, plan: 2, kroner: 1, owned: { desks: 9, rooms: ['claude', 'team'] }, credited: {} }))
+  const second = await start(home)
+  try {
+    await sleep(800)
+    assert.equal(JSON.parse(fs.readFileSync(path.join(backupDir(home), today), 'utf8')).owned.desks, 4)
+  } finally {
+    await stop(second)
+  }
+})
