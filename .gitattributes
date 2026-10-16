@@ -1,0 +1,4 @@
+# Every text file is LF, in the repo and in the working tree, on every OS.
+* text=auto eol=lf
+*.svg text eol=lf
+*.png binary
