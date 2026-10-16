@@ -85,7 +85,7 @@ Status: ✅ lavet · 🟡 delvist · ⬜ ikke lavet · ➖ ikke længere relevan
 | 39 | **Liv i teamrummet og køkkenet:** tæpper under skrivebordene, reol, sofahjørne med lampe, bordtennisbord, bistrobord, snackautomat, damp fra kaffemaskinen i pausen. | M | ✅ |
 | 40 | **Egne ting på skrivebordet:** hver hjælper har altid de samme to ting (kop, plante, papirer, badeand, høretelefoner, billede eller snack). | S | ✅ |
 | 41 | **Lys og dybde:** skygger under figurer og stole, sollys fra vinduerne der følger solen, aftenmørke med lamper, loftslys og lysende skærme. Se en anden tid med `?tid=21:30` i adressen. | M | ✅ |
-| 42 | **Projektrummet står tit tomt:** bliv til mødelokale eller skrump, når der ikke er andre sessioner. | M | ⬜ |
+| 42 | **Projektrummet stod tit tomt:** det er blevet et stillerum med fire skriveborde mere; andre sessioner nås med fanerne. | M | ✅ |
 | 43 | **Mere levende figurer:** lidt større, blinker hver på sit tidspunkt, ånder når de sidder, og en tænkeboble med … i stedet for "Tænker". | M | ✅ |
 | 34 | **Del kontoret med teamet igen,** fx via Supabase, nu hvor tegningen ikke længere ligger i panelet. | L | ⬜ |
 
@@ -101,6 +101,52 @@ Status: ✅ lavet · 🟡 delvist · ⬜ ikke lavet · ➖ ikke længere relevan
 |---|---|---|---|
 | 44 | **Tjen kroner, køb kontoret:** pladser, rum, pynt, gulvsiddere der brokker sig, trivsel, og et kontor der kan blive markant større. Hele planen står i [SPIL.md](SPIL.md). | L+ | 🟡 |
 | 45 | **Drama og banter:** hjælperne driller, konkurrerer og brokker sig i små replikskifter, når de står i kantinen, ud fra dagens rigtige hændelser. Se SPIL.md, fase 3. | M | ✅ |
+
+## 🔎 Scope-runde 16.10.2026 (efter fase 4)
+
+Fundet ved en gennemgang af koden og det, vi har set undervejs. **P1** er fejl, der ses i daglig brug, **P2** er mangler, **P3** er udvidelser. Mit forslag til rækkefølge står nederst.
+
+### Fejl (P1)
+
+| # | Hvad | Str. | Status |
+|---|---|---|---|
+| 47 | **En gammel server bliver ved med at køre efter en opdatering.** Mod'en ser, at der svarer en server, men ikke at den er en ældre version, så ny serverkode først kommer i brug, når den gamle lukker. Mod'en bør sammenligne `/health`-versionen med sin egen og bede den gamle lukke (et beskyttet `/api/quit`). | S | ⬜ |
+| 48 | **En gulvsidder teleporterer til sit nye skrivebord**, når det bliver købt, i stedet for at rejse sig og gå derhen. | S | ⬜ |
+| 49 | **Aflevering til en tom stol:** holder Claude pause i køkkenet, afleverer hjælperen alligevel ved skrivebordet og siger "Tak" til ingen. Den bør gå til køkkenet, eller Claude bør gå tilbage. | S | ⬜ |
+| 50 | **Skilte og bobler overlapper:** prisskiltet over en ledig plads tegnes oven i gulvsiddernes og ventendes bobler. | S | ⬜ |
+| 51 | **Trivslen og kontoret kan være uenige:** serveren tæller gulvsiddere i den session, der har flest, mens siden viser den valgte session. Med to sessioner kan trivslen falde uden at nogen ses på gulvet. | S | ⬜ |
+
+### Mangler (P2)
+
+| # | Hvad | Str. | Status |
+|---|---|---|---|
+| 52 | **Brede skærme udnyttes ikke:** kontoret er bundet af højden, og panelet er smalt, så der er tomt på begge sider (set på 2000 px). Automatisk skalering: bredere panel, større tegning og evt. en ekstra kolonne med Fremskridt. | M | ⬜ |
+| 53 | **Ingen backup af spil.json.** Én dårlig skrivning eller fejl kan koste alle kroner. Serveren bør gemme en daglig kopi (de sidste 7). | S | ⬜ |
+| 54 | **`/kontor panel` i Claude kender ikke spillet:** ingen saldo, trivsel eller præstationer i tekstpanelet. | S | ⬜ |
+| 55 | **Siden har ingen automatiske tests.** Ruterne tjekkes kun med `kontorCheckRoutes()` i hånden; et lille script, der kører siden uden browser (eller i preview), ville fange fx akvariet, der lukkede døren. | M | ⬜ |
+| 56 | **Statistikken starter først nu** (0.13.0); dagene før findes ikke. Intet at gøre ved det, men værd at vide. | – | ➖ |
+| 57 | **Ingen lyd** (punkt 16): dørklokke, aflevering, venter på dig, med en knap til at slå fra. | M | ⬜ |
+| 58 | **Ingen browser-notifikation**, når Claude venter på dig og fanen er skjult (punkt 30). | S | ⬜ |
+
+### Udvidelser (P3)
+
+| # | Hvad | Str. | Status |
+|---|---|---|---|
+| 59 | **Personlighed i dialogen:** hver hjælper får et temperament ud fra navnet (kæk, tør, dramatisk, positiv), så replikkerne lyder forskelligt (rest fra fase 3). | S | ⬜ |
+| 60 | **Claude laver noget i pauserne:** vander planter, går en tur, spiller bordtennis med en hjælper (rest af punkt 19). | M | ⬜ |
+| 61 | **Fase 5, vækst:** mere grund, teamrum 2, en ny etage med elevator, og en ny bygning hvor de andre sessioner sidder. | L | ⬜ |
+| 62 | **Daglig bonus og stribe:** en lille bonus for første arbejde på dagen og for dage i træk. | S | ⬜ |
+| 63 | **Sæson og vejr:** jul i december, regn på ruderne, sne om vinteren (rest af punkt 22). | M | ⬜ |
+| 64 | **Kontorhund eller -kat** (punkt 23), evt. købt i butikken. | M | ⬜ |
+| 65 | **Indret selv:** flyt pynt og inventar rundt med træk og slip (punkt 25). | L | ⬜ |
+| 66 | **Månedens medarbejder:** hjælpernes navne går igen, så de kan få deres egen statistik og en pokal. | M | ⬜ |
+| 67 | **Tv-tilstand** til en ekstra skærm: fuld skærm, ingen panel, kameraet følger det, der sker (punkt 31). | S | ⬜ |
+
+### Forslag til rækkefølge
+
+1. **Fejlene 47-51** samlet i én runde: små, men de ses hver dag.
+2. **53 backup** og **52 automatisk skalering**: sikkerhed for kronerne og plads til det, der kommer.
+3. Derefter det sjove: **59 personlighed**, **62 daglig bonus** og **57 lyd**, og så **fase 5**.
 
 ## 🧹 Oprydning
 
