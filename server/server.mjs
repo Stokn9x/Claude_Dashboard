@@ -15,7 +15,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-const VERSION = '0.10.0'
+const VERSION = '0.11.0'
 const HOST = '127.0.0.1'
 const PORT = Number(process.env.AGENT_KONTOR_PORT || 4747)
 const HERE = path.dirname(fileURLToPath(import.meta.url))
@@ -82,6 +82,27 @@ const saveGame = () => {
   }
 }
 
+// ── Wellbeing ───────────────────────────────────────────────────────────
+// How the office feels, 0 to 100: a bare office is so-so, every room and
+// piece of furniture makes it better, every helper on the floor worse. It
+// multiplies what the work earns by 0.8 to 1.2.
+const WELLBEING = { base: 40, kitchen: 15, toilet: 10, lounge: 10, pingpong: 10, meeting: 5, perFloorSitter: -8 }
+// Helpers on the floor right now: the most any session has beyond the desks.
+let floorNow = 0
+
+const wellbeing = () => {
+  const parts = [{ what: 'Grundniveau', points: WELLBEING.base }]
+  for (const item of ['kitchen', 'toilet', 'lounge', 'pingpong', 'meeting']) {
+    if (game.owned.rooms.includes(item)) parts.push({ what: item, points: WELLBEING[item] })
+  }
+  if (floorNow > 0) parts.push({ what: 'floor', count: floorNow, points: floorNow * WELLBEING.perFloorSitter })
+  const score = Math.max(0, Math.min(100, parts.reduce((sum, p) => sum + p.points, 0)))
+  return { score, multiplier: 0.8 + (0.4 * score) / 100, parts }
+}
+
+const floorSittersIn = sessions =>
+  Math.max(0, ...sessions.map(s => (s.subs ?? []).filter(sub => sub.phase === 'arriving' || sub.phase === 'working').length - game.owned.desks))
+
 const credit = (status, now) => {
   const earned = status.earned
   if (!status.key || !earned || typeof earned !== 'object') return
@@ -103,7 +124,7 @@ const credit = (status, now) => {
     }
     return
   }
-  game.kroner += kroner
+  game.kroner += kroner * wellbeing().multiplier
   game.credited[status.key] = { earned: { ...earned }, at: now }
   isGameChanged = true
 }
@@ -119,8 +140,9 @@ const pruneCredited = now => {
 
 // ── The shop ────────────────────────────────────────────────────────────
 // Prices live here and only here: the page asks to buy, the server decides.
-// Desks 1-2 come with the office; the team room has room for six.
-const DESK_PRICES = [0, 0, 500, 750, 1000, 1500]
+// Desks 1-2 come with the office; the team room has room for six, the
+// quiet room for four more.
+const DESK_PRICES = [0, 0, 500, 750, 1000, 1500, 2000, 2500, 3000, 3500]
 const MAX_DESKS = DESK_PRICES.length
 // Rooms, and furniture for the team room, bought once each.
 const ROOM_PRICES = { kitchen: 2000, toilet: 1500, lounge: 2500, pingpong: 3000, meeting: 5000 }
@@ -152,6 +174,10 @@ const gameView = () => ({
   next: Object.fromEntries(['desk', ...Object.keys(ROOM_PRICES)].map(item => [item, priceOf(item)])),
   maxDesks: MAX_DESKS,
   rates: RATES,
+  wellbeing: (() => {
+    const w = wellbeing()
+    return { score: w.score, multiplier: Math.round(w.multiplier * 100) / 100, parts: w.parts }
+  })(),
   bought: (game.log ?? []).slice(-5),
 })
 
@@ -222,6 +248,7 @@ const send = (res, text) => {
 
 const publish = (isForced = false) => {
   sessionsNow = readSessions()
+  floorNow = floorSittersIn(sessionsNow)
   pruneCredited(Date.now())
   saveGame()
   if (sessionsNow.length > 0) lastBusyAt = Date.now()

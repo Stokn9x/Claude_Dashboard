@@ -18,7 +18,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms))
 const start = () => spawn(process.execPath, [server], { env: { ...process.env, USERPROFILE: home, HOME: home, AGENT_KONTOR_PORT: PORT }, stdio: 'ignore' })
 const state = async () => (await fetch(`http://127.0.0.1:${PORT}/api/state`)).json()
 const write = (earned, extra = {}) =>
-  fs.writeFileSync(path.join(dir, 'sA.json'), JSON.stringify({ v: 2, key: 'sA', project: 'p', updatedAt: Date.now(), main: { state: 'idle', detail: 'x' }, subs: [], earned, ...extra }))
+  fs.writeFileSync(path.join(dir, `${extra.key ?? 'sA'}.json`), JSON.stringify({ v: 2, key: 'sA', project: 'p', updatedAt: Date.now(), main: { state: 'idle', detail: 'x' }, subs: [], earned, ...extra }))
 const check = (label, actual, expected) => {
   const ok = actual === expected
   console.log(`${ok ? 'ok  ' : 'FAIL'} ${label}: ${actual}${ok ? '' : ` (expected ${expected})`}`)
@@ -26,28 +26,29 @@ const check = (label, actual, expected) => {
 }
 
 const zero = { added: 0, removed: 0, delivered: 0, tests: 0, commits: 0, prs: 0 }
-write({ ...zero, added: 100, removed: 10, delivered: 1 }) // 100 + 5 + 25 = 130
+// A bare office has wellbeing 40: earnings × 0.96.
+write({ ...zero, added: 100, removed: 10, delivered: 1 }) // (100 + 5 + 25) × 0.96 = 124.8
 let child = start()
 await sleep(900)
-check('first credit', (await state()).game.kroner, 130)
+check('first credit', (await state()).game.kroner, 124)
 check('starts with two desks', (await state()).game.owned.desks, 2)
 
-write({ ...zero, added: 150, removed: 10, delivered: 1, tests: 1 }) // +50 +50 = 230
+write({ ...zero, added: 150, removed: 10, delivered: 1, tests: 1 }) // + (50 + 50) × 0.96 = 220.8
 await sleep(900)
-check('only the growth is credited', (await state()).game.kroner, 230)
+check('only the growth is credited', (await state()).game.kroner, 220)
 
 child.kill()
 await sleep(300)
 child = start()
 await sleep(900)
-check('a restart credits nothing twice', (await state()).game.kroner, 230)
+check('a restart credits nothing twice', (await state()).game.kroner, 220)
 
 // The session ends with a last commit in its final file.
 fs.writeFileSync(path.join(dir, 'sA.json'), JSON.stringify({ key: 'sA', ended: true, earned: { ...zero, added: 150, removed: 10, delivered: 1, tests: 1, commits: 1 }, updatedAt: 0 }))
 await sleep(900)
-check('the ending file is credited', (await state()).game.kroner, 260)
+check('the ending file is credited', (await state()).game.kroner, 249)
 check('and then removed', fs.existsSync(path.join(dir, 'sA.json')), false)
-check('spil.json has the kroner', JSON.parse(fs.readFileSync(path.join(home, '.claude', 'agent-kontor', 'spil.json'), 'utf8')).kroner, 260)
+check('spil.json has the kroner', Math.floor(JSON.parse(fs.readFileSync(path.join(home, '.claude', 'agent-kontor', 'spil.json'), 'utf8')).kroner), 249)
 
 // Buying: only from the page (Origin and token), and only what you can afford.
 const buy = (headers, item = 'desk') =>
@@ -58,14 +59,13 @@ check('a buy without the token is refused', (await buy({ origin })).status, 403)
 check('a buy from another site is refused', (await buy({ origin: 'https://example.com', 'x-kontor-token': token })).status, 403)
 check('a desk you cannot afford is refused', (await buy({ origin, 'x-kontor-token': token })).status, 409)
 write({ ...zero, added: 500 }, { key: 'sB' })
-fs.renameSync(path.join(dir, 'sA.json'), path.join(dir, 'sB.json'))
 await sleep(900)
-check('earned enough', (await state()).game.kroner, 760)
+check('earned enough', (await state()).game.kroner, 729)
 check('the third desk costs 500', (await state()).game.next.desk, 500)
 check('buying it works', (await buy({ origin, 'x-kontor-token': token })).status, 200)
 const after = (await state()).game
 check('three desks now', after.owned.desks, 3)
-check('and 500 kr less', after.kroner, 260)
+check('and 500 kr less', after.kroner, 229)
 check('the next costs 750', after.next.desk, 750)
 
 // Rooms: bought once, and only with the money for them.
@@ -79,6 +79,20 @@ check('the kitchen is owned', withKitchen.owned.rooms.includes('kitchen'), true)
 check('and not for sale again', withKitchen.next.kitchen, null)
 check('a second kitchen is refused', (await buy({ origin, 'x-kontor-token': token }, 'kitchen')).status, 409)
 check('something unknown is refused', (await buy({ origin, 'x-kontor-token': token }, 'castle')).status, 409)
+
+// Wellbeing: a kitchen lifts it; helpers on the floor bring it down.
+check('wellbeing with a kitchen is 55', withKitchen.wellbeing.score, 55)
+const helpers = n => Array.from({ length: n }, (_, i) => ({ id: `h${i}`, seat: i, phase: 'working' }))
+write({ ...zero, added: 2500 }, { key: 'sB', subs: helpers(6) })
+await sleep(900)
+const crowded = (await state()).game
+check('three on the floor take 24 off', crowded.wellbeing.score, 31)
+check('and earnings are multiplied by 0.92', crowded.wellbeing.multiplier, 0.92)
+const beforeEarning = crowded.kroner
+write({ ...zero, added: 2600 }, { key: 'sB', subs: helpers(6) })
+await sleep(900)
+// The saldo is shown rounded down, so the difference may land a krone either side.
+check('100 lines earn about 92 kr at that wellbeing', Math.abs((await state()).game.kroner - beforeEarning - 92) <= 1, true)
 
 child.kill()
 fs.rmSync(home, { recursive: true, force: true })

@@ -1,6 +1,6 @@
 # Spillet i Agent-kontor
 
-Status: **fase 0, 1 og 2 er lavet (0.8.0, 0.9.0 og 0.10.0).** Beslutningerne står under [Besluttet](#besluttet).
+Status: **fase 0 til 3 er lavet (0.8.0 til 0.11.0).** Beslutningerne står under [Besluttet](#besluttet).
 
 ## Idéen
 
@@ -61,7 +61,7 @@ Hjælperne skal have lidt personlighed. Når to eller flere står i kantinen, ve
 - **Brok og sladder:** gulvsiddere, der brokker sig over en kollega med to skærme; nogen der har spist den sidste kage
 - **Reaktioner på det, der sker:** en hjælper, der gik i stå, bliver trøstet eller drillet; grønne tests giver high-five
 
-Replikkerne vælges ud fra rigtige hændelser (opgaver, tests, linjer, hvem der sidder på gulvet), så de passer til dagen. Hver hjælper får et lille temperament ud fra sit navn (fx kæk, tør, positiv, dramatisk), så de lyder forskelligt. Ingen sproglig model: replikkerne er skabeloner, så det koster intet og aldrig siger noget mærkeligt.
+Replikkerne vælges ud fra rigtige hændelser (opgaver, tests, linjer, hvem der sidder på gulvet), så de passer til dagen. Hver hjælper kan senere få et lille temperament ud fra sit navn (fx kæk, tør, positiv, dramatisk), så de lyder forskelligt; det er ikke lavet endnu. Ingen sproglig model: replikkerne er skabeloner, så det koster intet og aldrig siger noget mærkeligt.
 
 ## Trivsel (fase 3)
 
@@ -126,9 +126,9 @@ Det betyder, at **fase 0 er større**, end den ellers ville være. Til gengæld 
 | **0. Fundament** | Gitter og grundplan som data, kamera med træk og zoom, ruter med A\*, gåture med fast varighed, tællere i statusfilen, `spil.json` på serveren, saldo på siden | L+ ✅ |
 | **1. Pladser** | Køb skriveborde, gulvsiddere med laptop og brok, butik-fanen | M ✅ |
 | **2. Rum** | Ledige grunde, køb rum, byggeri med stillads, køkken/toilet/sofa/bordtennis/mødelokale | L ✅ |
-| **3. Liv** | Rummene bliver brugt: kaffe, toiletbesøg, bordtennis, møder; trivsel; **drama og banter** mellem hjælperne, når de står i kantinen | L |
+| **3. Liv** | Rummene bliver brugt: kaffe, toiletbesøg, bordtennis, møder; trivsel; **drama og banter** mellem hjælperne, når de står i kantinen | L ✅ |
 | **4. Mere** | Pynt-butik, opgraderinger (bedre stole, større skærme), præstationer ("1.000 linjer på en dag"), statistik | M |
-| **5. Vækst** | Mere grund, teamrum 3 og videre, nye etager med elevator, hjælpere fordelt på flere rum | L |
+| **5. Vækst** | Mere grund, flere arbejdsrum, nye etager med elevator, hjælpere fordelt på flere rum; **en ny bygning eller stor udvidelse, hvor man kan se sine andre sessioner** (indtil da skifter man mellem dem med fanerne øverst) | L |
 
 Hver fase kan bruges for sig og skal være færdig og testet, før den næste starter.
 

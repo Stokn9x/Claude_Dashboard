@@ -24,6 +24,7 @@ Status: ✅ lavet · 🟡 delvist · ⬜ ikke lavet · ➖ ikke længere relevan
 | 0.8.0 | Spillets fase 0: grundplanen som data, ruter med A\*, kamera med træk, zoom og minikort, gåture med fast varighed, kroner tjent ved arbejdet og vist på siden |
 | 0.9.0 | Spillets fase 1: køb skriveborde for kroner i butikken eller ved at klikke på skiltet; hjælpere uden skrivebord sidder på gulvet med en laptop og brokker sig |
 | 0.10.0 | Spillets fase 2: køb køkken, toilet, sofahjørne, bordtennisbord og mødelokale; ledige grunde med skilte, byggeri med stillads og konfetti; toilet og mødelokale er nye rum under projektrummet |
+| 0.11.0 | Spillets fase 3: kaffepauser, toiletbesøg, bordtennis og møder hos Claude; drama og banter i køkkenet ud fra dagens rigtige tal; trivsel der ganger indtjeningen; projektrummet er blevet et stillerum med fire skriveborde mere; CLAUDE.md |
 
 ## 🔧 Fejl og ting der driller
 
@@ -60,7 +61,7 @@ Status: ✅ lavet · 🟡 delvist · ⬜ ikke lavet · ➖ ikke længere relevan
 | 16 | **Lyde:** dørklokke når en hjælper kommer, "ding" ved afleveringen, et blidt signal når Claude venter på dig. Nemt nu, hvor siden kører i browseren. | M | ⬜ |
 | 17 | **Dialog mellem agenterne:** Claude siger tak ved navn, småsnak i køkkenet. | S | ✅ |
 | 18 | **Udseende efter type:** Explore får forstørrelsesglas, Plan en tegnerulle. Modellen som farve på navneskiltet (Opus, Sonnet, Haiku). | M | ⬜ |
-| 19 | **Liv i pauserne:** Claude går rundt, vander planter og spiller bordtennis med hjælperne. | L | ⬜ |
+| 19 | **Liv i pauserne:** hjælperne holder kaffepause, går på toilettet, spiller bordtennis og holder møde med Claude. Mangler: Claude der vander planter og går rundt. | L | 🟡 |
 | 20 | **Grænser som rekvisitter:** kaffekanden tømmes, efterhånden som 5-timers-grænsen bruges, og en plante visner, når konteksten fyldes. | M | ⬜ |
 | 21 | **Tavle og ur på væggen:** tavlen viser dagens linjer og pris, uret det rigtige klokkeslæt. | S | ✅ |
 | 22 | **Dag, nat og vejr:** Lyset følger nu tidspunktet (se punkt 41); mangler regn på ruderne og vejr. | M | 🟡 |
@@ -96,7 +97,7 @@ Status: ✅ lavet · 🟡 delvist · ⬜ ikke lavet · ➖ ikke længere relevan
 | # | Hvad | Str. | Status |
 |---|---|---|---|
 | 44 | **Tjen kroner, køb kontoret:** pladser, rum, pynt, gulvsiddere der brokker sig, trivsel, og et kontor der kan blive markant større. Hele planen står i [SPIL.md](SPIL.md). | L+ | 🟡 |
-| 45 | **Drama og banter:** hjælperne driller, konkurrerer og brokker sig i små replikskifter, når de står i kantinen, ud fra dagens rigtige hændelser. Se SPIL.md, fase 3. | M | ⬜ |
+| 45 | **Drama og banter:** hjælperne driller, konkurrerer og brokker sig i små replikskifter, når de står i kantinen, ud fra dagens rigtige hændelser. Se SPIL.md, fase 3. | M | ✅ |
 
 ## 🧹 Oprydning
 

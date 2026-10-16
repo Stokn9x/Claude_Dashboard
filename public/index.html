@@ -88,6 +88,14 @@
     .hint { color: var(--soft); font-size: 12px; margin: 0; }
     .shop [hidden] { display: none; }
     .owned { color: #2E9E8F; font-size: 12px; font-weight: 600; margin: 0; }
+    .mood { cursor: pointer; }
+    .mood-box { padding: 10px 12px; border-radius: 10px; background: var(--chip); border: 1px solid var(--line); display: grid; gap: 6px; }
+    .mood-bar { display: block; height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; }
+    .mood-fill { display: block; height: 100%; border-radius: 3px; transition: width 0.6s; }
+    .mood-parts { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; font-size: 12px; }
+    .mood-parts li { display: grid; grid-template-columns: 36px 1fr; }
+    .plus { color: #2E9E8F; font-weight: 600; }
+    .minus { color: #E5484D; font-weight: 600; }
     .buy { border: 0; border-radius: 8px; padding: 7px 10px; font: inherit; font-weight: 600; cursor: pointer; background: #2E9E8F; color: #FFFFFF; }
     .buy:disabled { background: var(--line); color: var(--soft); cursor: default; }
     .rates li { display: grid; grid-template-columns: 64px 1fr; font-size: 13px; }
@@ -109,6 +117,7 @@
   <header>
     <h1>Agent-kontor</h1>
     <nav class="tabs" id="tabs" aria-label="Sessioner"></nav>
+    <span class="saldo mood" id="mood" hidden></span>
     <span class="saldo" id="saldo" title="Tjent ved arbejdet i alle dine sessioner" hidden></span>
     <span class="status" id="status">Forbinder…</span>
   </header>

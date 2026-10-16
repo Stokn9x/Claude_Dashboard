@@ -34,6 +34,9 @@ const ROOM_TYPES = {
     topWall: 16,
     windows: [290, 390],
     coffee: { x: 318, y: 112 },
+    // Where helpers stand with their coffee on a break
+    // Spread round the big table, clear of stools and machines, two by two
+    standing: [[334, 100, 'right'], [300, 128, 'right'], [412, 128, 'left'], [298, 76, 'right'], [340, 66, 'front']].map(([x, y, facing]) => ({ x, y, facing })),
     machine: { x: 270, y: 20 },
     clock: { x: 461, y: 8, r: 6 },
     plants: [[462, 120], [262, 120]],
@@ -53,6 +56,8 @@ const ROOM_TYPES = {
     bulbs: [[130, 366, 'lounge']],
     // Furniture bought for the room, and where its sign stands until then
     items: { lounge: { x: 180, y: 362 }, pingpong: { x: 316, y: 362 } },
+    // The two ends of the ping-pong table
+    pingpong: [{ x: 280, y: 364, facing: 'right' }, { x: 352, y: 364, facing: 'left' }],
     blocks: [
       // Desks, and the chairs behind them: walkers go round, not over people
       ...[0, 1, 2, 3, 4, 5].map(i => [50 + (i % 3) * 148, 201 + Math.floor(i / 3) * 102, 84, 30]),
@@ -65,6 +70,8 @@ const ROOM_TYPES = {
     w: 114,
     h: 90,
     plants: [[106, 588]],
+    // Inside each stall, out of sight
+    stalls: [{ x: 35, y: 546 }, { x: 85, y: 546 }],
     lights: [[63, 559, 44, 0.18, 'ceiling']],
     blocks: [[10, 516, 100, 40], [12, 584, 44, 16]],
   },
@@ -73,17 +80,24 @@ const ROOM_TYPES = {
     w: 348,
     h: 90,
     plants: [[140, 528], [460, 528, true]],
+    // Chairs round the long table: a row behind it, a row in front of it
+    chairs: [
+      ...[0, 1, 2, 3, 4, 5].map(i => ({ x: 190 + i * 44, y: 542, row: 'behind' })),
+      ...[0, 1, 2, 3, 4, 5].map(i => ({ x: 190 + i * 44, y: 588, row: 'front', facing: 'back' })),
+    ],
+    head: { x: 154, y: 566, facing: 'right' },
     lights: [[240, 560, 54, 0.3], [360, 560, 54, 0.3]],
     blocks: [[168, 532, 264, 58], [424, 516, 40, 16]],
   },
-  // Where the other sessions sit
-  project: {
+  // The quiet room: four more desks, for when the team room is full
+  quiet: {
     home: { x: 6, y: 384 },
     w: 468,
     h: 118,
-    seats: [0, 1, 2, 3].map(i => ({ cx: 72 + i * 112, dy: 440 })),
-    lights: [[92, 440], [240, 440], [388, 440]].map(([x, y]) => [x, y, 66, 0.16, 'ceiling']),
-    blocks: [0, 1, 2, 3].flatMap(i => [[32 + i * 112, 439, 80, 30], [51 + i * 112, 422, 42, 22]]),
+    desks: [0, 1, 2, 3].map(i => ({ cx: 72 + i * 112, dy: 440 })),
+    plants: [[460, 400, true], [18, 400]],
+    lights: [[128, 440], [240, 440], [352, 440]].map(([x, y]) => [x, y, 66, 0.16, 'ceiling']),
+    blocks: [0, 1, 2, 3].flatMap(i => [[30 + i * 112, 439, 84, 30], [51 + i * 112, 422, 42, 22]]),
   },
 }
 
@@ -92,7 +106,7 @@ const PLAN = {
     { id: 'claude', type: 'corner', x: 6, y: 16 },
     { id: 'kitchen', type: 'kitchen', x: 252, y: 16, buy: 'kitchen' },
     { id: 'team', type: 'team', x: 6, y: 138 },
-    { id: 'project', type: 'project', x: 6, y: 384 },
+    { id: 'quiet', type: 'quiet', x: 6, y: 384 },
     { id: 'toilet', type: 'toilet', x: 6, y: 514, buy: 'toilet' },
     { id: 'meeting', type: 'meeting', x: 126, y: 514, buy: 'meeting' },
   ],
@@ -102,9 +116,9 @@ const PLAN = {
     { x: 246, y: 90, w: 6, h: 32, colour: '#CDB892', between: ['claude', 'kitchen'] },
     { x: 196, y: 132, w: 40, h: 6, colour: '#CDB892', between: ['claude', 'team'] },
     { x: 300, y: 132, w: 40, h: 6, colour: '#D5DAD2', between: ['kitchen', 'team'] },
-    { x: 214, y: 378, w: 48, h: 6, colour: '#C3CCD6', between: ['team', 'project'] },
-    { x: 40, y: 502, w: 36, h: 12, colour: '#C3CCD6', between: ['project', 'toilet'] },
-    { x: 280, y: 502, w: 48, h: 12, colour: '#C3CCD6', between: ['project', 'meeting'] },
+    { x: 214, y: 378, w: 48, h: 6, colour: '#C3CCD6', between: ['team', 'quiet'] },
+    { x: 40, y: 502, w: 36, h: 12, colour: '#C3CCD6', between: ['quiet', 'toilet'] },
+    { x: 280, y: 502, w: 48, h: 12, colour: '#C3CCD6', between: ['quiet', 'meeting'] },
     { x: 474, y: 236, w: 6, h: 40, colour: '#8C6B4A', isEntrance: true, between: ['team'] },
   ],
   entrance: { x: 478, y: 256 },
@@ -155,7 +169,7 @@ let S = 3
 
 // Places, as the floor plan has them now. Every desk the rooms have room
 // for, and how many of them are bought (all of them before the server tells).
-const deskSlots = () => roomsOf('team').flatMap(room => typeOf(room).desks.map(d => at(room, d)))
+const deskSlots = () => PLAN.rooms.filter(room => typeOf(room).desks).flatMap(room => typeOf(room).desks.map(d => at(room, d)))
 const ownedDesks = () => Math.min(deskSlots().length, state.game?.owned?.desks ?? deskSlots().length)
 const desks = () => deskSlots().slice(0, ownedDesks())
 // Floor spots, the ones that hurt most first: two on the rug of every desk
@@ -387,6 +401,139 @@ const poseOf = (sub, now, walks = WALKS) => {
   return e < walks.leave ? walkAt(leaveRoute(sub.seat), e / walks.leave) : null
 }
 
+
+// ── Breaks ───────────────────────────────────────────────────────────────
+// The helpers are real subagents at work; their breaks are for show. Who
+// takes which break, and when, is worked out from their ids and the clock,
+// so every viewer sees the same and a reload changes nothing. Every three
+// minutes there is a break: some fetch coffee (and talk), some go to the
+// toilet, two play ping-pong, each only in rooms that are bought. Every ten
+// minutes, with three or more helpers in, Claude holds a short meeting.
+// Nobody leaves while they wait for you.
+const BREAK_EVERY = 180_000
+const BREAK_AT = 20_000
+const MEETING_EVERY = 600_000
+const MEETING_AT = 60_000
+const ERRAND_WALK = 3000
+const STAY = { coffee: 22_000, toilet: 12_000, pingpong: 24_000, meeting: 25_000 }
+
+// Helpers who can take a break that starts at `start`: at their place well
+// before it, and not waiting for you.
+const freeFor = (subs, start, walks) =>
+  subs
+    .filter(s => s.phase === 'working' && s.since + walks.arrive + 5000 < start && s.activity.state !== 'waiting')
+    .sort((a, b) => (a.id < b.id ? -1 : 1))
+
+// The meeting going on now, if any: who sits where, from when.
+const meetingNow = (subs, now, walks, main) => {
+  const room = firstRoom('meeting')
+  if (!room || !isBuilt(room)) return null
+  const slot = Math.floor(now / MEETING_EVERY)
+  const start = slot * MEETING_EVERY + MEETING_AT
+  if (now < start || now > start + STAY.meeting + 2 * ERRAND_WALK) return null
+  const people = freeFor(subs, start, walks)
+  if (people.length < 3) return null
+  const chairs = typeOf(room).chairs.map(c => at(room, c))
+  const seats = new Map(people.slice(0, chairs.length).map((s, i) => [s.id, chairs[i]]))
+  // Claude joins when at work; on a break, or waiting for you, it stays put.
+  const withClaude = main.state !== 'waiting' && main.state !== 'idle'
+  return { start, seats, head: at(room, typeOf(room).head), withClaude, order: people.slice(0, chairs.length) }
+}
+
+// The break going on now: who does what, where.
+const breakNow = (subs, now, walks, meeting) => {
+  const slot = Math.floor(now / BREAK_EVERY)
+  const start = slot * BREAK_EVERY + BREAK_AT
+  if (now < start || now > start + STAY.pingpong + 2 * ERRAND_WALK + 9000) return null
+  const picks = { coffee: [], toilet: [], pingpong: [] }
+  for (const sub of freeFor(subs, start, walks)) {
+    if (meeting?.seats.has(sub.id)) continue
+    const r = stir(hashOf(sub.id), slot) % 100
+    if (owns('pingpong') && r < 22) picks.pingpong.push(sub)
+    else if (owns('toilet') && r < 36) picks.toilet.push(sub)
+    else if (owns('kitchen') && r < 75) picks.coffee.push(sub)
+  }
+  // Ping-pong takes two; the rest go for coffee.
+  const extra = picks.pingpong.length >= 2 ? picks.pingpong.splice(2) : picks.pingpong.splice(0)
+  if (owns('kitchen')) picks.coffee.push(...extra)
+  picks.toilet = picks.toilet.slice(0, 2)
+  const kitchen = firstRoom('kitchen')
+  const team = firstRoom('team')
+  const toilet = firstRoom('toilet')
+  const spotsFor = {
+    coffee: kitchen ? typeOf(kitchen).standing.map(p => at(kitchen, p)) : [],
+    toilet: toilet ? typeOf(toilet).stalls.map(p => at(toilet, p)) : [],
+    pingpong: team ? typeOf(team).pingpong.map(p => at(team, p)) : [],
+  }
+  const errands = new Map()
+  for (const kind of ['coffee', 'toilet', 'pingpong']) {
+    picks[kind].slice(0, spotsFor[kind].length).forEach((sub, i) => {
+      // Staggered a little, so not everyone gets up at once; ping-pong
+      // players start together.
+      const stagger = kind === 'pingpong' ? 0 : (stir(hashOf(sub.id), slot + 7) % 9) * 900
+      errands.set(sub.id, { kind, start: start + stagger, stay: STAY[kind], dest: spotsFor[kind][i], index: i, slot })
+    })
+  }
+  return { slot, start, errands }
+}
+
+// Where someone on an errand is: on the way there, there, or on the way back.
+const errandPose = (home, e, now) => {
+  const t = now - e.start
+  if (t < 0 || t >= 2 * ERRAND_WALK + e.stay) return null
+  if (t < ERRAND_WALK) return { ...walkAt(route(home, e.dest), t / ERRAND_WALK), errand: e }
+  if (t < ERRAND_WALK + e.stay) return { x: e.dest.x, y: e.dest.y, facing: e.dest.facing ?? 'front', isWalking: false, isThere: true, there: t - ERRAND_WALK, errand: e }
+  return { ...walkAt(route(e.dest, home), (t - ERRAND_WALK - e.stay) / ERRAND_WALK), errand: e }
+}
+
+// ── Banter ───────────────────────────────────────────────────────────────
+// Two or more at the coffee machine talk. What about is picked for the
+// break from what is true today: who wrote the most, who sits on the floor,
+// who waits for you, what the office has bought. Each exchange is a few
+// lines, said in turn, three seconds apart.
+const BANTER = [
+  ({ people, top }) =>
+    top && top.linesAdded >= 10 && people.length > 1 && [
+      [top, `Jeg har skrevet ${top.linesAdded} linjer i dag.`],
+      [people.find(p => p !== top), 'Imponerende. Hvor mange af dem virker?'],
+      [top, 'Alle sammen. Næsten.'],
+    ],
+  ({ people, onFloor }) => {
+    const f = people.find(p => onFloor.has(p.id))
+    const d = people.find(p => !onFloor.has(p.id))
+    return f && d && [[f, 'Fint for jer med jeres skriveborde.'], [d, 'Du kan låne min stol, når jeg går hjem.'], [f, 'Du går aldrig hjem!']]
+  },
+  ({ people }) => {
+    const busy = people.find(p => (p.tools ?? 0) >= 8)
+    const other = people.find(p => p !== busy)
+    return busy && other && [[other, `${busy.name}, ${busy.tools} værktøjer allerede? Slapper du aldrig af?`], [busy, 'Det her ER mit kaffepause-ansigt.']]
+  },
+  ({ people: [a, b] }) => [[a, 'Har nogen set Claude holde fri?'], [b, 'Claude drikker kun kaffe, når vi er færdige.'], [a, 'Så må vi hellere skynde os.']],
+  ({ people: [a, b] }) => [[a, 'Hvem har spist den sidste kage?'], [b, 'Ikke mig.'], [a, 'Du har krummer på trøjen.'], [b, '… det var en meget lille kage.']],
+  ({ people: [a, b] }) => owns('pingpong') && [[a, `Revanche ved bordtennisbordet, ${b.name}?`], [b, 'Du taber stadig.'], [a, 'Det var vinden sidst!'], [b, 'Vi er indenfor.']],
+  ({ people: [a, b], waiting }) =>
+    waiting && [[a, `${waiting.name} har ventet på godkendelse et stykke tid.`], [b, 'Mennesker. De er så langsomme.'], [a, 'Sig det ikke højt. De læser med.']],
+  ({ people: [a, b], onFloor, all }) => {
+    const price = state.game?.next?.desk
+    const f = all.find(p => onFloor.has(p.id))
+    return f && typeof price === 'number' && (state.game?.kroner ?? 0) >= price && [[a, `Vi har ${kr(state.game.kroner)}. Hvorfor sidder ${f.name} stadig på gulvet?`], [b, 'Claude sparer op til en bordtennisbat.']]
+  },
+  ({ people: [a, b] }) => owns('meeting') && [[a, 'Skal vi virkelig til møde igen?'], [b, 'Ja. Mødet om mødet.']],
+  ({ people: [a, b] }) => [[a, 'Kaffen er bedre i dag.'], [b, 'Det er den samme kaffe.'], [a, 'Så er det mig, der er bedre i dag.']],
+]
+
+// The line said right now in the kitchen, and by whom.
+const banterNow = (people, all, now, slot, onFloor) => {
+  if (people.length < 2) return null
+  const top = [...all].sort((x, y) => (y.linesAdded ?? 0) - (x.linesAdded ?? 0))[0]
+  const waiting = all.find(p => p.activity.state === 'waiting')
+  const context = { people, all, top, waiting, onFloor }
+  const options = BANTER.map(topic => topic(context)).filter(Boolean)
+  if (!options.length) return null
+  const lines = options[stir(slot, 11) % options.length]
+  return lines
+}
+
 // ── Look ─────────────────────────────────────────────────────────────────
 const OUTLINE = '#2B2230'
 const P = 3.5
@@ -553,6 +700,12 @@ const shadow = (x, y, rx, ry, alpha = 0.2) => {
   ctx.globalAlpha = 1
 }
 
+// Sitting with the back to us: the near side of the meeting table.
+const sittingBack = (x, y, look) => {
+  shadow(x, y + 1, 9, 2.6)
+  paintRows(BACK, look, x - 5 * P, y - BACK.length * P)
+}
+
 // On the floor, legs crossed, laptop on the lap.
 const onTheFloor = (x, y, look, t, seed) => {
   shadow(x, y + 1, 12, 3)
@@ -709,8 +862,8 @@ const hands = (cx, dy, look, isTyping, t) => {
   rect(cx + 5, dy + 10 - lift, 5, 3, look.skin)
 }
 
-const bubble = (cx, bottom, text, isAlert, t) => {
-  const words = clip(text, 30)
+const bubble = (cx, bottom, text, isAlert, t, max = 30) => {
+  const words = clip(text, max)
   ctx.font = `600 8.5px ${FONT}`
   const w = Math.round(ctx.measureText(words).width + 14)
   const x = Math.round(cx - w / 2)
@@ -1149,13 +1302,28 @@ const roomDrawers = {
     }
   },
 
-  project: (g, fill) => {
-    fill(6, 384, 468, 118, '#D6DCE6')
-    for (let r = 0; r < 5; r++) fill(6, 384 + r * 24, 468, 1, '#C7CED9')
+  quiet: g => {
+    // A soft blue carpet, a rug under each desk, a sign on the floor
+    g.fillStyle = '#D6DCE6'
+    g.fillRect(6, 384, 468, 118)
+    g.fillStyle = '#C7CED9'
+    for (let r = 0; r < 5; r++) g.fillRect(6, 384 + r * 24, 468, 1)
+    const rugs = [['#C9D3E3', '#BCC6D8'], ['#D3CFE3', '#C6C1D8'], ['#CFDDD8', '#C1D1CB'], ['#E0D6CB', '#D4C8BB']]
+    ROOM_TYPES.quiet.desks.forEach(({ cx, dy }, i) => {
+      const [base, edge] = rugs[i % rugs.length]
+      g.fillStyle = edge
+      g.beginPath()
+      g.roundRect(cx - 50, dy - 26, 100, 62, 6)
+      g.fill()
+      g.fillStyle = base
+      g.beginPath()
+      g.roundRect(cx - 47, dy - 23, 94, 56, 4)
+      g.fill()
+    })
     g.font = `700 8.5px ${FONT}`
     g.fillStyle = '#5B6672'
     g.textAlign = 'left'
-    g.fillText('Dine andre sessioner', 16, 496)
+    g.fillText('Stillerum', 16, 496)
   },
 }
 
@@ -1476,12 +1644,34 @@ const draw = () => {
   // Screens in use, which glow in the dark
   const glowing = []
 
+  // Breaks and meetings going on now
+  const meeting = meetingNow(subs, now, walks, main)
+  const pause = breakNow(subs, now, walks, meeting)
+  const onErrand = new Map()
+  for (const sub of subs) {
+    const home = placeOf(sub.seat).spot
+    const seat = meeting?.seats.get(sub.id)
+    const e = seat
+      ? { kind: 'meeting', start: meeting.start, stay: STAY.meeting, dest: seat }
+      : pause?.errands.get(sub.id)
+    const pose = e && sub.phase === 'working' && sub.activity.state !== 'waiting' ? errandPose(home, e, now) : null
+    if (pose) onErrand.set(sub.id, pose)
+  }
+  // Claude at the head of the meeting table
+  const claudeMeeting = meeting?.withClaude ? errandPose({ x: MAIN.cx, y: MAIN.dy - 6 }, { kind: 'meeting', start: meeting.start, stay: STAY.meeting, dest: meeting.head }, now) : null
+
   // Claude
+  const isAtDesk = !isOut && !claudeMeeting
   chair(MAIN.cx, MAIN.dy)
-  if (!isOut) sitting(MAIN.cx, MAIN.dy + 4, claudeLook, main.state === 'waiting', t, 7)
-  desk(MAIN.cx, MAIN.dy, 128, isOut ? null : main.state, t, 2)
-  if (!isOut) glowing.push([MAIN.cx + 46, MAIN.dy + 8], [MAIN.cx - 46, MAIN.dy + 8])
-  if (!isOut) {
+  if (isAtDesk) sitting(MAIN.cx, MAIN.dy + 4, claudeLook, main.state === 'waiting', t, 7)
+  desk(MAIN.cx, MAIN.dy, 128, isAtDesk ? main.state : null, t, 2)
+  if (isAtDesk) glowing.push([MAIN.cx + 46, MAIN.dy + 8], [MAIN.cx - 46, MAIN.dy + 8])
+  if (claudeMeeting) {
+    if (claudeMeeting.isThere) sitting(claudeMeeting.x, claudeMeeting.y, claudeLook, false, t, 7)
+    else standing(claudeMeeting.x, claudeMeeting.y, claudeLook, claudeMeeting.facing, claudeMeeting.isWalking, t, 7)
+    tag(claudeMeeting.x, claudeMeeting.y + 3, 'Claude', '#C8643B')
+    frameHits.push({ kind: 'claude', id: 'claude', ...standingBox(claudeMeeting.x, claudeMeeting.y) })
+  } else if (!isOut) {
     hands(MAIN.cx, MAIN.dy, claudeLook, main.state !== 'waiting', t)
     tag(MAIN.cx, MAIN.dy + 30, 'Claude', '#C8643B')
     frameHits.push({ kind: 'claude', id: 'claude', ...seatedBox(MAIN.cx, MAIN.dy) })
@@ -1512,7 +1702,7 @@ const draw = () => {
   }
 
   // The desks, and who sits at them
-  const seatedAt = seat => subs.find(x => x.seat === seat && poseOf(x, now, walks)?.seated)
+  const seatedAt = seat => subs.find(x => x.seat === seat && poseOf(x, now, walks)?.seated && !onErrand.has(x.id))
   list.forEach(({ cx, dy }, seat) => {
     if (!isInView(cx - 60, dy - 60, 120, 120)) return
     const sub = seatedAt(seat)
@@ -1539,7 +1729,7 @@ const draw = () => {
   const floorSitters = []
   for (const sub of subs) {
     const pose = poseOf(sub, now, walks)
-    if (!pose?.seated || sub.seat < list.length) continue
+    if (!pose?.seated || sub.seat < list.length || onErrand.has(sub.id)) continue
     const { spot } = placeOf(sub.seat)
     floorSitters.push({ sub, spot })
   }
@@ -1550,39 +1740,47 @@ const draw = () => {
     tag(spot.x, spot.y + 3, sub.name, '#4A5868')
     frameHits.push({ kind: 'sub', id: sub.id, x0: spot.x - 20, y0: spot.y - 44, x1: spot.x + 20, y1: spot.y + 14 })
   }
-  // Everyone on their feet: walking or handing over.
+  // Everyone on their feet: walking, handing over, or on a break.
   const walkers = []
   for (const sub of subs) {
-    const pose = poseOf(sub, now, walks)
+    const pose = onErrand.get(sub.id) ?? poseOf(sub, now, walks)
     if (pose && !pose.seated) walkers.push({ sub, pose })
   }
   walkers.sort((a, b) => a.pose.y - b.pose.y)
+  // The ping-pong ball, while both players are at the table
+  const players = walkers.filter(w => w.pose.isThere && w.pose.errand.kind === 'pingpong')
   for (const { sub, pose } of walkers) {
-    standing(pose.x, pose.y, lookFor(sub.id), pose.facing, pose.isWalking, t, hashOf(sub.id))
+    const look = lookFor(sub.id)
+    const kind = pose.isThere ? pose.errand.kind : null
+    if (kind === 'toilet') {
+      // In the stall: the door says so
+      tag(pose.x, pose.y - 18, 'Optaget', '#E5484D')
+      continue
+    }
+    if (kind === 'meeting') {
+      if (pose.errand.dest.row === 'front') sittingBack(pose.x, pose.y, look)
+      else sitting(pose.x, pose.y, look, false, t, hashOf(sub.id))
+    } else standing(pose.x, pose.y, look, pose.facing, pose.isWalking, t, hashOf(sub.id))
+    if (kind === 'coffee') {
+      rect(pose.x + 9, pose.y - 22, 6, 7, OUTLINE)
+      rect(pose.x + 10, pose.y - 21, 4, 5, '#FFFFFF')
+      rect(pose.x + 10, pose.y - 21, 4, 1.5, '#7A4B2A')
+    }
+    if (kind === 'pingpong') {
+      const side = pose.facing === 'right' ? 1 : -1
+      circle(pose.x + side * 10, pose.y - 18, 3.2, '#E5484D', OUTLINE)
+    }
     tag(pose.x, pose.y + 3, sub.name, '#4A5868')
     frameHits.push({ kind: 'sub', id: sub.id, ...standingBox(pose.x, pose.y) })
   }
-
-  // The project room: the other sessions
-  const projectRoom = firstRoom('project')
-  const seats = projectRoom ? typeOf(projectRoom).seats.map(p => at(projectRoom, p)) : []
-  const others = state.sessions.filter(x => x !== s).slice(0, seats.length)
-  seats.forEach(({ cx, dy }, i) => {
-    const o = others[i]
-    chair(cx, dy)
-    if (!o) {
-      desk(cx, dy, 80, null, t)
-      return
-    }
-    const look = { ...claudeLook, shirt: shirts[hashOf(o.key) % shirts.length][0], shirtShade: shirts[hashOf(o.key) % shirts.length][1] }
-    const away = o.main.state === 'idle'
-    if (!away) sitting(cx, dy + 4, look, o.main.state === 'waiting', t, hashOf(o.key))
-    desk(cx, dy, 80, away ? null : o.main.state, t)
-    if (!away) hands(cx, dy, look, o.main.state !== 'waiting', t + i * 51)
-    tag(cx, dy + 30, clip(o.project, 16), '#C8643B')
-    if (o.subs?.length) tag(cx + 30, dy + 44, `+${o.subs.length}`, '#4A5868')
-    frameHits.push({ kind: 'session', id: o.key, x0: cx - 42, y0: dy - 40, x1: cx + 42, y1: dy + 44 })
-  })
+  if (players.length === 2) {
+    const [left, right] = players[0].pose.x < players[1].pose.x ? players : [players[1], players[0]]
+    const k = (Math.sin(t / 420) + 1) / 2
+    const bx = left.pose.x + 14 + (right.pose.x - left.pose.x - 28) * k
+    const by = left.pose.y - 6 - Math.abs(Math.sin(t / 210)) * 8
+    shadow(bx, left.pose.y - 2, 2, 1, 0.25)
+    circle(bx, by, 1.6, '#FFFFFF', OUTLINE)
+  }
 
   evening(timeNow, glowing)
 
@@ -1612,12 +1810,6 @@ const draw = () => {
       if (grumble) bubble(spot.x, spot.y - 44, grumble, false, t)
     }
   }
-  seats.forEach(({ cx, dy }, i) => {
-    const o = others[i]
-    if (!o) return
-    if (o.main.state === 'idle') tag(cx, dy - 26, 'Holder pause', '#8A94A0')
-    else say(cx, dy - 34, o.main, t + i * 170)
-  })
   if (typeof nextPrice === 'number' && list.length < slots.length) {
     const { cx, dy } = slots[list.length]
     forSaleSign(cx, dy, nextPrice, (state.game?.kroner ?? 0) >= nextPrice, t)
@@ -1636,6 +1828,34 @@ const draw = () => {
     frameHits.push({ kind: 'shop', id: sale.item, x0: sale.x - 46, y0: sale.y - 12, x1: sale.x + 46, y1: sale.y + 18 })
   }
   construction(now, t)
+  // On a break: banter in the kitchen, ping and pong, status at the meeting
+  const onFloorIds = new Set(subs.filter(x => x.seat >= list.length).map(x => x.id))
+  const inKitchen = walkers.filter(w => w.pose.isThere && w.pose.errand.kind === 'coffee').map(w => w.sub)
+  const banter = pause && banterNow(inKitchen, subs, now, pause.slot, onFloorIds)
+  if (banter) {
+    const there = Math.min(...walkers.filter(w => inKitchen.includes(w.sub)).map(w => w.pose.there))
+    const line = Math.floor(there / 3000)
+    if (line < banter.length && there % 3000 < 2600) {
+      const [who, text] = banter[line]
+      const w = walkers.find(x => x.sub === who)
+      if (w) bubble(w.pose.x, w.pose.y - 52, text, false, t, 48)
+    }
+  }
+  if (players.length === 2) {
+    const hitter = Math.sin(t / 420) > 0 ? players[1] : players[0]
+    if (Math.abs(Math.sin(t / 420)) > 0.97) bubble(hitter.pose.x, hitter.pose.y - 52, hitter === players[0] ? 'Ping!' : 'Pong!', false, t)
+  }
+  if (meeting && claudeMeeting?.isThere) {
+    // Claude opens, then each says what they are on, in turn
+    const round = Math.floor(claudeMeeting.there / 3000)
+    if (round === 0) bubble(claudeMeeting.x, claudeMeeting.y - 44, 'Kort status, alle sammen', false, t)
+    else {
+      const sub = meeting.order[(round - 1) % meeting.order.length]
+      const w = walkers.find(x => x.sub.id === sub.id && x.pose.isThere)
+      const status = sub.activity.detail === 'Tænker' ? 'Jeg tænker stadig over min opgave' : sub.activity.detail
+      if (w && claudeMeeting.there % 3000 < 2600) bubble(w.pose.x, w.pose.y - 44, status, false, t, 40)
+    }
+  }
   // The one whose card is open, ringed.
   const ring = selected && frameHits.find(h => h.kind === selected.kind && h.id === selected.id)
   if (ring) {
@@ -1693,7 +1913,7 @@ const drawMinimap = () => {
   mini.setTransform(k, 0, 0, k, -WORLD.x * k, -WORLD.y * k)
   mini.fillStyle = '#2A323B'
   mini.fillRect(WORLD.x, WORLD.y, W, H)
-  const colours = { corner: '#DCC194', kitchen: '#F3F5F6', team: '#CBD9C7', project: '#D6DCE6', toilet: '#E3EEF2', meeting: '#B48A64' }
+  const colours = { corner: '#DCC194', kitchen: '#F3F5F6', team: '#CBD9C7', quiet: '#D6DCE6', toilet: '#E3EEF2', meeting: '#B48A64' }
   for (const room of PLAN.rooms) {
     mini.fillStyle = isBuilt(room) ? (colours[room.type] ?? '#C9CED3') : '#A9C08A'
     mini.fillRect(room.x, room.y, typeOf(room).w, typeOf(room).h)
@@ -1807,6 +2027,8 @@ const people = document.getElementById('people')
 const alertBox = document.getElementById('alert')
 const statusLine = document.getElementById('status')
 const saldo = document.getElementById('saldo')
+const moodChip = document.getElementById('mood')
+moodChip.addEventListener('click', () => showPanel('shop'))
 alertBox.addEventListener('click', lookAtWaiting)
 
 const el = (tagName, props = {}, children = []) => {
@@ -1821,6 +2043,12 @@ const renderPage = () => {
   const s = focused()
   saldo.hidden = typeof state.game?.kroner !== 'number'
   if (!saldo.hidden) saldo.textContent = kr(state.game.kroner)
+  const mood = state.game?.wellbeing
+  moodChip.hidden = !mood
+  if (mood) {
+    moodChip.textContent = `${moodFace(mood.score)} ${mood.score}`
+    moodChip.title = `Trivsel ${mood.score} af 100: arbejdet tjener ${String(mood.multiplier).replace('.', ',')} gange så meget`
+  }
   tabs.replaceChildren(
     ...state.sessions.map(x =>
       el('button', { className: 'tab', type: 'button', onclick: () => choose(x.key), ariaPressed: String(x === s) }, [dot(x.main.state), x.project || 'Session']),
@@ -2043,6 +2271,7 @@ const RATE_TEXT = { added: 'linje tilføjet', removed: 'linje fjernet', delivere
 let shopParts = null
 
 const SHOP_ORDER = ['desk', 'kitchen', 'toilet', 'lounge', 'pingpong', 'meeting']
+const moodFace = score => (score < 35 ? '😟' : score < 60 ? '🙂' : '😄')
 
 const buildShop = g => {
   const saldoValue = el('strong', {}, [''])
@@ -2062,14 +2291,24 @@ const buildShop = g => {
     return { item, li, count, button, missing, done }
   })
   const rates = Object.entries(g.rates ?? {}).map(([k, v]) => el('li', {}, [el('span', { className: 'rate' }, [`${String(v).replace('.', ',')} kr`]), RATE_TEXT[k] ?? k]))
+  const moodScore = el('strong', {}, [''])
+  const moodBar = el('span', { className: 'mood-fill' }, [])
+  const moodNote = el('p', { className: 'hint' }, [''])
+  const moodParts = el('ul', { className: 'mood-parts' }, [])
   shop.replaceChildren(
     el('div', { className: 'shop-saldo' }, [el('span', { className: 'hint' }, ['Saldo']), saldoValue]),
     message,
+    el('section', { className: 'mood-box' }, [
+      el('div', { className: 'item-head' }, [el('strong', {}, ['Trivsel']), moodScore]),
+      el('span', { className: 'mood-bar' }, [moodBar]),
+      moodNote,
+      moodParts,
+    ]),
     el('ul', { className: 'items' }, rows.map(r => r.li)),
     el('h3', {}, ['Sådan tjener du kroner']),
     el('ul', { className: 'rates' }, rates),
   )
-  return { saldoValue, message, rows }
+  return { saldoValue, message, rows, moodScore, moodBar, moodNote, moodParts }
 }
 
 const renderShop = () => {
@@ -2082,6 +2321,25 @@ const renderShop = () => {
   shopParts ??= buildShop(g)
   const p = shopParts
   p.saldoValue.textContent = kr(g.kroner)
+  const mood = g.wellbeing
+  if (mood) {
+    p.moodScore.textContent = `${moodFace(mood.score)} ${mood.score}`
+    p.moodBar.style.width = `${mood.score}%`
+    p.moodBar.style.background = mood.score < 35 ? '#E5484D' : mood.score < 60 ? '#D6A23C' : '#2E9E8F'
+    p.moodNote.textContent = `Arbejdet tjener ${String(mood.multiplier).replace('.', ',')} gange så meget. Rum og inventar hæver trivslen, hjælpere på gulvet sænker den.`
+    const partsKey = JSON.stringify(mood.parts)
+    if (p.moodParts.dataset.key !== partsKey) {
+      p.moodParts.dataset.key = partsKey
+      p.moodParts.replaceChildren(
+        ...mood.parts.map(part =>
+          el('li', {}, [
+            el('span', { className: part.points < 0 ? 'minus' : 'plus' }, [`${part.points > 0 ? '+' : ''}${part.points}`]),
+            part.what === 'floor' ? `${part.count} på gulvet` : ITEMS[part.what]?.name ?? part.what,
+          ]),
+        ),
+      )
+    }
+  }
   p.message.hidden = !shopMessage
   p.message.textContent = shopMessage
   for (const row of p.rows) {
@@ -2096,7 +2354,7 @@ const renderShop = () => {
     row.missing.hidden = !isForSale || canAfford
     row.missing.textContent = isForSale ? `Mangler ${kr(Math.max(0, price - g.kroner))}` : ''
     row.done.hidden = isForSale
-    row.done.textContent = isDesk ? 'Teamrummet er fuldt. Flere pladser kommer med teamrum 2.' : 'Ejet ✓'
+    row.done.textContent = isDesk ? 'Alle skriveborde er købt. Flere pladser kommer med flere rum.' : 'Ejet ✓'
   }
 }
 
