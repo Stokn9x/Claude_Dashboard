@@ -112,20 +112,6 @@ export const hands = (cx, dy, look, isTyping, t) => {
   rect(cx + 5, dy + 10 - lift, 5, 3, look.skin)
 }
 
-// What a helper on the floor has to say about it, now and then, in turn
-// with what it is doing.
-const GRUMBLES = [
-  'Av, min ryg',
-  'Har vi ikke en stol?',
-  'Jeg vil også have et skrivebord',
-  'Gulvet er koldt',
-  'Laptop på skødet, seriøst?',
-  'Hvem har taget min plads?',
-  'Jeg skriver det her i et klagebrev',
-  'Mine ben sover',
-]
-export const grumbleAt = (t, seed) => ((t + seed * 997) % 9000 < 3000 ? GRUMBLES[Math.floor((t + seed * 997) / 9000 + seed) % GRUMBLES.length] : null)
-
 // A pixel portrait for the list, head and shoulders, drawn once per look and kept.
 const portraits = new Map()
 export const portraitOf = (key, look) => {

@@ -66,7 +66,7 @@ for (const surface of ['terminal', 'desktop'] as const) {
     expect(JSON.stringify(await ui.drawn())).toContain('Claude venter på dig: Venter på din godkendelse')
   })
 
-  test(`${surface}: a subagent walks in, works at a desk, delivers to Claude and leaves`, async ($, on) => {
+  test(`${surface}: a subagent walks in, works at a desk, delivers to Claude, takes some time off and leaves`, async ($, on) => {
     let ui: { drawn: () => Promise<unknown> } = { drawn: async () => null }
     let whileReading = ''
     const clock = engine(on, async e => {
@@ -87,9 +87,11 @@ for (const surface of ['terminal', 'desktop'] as const) {
 
     // The walk to Claude's desk and the handover take their time…
     await clock.advance(6500)
-    expect(JSON.stringify(await ui.drawn())).toContain('Går igen: Kortlæg API’et')
+    expect(JSON.stringify(await ui.drawn())).toContain('Holder fri: Kortlæg API’et')
 
-    // …and so does the walk out of the door.
+    // …then a few minutes off work, and the walk out of the door.
+    await clock.advance(3 * 60_000)
+    expect(JSON.stringify(await ui.drawn())).toContain('Går igen: Kortlæg API’et')
     await clock.advance(7000)
     expect(JSON.stringify(await ui.drawn())).toContain('Ingen hjælpere i kontoret')
   })
@@ -377,13 +379,46 @@ test('every helper gets a place number, without a limit, and a freed number is u
   // The page decides which numbers get a desk and which sit on the floor.
   expect(seatOf('sub-b7')).toBe(6)
 
-  // The second helper is done; once it is out of the door, its number is free.
+  // The second helper is done; once it has handed over and is off work, its number is free.
   await $.classic.SubagentStop({ agent_id: 'sub-b2', agent_type: 'Explore', stop_hook_active: false, agent_transcript_path: '' } as never)
-  await clock.advance(11_000)
-  expect(seatOf('sub-b2')).toBeUndefined()
+  await clock.advance(7000)
   await $.tool.call({ tool: 'Agent', prompt: 'p', description: 'Læs README', tool_use_id: 'b8', run_in_background: true } as never)
   await clock.advance(600)
   expect(seatOf('sub-b8')).toBe(1)
+})
+
+test('a finished helper stays off work for a while, goes back to work when called on, and goes home when not', async ($, on) => {
+  const clock = backgroundHelper(on, $)
+  const file = statusFile(on)
+  on('classic.SubagentStop', () => ({}) as never)
+  on('agent.list', () => ({ value: [agentEntry('sub-b1', 'running')] }) as never)
+  await $.session.start(start())
+  const phaseOf = () => file.last()?.subs.find(s => JSON.stringify(s).includes('sub-b1')) as (Status['subs'][number] & { from?: string; activity: { detail: string } }) | undefined
+
+  await $.tool.call({ tool: 'Agent', prompt: 'p', description: 'Læs README', tool_use_id: 'b1', run_in_background: true } as never)
+  await clock.advance(5000)
+  await $.classic.SubagentStop({ agent_id: 'sub-b1', agent_type: 'Explore', stop_hook_active: false, agent_transcript_path: '' } as never)
+  await clock.advance(7000)
+  expect(phaseOf()?.phase).toBe('idle')
+  expect(phaseOf()?.activity.detail).toBe('Holder fri')
+
+  // Called on again: back to a desk, walking from where it was idling.
+  await $.tool.call({ tool: 'Read', file_path: 'C:/kode/a.ts', tool_use_id: 'r1', agentId: 'sub-b1' } as never)
+  await clock.advance(600)
+  expect(phaseOf()?.phase).toBe('arriving')
+  expect(phaseOf()?.from).toBe('idle')
+  await clock.advance(5000)
+  expect(phaseOf()?.phase).toBe('working')
+
+  // Done again, and then left alone: home after a few minutes off work.
+  await $.classic.SubagentStop({ agent_id: 'sub-b1', agent_type: 'Explore', stop_hook_active: false, agent_transcript_path: '' } as never)
+  await clock.advance(7000)
+  expect(phaseOf()?.phase).toBe('idle')
+  await clock.advance(3 * 60_000)
+  expect(phaseOf()?.phase).toBe('leaving')
+  expect(phaseOf()?.from).toBe('idle')
+  await clock.advance(5000)
+  expect(phaseOf()).toBeUndefined()
 })
 
 test('earnings are counted by the rules: a cap per edit, tests at most every ten minutes', async ($, on) => {

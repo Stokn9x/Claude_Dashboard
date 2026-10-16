@@ -9,9 +9,12 @@ import { hashOf, kr } from './util.js'
 import { ITEMS, MAIN, MAIN_SPOT, PLAN, ROOM_TYPES, at, coffeeSpot, deskSlots, desks, firstRoom, isBuilt, placeOf, shiftOf, typeOf } from './plan.js'
 import { HOMEWARD_MS, WALKS, homewardPose, outAt, poseOf, route, walkAt } from './routes.js'
 import { STAY, banterFor, breakNow, errandPose, meetingNow } from './breaks.js'
-import { claudeLook, grumbleAt, hands, lookFor, onTheFloor, sitting, sittingBack, standing } from './figures.js'
+import { claudeLook, hands, lookFor, onTheFloor, sitting, sittingBack, standing } from './figures.js'
 import { board, chair, clock, desk, deskThingsFor, mug, steam } from './furniture.js'
 import { daylight, evening, timeOfDay } from './light.js'
+import { chatFor, grumbleAt } from './voices.js'
+import { IDLE_WALK_MS, idlePlan } from './idle.js'
+import { GROUNDS, handoffFor } from './plan.js'
 import { applyView, drawMinimap, isInView, stepGlide, visibleRect } from './camera.js'
 import { background, drawBuilding } from './building.js'
 import { drawLife } from './outdoors.js'
@@ -33,6 +36,32 @@ const moves = new Map()
 // Helpers on their way out, by id: { sub, out }, kept after the status file
 // has let them go, for the walk down the path.
 const homeward = new Map()
+// Helpers off work: the walk to their current idle spot, by id
+// ({ from, to, start }), and where each was last seen, for the walk back to
+// a desk or out of the door once they are called on or go home.
+const idleWalks = new Map()
+const lastIdle = new Map()
+
+// Where a helper off work is now: walking to its idle spot, or there.
+const idlePose = (sub, plan, now) => {
+  const target = plan.get(sub.id)
+  if (!target) return null
+  let walk = idleWalks.get(sub.id)
+  const isNewSpot = walk && (walk.to.x !== target.spot.x || walk.to.y !== target.spot.y)
+  if (!walk || isNewSpot) {
+    // From where it is now, or, the first time, from where it handed over.
+    const from = walk ? lastIdle.get(sub.id) ?? walk.to : handoffFor(sub.seat)
+    walk = { from: { x: from.x, y: from.y }, to: target.spot, start: walk ? now : sub.since }
+    idleWalks.set(sub.id, walk)
+  }
+  const k = (now - walk.start) / IDLE_WALK_MS
+  const pose =
+    k < 1
+      ? walkAt(route(walk.from, walk.to), k)
+      : { x: target.spot.x, y: target.spot.y, facing: target.spot.facing ?? 'front', isWalking: false, isThere: true, there: now - walk.start - IDLE_WALK_MS }
+  lastIdle.set(sub.id, { x: pose.x, y: pose.y })
+  return { ...pose, isIdle: true, errand: { kind: target.kind, dest: target.spot, index: target.index, slot: target.slot } }
+}
 
 // ── Celebrations ─────────────────────────────────────────────────────────
 const party = (p, spot, t) => {
@@ -307,7 +336,8 @@ const drawWalkers = ({ walkers, players, hits, t }) => {
       tag(pose.x, pose.y - 26, 'Optaget', '#E5484D')
       continue
     }
-    if (kind === 'meeting') {
+    if (kind === 'lounge') sitting(pose.x, pose.y, look, false, t, hashOf(sub.id))
+    else if (kind === 'meeting') {
       if (pose.errand.dest.row === 'front') sittingBack(pose.x, pose.y, look)
       else sitting(pose.x, pose.y, look, false, t, hashOf(sub.id))
     } else standing(pose.x, pose.y, look, pose.facing, pose.isWalking, t, hashOf(sub.id))
@@ -350,7 +380,7 @@ const drawSpeech = ({ s, main, where, meeting, meetingPose, pause, kitchenSpot, 
   for (const { sub, spot } of floorSitters) {
     if (sub.activity.state === 'waiting') say(spot.x, spot.y - 44, sub.activity, t)
     else {
-      const grumble = grumbleAt(t, hashOf(sub.id))
+      const grumble = grumbleAt(sub.name, t, hashOf(sub.id), placeOf(sub.seat).isOutside)
       if (grumble) bubble(spot.x, spot.y - 44, grumble, false, t)
     }
   }
@@ -365,6 +395,23 @@ const drawSpeech = ({ s, main, where, meeting, meetingPose, pause, kitchenSpot, 
       const [who, text] = banter[line]
       const w = walkers.find(x => x.sub === who)
       if (w) bubble(w.pose.x, w.pose.y - 52, text, false, t, 48)
+    }
+  }
+  // Off work on the lawn: those standing two by two chat, a line every three
+  // seconds, a new subject every fifteen.
+  const onLawn = walkers.filter(w => w.pose.isIdle && w.pose.isThere && w.pose.errand.kind === 'garden')
+  for (const a of onLawn) {
+    if (a.pose.errand.index % 2 !== 0) continue
+    const b = onLawn.find(w => w.pose.errand.index === a.pose.errand.index + 1)
+    if (!b) continue
+    const there = Math.min(a.pose.there, b.pose.there)
+    const round = Math.floor(there / 15_000)
+    const lines = chatFor(a.sub, b.sub, a.pose.errand.slot * 64 + a.pose.errand.index * 8 + round)
+    const line = Math.floor((there % 15_000) / 3000)
+    if (line < lines.length && there % 3000 < 2600) {
+      const [who, text] = lines[line]
+      const w = who === a.sub ? a : b
+      bubble(w.pose.x, w.pose.y - 52, text, false, t, 44)
     }
   }
   // Ping and pong
@@ -416,7 +463,13 @@ export const draw = () => {
   // On a break Claude goes to the kitchen; with no kitchen it stays put.
   const where = meetingPose ? 'meeting' : main.state === 'idle' && kitchenSpot && !isReceiving ? 'kitchen' : 'desk'
 
-  const poses = new Map(subs.map(sub => [sub.id, poseOf(sub, now, walks)]))
+  const plan = idlePlan(subs.filter(sub => sub.phase === 'idle'), now)
+  const poses = new Map(
+    subs.map(sub => [sub.id, sub.phase === 'idle' ? idlePose(sub, plan, now) : poseOf(sub, now, walks, sub.from === 'idle' ? lastIdle.get(sub.id) ?? GROUNDS.hangout[0] : null)]),
+  )
+  // Forget the idle walks of those no longer off work.
+  for (const id of idleWalks.keys()) if (!subs.some(sub => sub.id === id && sub.phase === 'idle')) idleWalks.delete(id)
+  for (const id of lastIdle.keys()) if (!subs.some(sub => sub.id === id)) lastIdle.delete(id)
   const bySeat = new Map(subs.filter(sub => poses.get(sub.id)?.seated && !onErrand.has(sub.id)).map(sub => [sub.seat, sub]))
   const seatedAt = seat => bySeat.get(seat)
   const floorSitters = subs

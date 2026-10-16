@@ -142,3 +142,63 @@ test('with no spil.json at all, a new office starts small', async () => {
     await stop(child)
   }
 })
+
+const dayOf = at => {
+  const d = new Date(at)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+const work = (home, added) =>
+  fs.writeFileSync(
+    path.join(home, '.claude', 'agent-kontor', 'sessions', 'sw.json'),
+    JSON.stringify({ v: 2, key: 'sw', project: 'p', updatedAt: Date.now(), main: { state: 'idle', detail: 'x' }, subs: [], earned: { added, removed: 0, delivered: 0, tests: 0, commits: 0, prs: 0 } }),
+  )
+
+test('the first work of the day pays a bonus, once', async () => {
+  const home = newHome()
+  const child = await start(home)
+  try {
+    work(home, 10)
+    await sleep(900)
+    const { game } = JSON.parse((await get('/api/state')).body)
+    assert.equal(game.streak.count, 1)
+    assert.equal(game.streak.isToday, true)
+    assert.equal(game.streak.bonus, 25)
+    assert.equal(game.stats.totals.bonus, 25)
+    work(home, 20)
+    await sleep(900)
+    assert.equal(JSON.parse((await get('/api/state')).body).game.stats.totals.bonus, 25, 'not twice in a day')
+  } finally {
+    await stop(child)
+  }
+})
+
+test('a streak from yesterday grows, and pays more', async () => {
+  const home = newHome()
+  const yesterday = dayOf(Date.now() - 24 * 60 * 60_000)
+  fs.writeFileSync(gameFile(home), JSON.stringify({ v: 1, kroner: 0, owned: { desks: 0, rooms: ['claude', 'team'] }, credited: {}, streak: { day: yesterday, count: 3, bonus: 45, at: 1 } }))
+  const child = await start(home)
+  try {
+    assert.equal(JSON.parse((await get('/api/state')).body).game.streak.count, 3, 'still alive before today’s work')
+    work(home, 10)
+    await sleep(900)
+    const { game } = JSON.parse((await get('/api/state')).body)
+    assert.equal(game.streak.count, 4)
+    assert.equal(game.streak.bonus, 25 + 3 * 10)
+  } finally {
+    await stop(child)
+  }
+})
+
+test('a streak with a day missing starts over', async () => {
+  const home = newHome()
+  fs.writeFileSync(gameFile(home), JSON.stringify({ v: 1, kroner: 0, owned: { desks: 0, rooms: ['claude', 'team'] }, credited: {}, streak: { day: '2020-01-01', count: 6, bonus: 75, at: 1 } }))
+  const child = await start(home)
+  try {
+    assert.equal(JSON.parse((await get('/api/state')).body).game.streak.count, 0)
+    work(home, 10)
+    await sleep(900)
+    assert.equal(JSON.parse((await get('/api/state')).body).game.streak.count, 1)
+  } finally {
+    await stop(child)
+  }
+})

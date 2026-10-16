@@ -14,10 +14,13 @@ const PANE = 'kontor'
 // Every walk takes the same time, however far it goes: the page knows the
 // floor plan and sets the pace, this module only when each walk is over. The
 // status file carries these, so the two always agree.
-const WALKS = { arrive: 4000, deliver: 3500, handover: 2600, leave: 4000 }
+// `idle` is how long a helper stays after handing over, off work, before it
+// goes home; called on again in that time, it goes back to work.
+const WALKS = { arrive: 4000, deliver: 3500, handover: 2600, leave: 4000, idle: 3 * 60_000 }
 
 const thinking: Activity = { state: 'working', detail: 'Tænker' }
 const pause: Activity = { state: 'idle', detail: 'Holder pause' }
+const offWork: Activity = { state: 'idle', detail: 'Holder fri' }
 
 const emptyOffice: Office = {
   sessionKey: '',
@@ -108,7 +111,8 @@ const hashOf = (id: string) => {
 // number into a desk, or into a spot on the floor once the desks run out.
 const freeSeat = (subs: Sub[]) => {
   let seat = 0
-  while (subs.some(s => s.seat === seat && s.phase !== 'leaving')) seat++
+  // A helper off work or on its way out holds no place.
+  while (subs.some(s => s.seat === seat && s.phase !== 'leaving' && s.phase !== 'idle')) seat++
   return seat
 }
 
@@ -135,10 +139,19 @@ const newSub = (id: string, task: string, activity: Activity, phase: Phase, now:
 const setActivity = async ($: $, agentId: string | undefined, activity: Activity) => {
   if (!agentId) return setMain($, activity)
   const now = await $.clock.now()
-  // A subagent the spawn hook did not see gets a desk now.
+  // A subagent the spawn hook did not see gets a desk now; one that was off
+  // work is called on again and goes back to a desk.
   await update($, office, o =>
     o.subs.some(s => s.id === agentId)
-      ? { ...o, subs: o.subs.map(s => (s.id === agentId && (s.phase === 'arriving' || s.phase === 'working') ? { ...s, activity } : s)) }
+      ? {
+          ...o,
+          subs: o.subs.map(s => {
+            if (s.id !== agentId) return s
+            if (s.phase === 'arriving' || s.phase === 'working') return { ...s, activity }
+            if (s.phase === 'idle') return { ...s, phase: 'arriving' as Phase, since: now, from: 'idle' as const, seat: freeSeat(o.subs.filter(x => x.id !== s.id)), activity, outcome: undefined }
+            return s
+          }),
+        }
       : { ...o, subs: [...o.subs, newSub(agentId, 'Hjælper', activity, 'working', now, o.subs)] },
   )
 }
@@ -204,11 +217,16 @@ const TIDY_MS = 500
 
 const nextPhase = (s: Sub, now: number): Sub | null => {
   const elapsed = now - s.since
-  if (s.phase === 'arriving') return elapsed >= WALKS.arrive ? { ...s, phase: 'working' } : s
+  if (s.phase === 'arriving') return elapsed >= WALKS.arrive ? { ...s, phase: 'working', from: undefined } : s
   if (s.phase === 'delivering') {
     const handedOver = WALKS.deliver + WALKS.handover
-    return elapsed < handedOver ? s : { ...s, phase: 'leaving', since: s.since + handedOver }
+    if (elapsed < handedOver) return s
+    // A finished helper stays a while off work; one that got stuck goes home.
+    return s.outcome === 'failed'
+      ? { ...s, phase: 'leaving', since: s.since + handedOver }
+      : { ...s, phase: 'idle', since: s.since + handedOver, activity: offWork, from: undefined }
   }
+  if (s.phase === 'idle') return elapsed >= WALKS.idle ? { ...s, phase: 'leaving', since: s.since + WALKS.idle, from: 'idle' } : s
   if (s.phase === 'leaving') return elapsed >= WALKS.leave ? null : s
   return s
 }
@@ -251,7 +269,7 @@ const sweepAgents = async ($: $) => {
 }
 
 // Tests, commits and pull requests, recognised by the command that ran them.
-const TESTS = /\b(npm|pnpm|yarn|bun)\s+(run\s+)?test\b|\bnpx\s+(jest|vitest|playwright)\b|\b(pytest|jest|vitest)\b|\b(cargo|go|dotnet)\s+test\b|\bplugin\s+test\b/
+const TESTS = /\b(npm|pnpm|yarn|bun)\s+(run\s+)?test\b|\bnpx\s+(jest|vitest|playwright)\b|\b(pytest|jest|vitest)\b|\b(cargo|go|dotnet)\s+test\b|\bplugin\s+test\b|\bnode\s+--test\b|\bdeno\s+test\b/
 const COMMIT = /\bgit\s+commit\b/
 const PULL = /\bgh\s+pr\s+create\b/
 const PARTY_MS = 5000
@@ -329,6 +347,7 @@ const phaseText: Record<Phase, string> = {
   arriving: 'På vej ind',
   working: '',
   delivering: 'Afleverer',
+  idle: 'Holder fri',
   leaving: 'Går igen',
 }
 

@@ -34,7 +34,7 @@ const achievement = a =>
 
 export const renderProgress = () => {
   const g = store.state.game
-  const key = JSON.stringify([g?.stats, g?.achievements?.map(a => [a.id, a.value, a.at])])
+  const key = JSON.stringify([g?.stats, g?.streak, g?.achievements?.map(a => [a.id, a.value, a.at])])
   if (key === progressKey) return
   progressKey = key
   if (!g?.stats) {
@@ -45,7 +45,15 @@ export const renderProgress = () => {
   const achievements = [...g.achievements].sort((a, b) => (b.at ? 1 : 0) - (a.at ? 1 : 0) || b.value / b.target - a.value / a.target)
   const unlocked = achievements.filter(a => a.at).length
   panel.replaceChildren(
-    el('div', { className: 'tiles' }, [tile(number(today.added), 'linjer i dag'), tile(number(today.delivered), 'opgaver i dag'), tile(`${number(today.kroner)} kr`, 'tjent i dag')]),
+    el('div', { className: 'tiles' }, [
+      tile(number(today.added), 'linjer i dag'),
+      tile(number(today.delivered), 'opgaver i dag'),
+      tile(`${number(today.kroner)} kr`, 'tjent i dag'),
+      tile(`🔥 ${number(g.streak?.count ?? 0)}`, (g.streak?.count ?? 0) === 1 ? 'dag i træk' : 'dage i træk'),
+    ]),
+    el('p', { className: 'hint' }, [
+      g.streak?.isToday ? `Dagens bonus er tjent: +${number(g.streak.bonus)} kr. I morgen giver den første linje +${number(g.streak.next)} kr.` : `Den første linje i dag giver en bonus på +${number(g.streak?.next ?? 25)} kr.`,
+    ]),
     el('h3', {}, ['De sidste 14 dage']),
     bars(days),
     el('p', { className: 'hint' }, [`Bedste dag: ${number(best.added)} linjer · ${daysActive} ${daysActive === 1 ? 'dag' : 'dage'} med arbejde`]),

@@ -7,9 +7,10 @@
 import { store, focused } from './store.js'
 import { stateColor } from './gfx.js'
 import { el, kr, remember, remembered } from './util.js'
-import { MAIN, desks } from './plan.js'
+import { MAIN, desks, placeOf } from './plan.js'
 import { claudeLook, lookFor, portraitOf } from './figures.js'
 import { fit, glide } from './camera.js'
+import { WALKS } from './routes.js'
 import { renderShop, moodFace } from './shop.js'
 import { renderProgress, announce } from './progress.js'
 
@@ -124,11 +125,21 @@ const renderAlert = s => {
   if (wasHidden !== alertBox.hidden) fit()
 }
 
+// When a helper off work goes home, in words: "går hjem om 2 min".
+const homeIn = (sub, now = Date.now()) => {
+  const minutes = Math.max(1, Math.ceil((sub.since + ({ ...WALKS, ...(focused()?.walks ?? {}) }).idle - now) / 60_000))
+  return `Går hjem om ${minutes} min`
+}
+
 export const phaseLabel = (sub, onFloorFrom) =>
   sub.outcome === 'failed' && (sub.phase === 'delivering' || sub.phase === 'leaving')
     ? 'Gik i stå'
-    : sub.phase === 'arriving'
-      ? 'På vej ind'
+    : sub.phase === 'idle'
+      ? homeIn(sub)
+      : sub.phase === 'arriving'
+      ? sub.from === 'idle'
+        ? 'Tilbage på arbejde'
+        : 'På vej ind'
       : sub.phase === 'delivering'
         ? 'Afleverer'
         : sub.phase === 'leaving'
@@ -136,7 +147,9 @@ export const phaseLabel = (sub, onFloorFrom) =>
           : sub.seat < 0
             ? 'Venter ved døren'
             : onFloorFrom !== undefined && sub.seat >= onFloorFrom
-              ? 'Sidder på gulvet'
+              ? placeOf(sub.seat).isOutside
+                ? 'Venter på bænken'
+                : 'Sidder på gulvet'
               : null
 
 const person = ({ key, name, look, state, detail, note, isClaude }) =>
@@ -171,7 +184,8 @@ const renderPeople = s => {
   // Those waiting for you first, then the rest as they came in
   const subs = [...(s.subs ?? [])].sort((a, b) => (b.activity.state === 'waiting') - (a.activity.state === 'waiting') || a.seat - b.seat)
   const onFloorFrom = desks().length
-  const key = JSON.stringify([s.key, s.main, facts, subs.map(x => [x.id, x.name, x.task, x.phase, x.outcome, x.activity, x.seat >= onFloorFrom])])
+  // The minute is in it too: "går hjem om 2 min" counts down.
+  const key = JSON.stringify([s.key, s.main, facts, Math.floor(Date.now() / 60_000), subs.map(x => [x.id, x.name, x.task, x.phase, x.from, x.outcome, x.activity, x.seat >= onFloorFrom])])
   if (key === peopleKey) return
   peopleKey = key
   people.replaceChildren(

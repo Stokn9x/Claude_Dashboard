@@ -49,7 +49,8 @@ export const ROOM_TYPES = {
     sideWindows: [[0, 284, 40], [474, 300, 40]],
     // Where a helper without a desk sits on the floor with its laptop
     floor: [[70, 372], [100, 372], [252, 372], [276, 372], [364, 372], [394, 372], [424, 372], [34, 278], [62, 278], [90, 278]].map(([x, y]) => ({ x, y })),
-    plants: [[462, 150, true], [20, 150], [380, 368], [56, 368], [234, 366, true]],
+    // Clear of the doorway to the quiet room, between it and the ping-pong table
+    plants: [[462, 150, true], [20, 150], [380, 368], [56, 368], [274, 368]],
     lights: [[130, 366, 54, 0.42, 'lamp', 'lounge'], [240, 147, 46, 0.4, 'neon', 'neon'], ...[[166, 200], [314, 200], [166, 300], [314, 300]].map(([x, y]) => [x, y, 66, 0.16, 'ceiling'])],
     bulbs: [[130, 366, 'lounge']],
     // Furniture bought for the room, and where its sign stands until then
@@ -169,6 +170,12 @@ export const GROUNDS = {
   farPavement: { y: 736, h: 12 },
   pond: { x: -250, y: 300, rx: 84, ry: 48 },
   bench: { x: 598, y: 226 },
+  // Where helpers with no room inside sit: on the bench, two side by side,
+  // then on the grass round it
+  benchSpots: [{ x: 590, y: 232 }, { x: 607, y: 232 }, { x: 578, y: 212 }, { x: 618, y: 212 }],
+  // A lawn east of the path where helpers off work stand and chat, two by
+  // two, facing each other
+  hangout: [[630, 312], [700, 342], [640, 384], [712, 414]].flatMap(([x, y]) => [{ x, y, facing: 'right' }, { x: x + 34, y, facing: 'left' }]),
   // The walk between the front door and the street: out of the door, to
   // the corner of the path, down to the pavement
   walkway: [{ x: 478, y: 256 }, { x: 552, y: 256 }, { x: 552, y: 684 }],
@@ -183,14 +190,9 @@ export const deskSlots = () => PLAN.rooms.filter(room => typeOf(room).desks).fla
 export const ownedDesks = () => Math.min(deskSlots().length, store.state.game?.owned?.desks ?? deskSlots().length)
 export const desks = () => deskSlots().slice(0, ownedDesks())
 
-// Floor spots, the ones that hurt most first: two on the rug of every desk
-// not yet bought, then along the walls.
-const floorSpots = () => [
-  ...deskSlots()
-    .slice(ownedDesks())
-    .flatMap(({ cx, dy }) => [{ x: cx - 22, y: dy + 28 }, { x: cx + 22, y: dy + 28 }]),
-  ...roomsOf('team').flatMap(room => (typeOf(room).floor ?? []).map(p => at(room, p))),
-]
+// The spots along the walls, for helpers beyond the last desk the rooms
+// have room for.
+const wallSpots = () => roomsOf('team').flatMap(room => (typeOf(room).floor ?? []).map(p => at(room, p)))
 
 export const MAIN = (() => {
   const room = firstRoom('corner')
@@ -209,20 +211,29 @@ export const handoffFor = seat => {
 }
 
 // A helper's place: its desk, or, once the bought desks run out, a spot on
-// the floor, where it works on a laptop and lets everyone know.
+// the floor, where it works on a laptop and lets everyone know. Every spot
+// follows from the seat number alone, never from how many desks are bought:
+// a helper whose desk is not bought yet sits on the rug where it will
+// stand, so buying a desk moves that one helper and nobody else. Beyond the
+// last desk the rooms have room for, along the walls; beyond those, outside
+// on the bench by the path.
 export const placeOf = seat => {
-  const list = desks()
-  if (seat >= 0 && seat < list.length) {
-    const d = list[seat]
+  const slots = deskSlots()
+  const s = Math.max(0, seat)
+  if (s < ownedDesks()) {
+    const d = slots[s]
     return { isDesk: true, cx: d.cx, dy: d.dy, spot: { x: d.cx, y: d.dy - 6 } }
   }
-  const n = Math.max(0, seat - list.length)
-  const spots = floorSpots()
-  if (n < spots.length) return { isDesk: false, spot: spots[n] }
-  // More than the floor holds: in a queue by the door.
-  const e = PLAN.entrance
-  const k = n - spots.length
-  return { isDesk: false, spot: { x: e.x - 30 - (k % 3) * 14, y: e.y - 12 + Math.floor(k / 3) * 16 } }
+  if (s < slots.length) return { isDesk: false, spot: { x: slots[s].cx - 22, y: slots[s].dy + 28 } }
+  const walls = wallSpots()
+  const n = s - slots.length
+  if (n < walls.length) return { isDesk: false, spot: walls[n] }
+  const bench = GROUNDS.benchSpots
+  const k = n - walls.length
+  if (k < bench.length) return { isDesk: false, isOutside: true, spot: bench[k] }
+  // More than even the bench holds: standing about on the grass beside it.
+  const m = k - bench.length
+  return { isDesk: false, isOutside: true, spot: { x: GROUNDS.bench.x + 40 + (m % 4) * 18, y: GROUNDS.bench.y - 20 + Math.floor(m / 4) * 22 } }
 }
 
 // What can be bought, by its id: rooms, the team room's furniture, decor.

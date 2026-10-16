@@ -26,6 +26,7 @@ Balancen er sat, så kontoret bygges over uger, ikke på en eftermiddag (justere
 | Grønne tests | 20 kr, højst én gang hvert 10. minut | Belønner at teste, uden at man kan spamme |
 | Commit | 15 kr | |
 | Pull request | 50 kr | |
+| Dagens første arbejde | 25 kr + 10 kr pr. dag i træk (højst 85 kr) | Belønner at komme igen; ganges ikke med trivslen (0.16.0) |
 
 **Loft:** en enkelt redigering tæller højst 100 linjer, så en genereret fil på 10.000 linjer ikke køber hele kontoret. En hjælper, der *gik i stå*, giver ingenting. Det hele ganges med trivslen (0,8 til 1,2).
 
@@ -35,7 +36,7 @@ En travl time (ca. 2.000 linjer, ti opgaver, et par tests og commits) giver omkr
 
 | Ting | Pris | Effekt |
 |---|---|---|
-| Skrivebord nr. 1-2 | gratis | Man starter med to |
+| Skrivebord nr. 1-2 | 300 / 500 kr | Man starter uden skriveborde (ændret i 0.16.0) |
 | Skrivebord nr. 3-6 (teamrummet) | 800 / 1.200 / 1.800 / 2.500 kr | En hjælper mindre på gulvet |
 | Skrivebord nr. 7-10 (stillerummet) | 3.500 / 4.500 / 6.000 / 8.000 kr | |
 | Toilet | 2.500 kr | Toiletbesøg i pauserne |
@@ -144,7 +145,7 @@ Hver fase kan bruges for sig og skal være færdig og testet, før den næste st
 
 | Spørgsmål | Svar |
 |---|---|
-| Start | **Et lille kontor forfra:** Claudes kontor og et lille teamrum med to skriveborde. Resten tjenes og købes. |
+| Start | **Et lille kontor forfra:** Claudes kontor og et tomt teamrum, uden skriveborde (fra 0.16.0; før startede man med to). Resten tjenes og købes. |
 | Hvad tjener penge | **Linjer og bedrifter:** linjer tilføjet og fjernet, afleverede opgaver, grønne tests, commits og PR'er. |
 | Trivsel | **Ja, i fase 3.** |
 | Valuta | **Kroner.** |

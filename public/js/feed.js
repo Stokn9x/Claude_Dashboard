@@ -7,7 +7,7 @@ import { el, remember, remembered } from './util.js'
 
 const KEEP = 40
 const SHOWN = 8
-const ICONS = { session: '🏢', arrive: '🚪', deliver: '📦', stuck: '⚠️', confetti: '✅', rain: '🌧️', balloons: '🎈', waiting: '✋', bought: '🛠️', achievement: '🏅' }
+const ICONS = { session: '🏢', arrive: '🚪', deliver: '📦', stuck: '⚠️', confetti: '✅', rain: '🌧️', balloons: '🎈', waiting: '✋', bought: '🛠️', achievement: '🏅', bonus: '🔥', idle: '🌳', back: '↩️', home: '👋' }
 
 const box = document.getElementById('feed')
 const list = el('ol', { className: 'feed-list' }, [])

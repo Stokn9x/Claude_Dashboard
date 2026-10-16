@@ -7,6 +7,7 @@ import { el } from './util.js'
 import { freeArea, hitAt, pixelsPerUnit, toScreen, wasDrag } from './camera.js'
 import { phaseLabel, showPanel, choose } from './panel.js'
 import { buyItem } from './shop.js'
+import { TEMPER_TEXT, temperOf } from './voices.js'
 
 const card = document.getElementById('card')
 
@@ -38,7 +39,7 @@ const subject = () => {
     }
   }
   const sub = (s.subs ?? []).find(x => x.id === selected.id)
-  return sub ? { ...sub, note: phaseLabel(sub) } : null
+  return sub ? { ...sub, note: phaseLabel(sub), temper: TEMPER_TEXT[temperOf(sub.name)] } : null
 }
 
 const dot = state => el('span', { className: 'dot', style: `background:${stateColor[state] ?? '#8A94A0'}` })
@@ -55,6 +56,7 @@ export const renderCard = () => {
     who.startedAt ? `I gang i ${ago(now, who.startedAt)}` : null,
     typeof who.tools === 'number' ? `${who.tools} ${who.tools === 1 ? 'værktøj' : 'værktøjer'}` : null,
     who.linesAdded || who.linesRemoved ? `+${who.linesAdded ?? 0} −${who.linesRemoved ?? 0} linjer` : null,
+    who.temper ? `${who.temper} type` : null,
   ].filter(Boolean)
   const steps = [...(who.recent ?? [])].reverse()
   card.replaceChildren(

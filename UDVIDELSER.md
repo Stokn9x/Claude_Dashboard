@@ -28,6 +28,7 @@ Status: ✅ lavet · 🟡 delvist · ⬜ ikke lavet · ➖ ikke længere relevan
 | 0.11.1 | Fejlrettelser: ingen går gennem væggene (døre forbinder rummene i rutegitteret, og der er fri vej ud af Claudes kontor), nyt toilet med døren ud til et frit område, ingen fliser i væggene; langsommere indtjening og højere priser, så kontoret bygges over uger |
 | 0.12.0 | En lækrere side rundt om kontoret: topbjælke med ikon, trivsel, saldo og forbindelsesprik; kort med pixel-portræt og statuspille i listen; venteboks med "Gå til"; butik med ikoner og fremdrift; kun mørkt tema |
 | 0.13.0 | Spillets fase 4: pynt og opgraderinger i butikken, 17 præstationer med belønning og notifikation, statistik i den nye fane Fremskridt |
+| 0.16.0 | Færdige hjælpere bliver og holder fri i nogle minutter (bordtennis, kaffe, sofaen eller en snak på græsset), går tilbage til arbejdet, hvis Claude tager fat i dem igen, og går ellers hjem; hver hjælper har et temperament, der farver replikkerne; daglig bonus og stribe; nyt kontor starter uden skriveborde; gulvsiddere beholder deres plads, og dem uden plads venter på bænken; `node --test` tæller som tests; planten foran døren er flyttet |
 | 0.15.0 | Hjælperne kommer op ad stien og går ned ad den og hen ad fortovet, når de går hjem; aktivitetslog nederst; kameraet styres også med tastaturet (pile/WASD, + og −, 0); serveren gemmer en kopi af spil.json hver dag (en uge tilbage) og redder et ødelagt spil.json fra den nyeste; 28 nye tests af sidens logik og serveren; planerne er nu i ét plan, uden etager |
 | 0.14.0 | Kontoret fylder hele vinduet: græs, træer, en sø, sti fra hoveddøren, hæk, fortov og en vej med biler og gadelygter rundt om; panelet svæver i venstre side og kan foldes sammen (på en telefon ligger det i bunden). Siden er delt op i små moduler i stedet for én fil på 2.800 linjer |
 | 0.13.1 | Fejl 47-51: en ældre server afløses efter en opdatering, en gulvsidder går hen til sit nye skrivebord, Claude tager imod afleveringer ved skrivebordet, skilte ligger under taleboblerne, og trivslen siger hvor gulvsidderne er |
@@ -135,10 +136,10 @@ Fundet ved en gennemgang af koden og det, vi har set undervejs. **P1** er fejl, 
 
 | # | Hvad | Str. | Status |
 |---|---|---|---|
-| 59 | **Personlighed i dialogen:** hver hjælper får et temperament ud fra navnet (kæk, tør, dramatisk, positiv), så replikkerne lyder forskelligt (rest fra fase 3). | S | ⬜ |
+| 59 | **Personlighed i dialogen:** hver hjælper får et temperament ud fra navnet (kæk, tør, dramatisk, positiv), så replikkerne lyder forskelligt (rest fra fase 3). Lavet i 0.16.0, og temperamentet står på hjælperens kort. | S | ✅ |
 | 60 | **Claude laver noget i pauserne:** vander planter, går en tur, spiller bordtennis med en hjælper (rest af punkt 19). | M | ⬜ |
 | 61 | **Fase 5, vækst:** mere grund, teamrum 2 og en ny bygning på grunden, hvor de andre sessioner sidder. Alt i ét plan, ingen etager. | L | ⬜ |
-| 62 | **Daglig bonus og stribe:** en lille bonus for første arbejde på dagen og for dage i træk. | S | ⬜ |
+| 62 | **Daglig bonus og stribe:** en lille bonus for første arbejde på dagen og for dage i træk. Lavet i 0.16.0: 25 kr plus 10 kr pr. dag i træk, højst en uge; vises i Fremskridt og i loggen. | S | ✅ |
 | 63 | **Sæson og vejr:** jul i december, regn på ruderne, sne om vinteren (rest af punkt 22). | M | ⬜ |
 | 64 | **Kontorhund eller -kat** (punkt 23), evt. købt i butikken. | M | ⬜ |
 | 65 | **Indret selv:** flyt pynt og inventar rundt med træk og slip (punkt 25). | L | ⬜ |
@@ -146,13 +147,16 @@ Fundet ved en gennemgang af koden og det, vi har set undervejs. **P1** er fejl, 
 | 67 | **Tv-tilstand** til en ekstra skærm: fuld skærm, ingen panel, kameraet følger det, der sker (punkt 31). | S | ⬜ |
 
 | 69 | **Aktivitetslog:** en lille liste nederst over det seneste, der er sket (ny opgave, aflevering, grønne tests), med tid og hvem. Lavet i 0.15.0. | S | ✅ |
-| 70 | **Liv udenfor:** hjælpere kommer gående op ad stien fra fortovet og går samme vej hjem; en hjælper uden plads venter på bænken. De går op ad det sidste stykke sti og hele vejen hjem i 0.15.0; bænken mangler. | M | 🟡 |
-| 68 | **Gulvsidderne bytter plads, når et skrivebord købes,** fordi pladserne på gulvet tælles fra det første ledige skrivebord. De går pænt, men det ligner stoleleg. Hver gulvsidder bør beholde sin plads. | S | ⬜ |
+| 70 | **Liv udenfor:** hjælpere kommer gående op ad stien fra fortovet og går samme vej hjem; en hjælper uden plads venter på bænken. De går op ad det sidste stykke sti og hele vejen hjem i 0.15.0; bænken kom i 0.16.0. | M | ✅ |
+| 68 | **Gulvsidderne bytter plads, når et skrivebord købes,** fordi pladserne på gulvet tælles fra det første ledige skrivebord. De går pænt, men det ligner stoleleg. Hver gulvsidder bør beholde sin plads. Lavet i 0.16.0: hver plads følger af hjælperens nummer, så et nyt skrivebord flytter kun den, det er til. | S | ✅ |
+| 71 | **Færdige hjælpere hænger ud:** efter afleveringen holder de fri i tre minutter (bordtennis to og to, kaffe, sofaen eller en snak på græsset ved stien), går tilbage til et skrivebord, hvis Claude kalder på dem igen, og går ellers hjem. Lavet i 0.16.0. | M | ✅ |
+| 72 | **Linjer skrevet gennem shell-scripts tæller ikke.** Kun Edit og Write giver kroner; `sed`, Python-scripts og lignende kan mod'en ikke tælle sikkert. Måske ud fra `git diff --stat` ved commit. | S | ⬜ |
 
 ### Forslag til rækkefølge
 
-1. **68 gulvsiddere bytter plads** og **70 bænken**: små ting, der ses hver dag (47-53 er lavet).
-2. Derefter det sjove: **59 personlighed**, **62 daglig bonus** og **57 lyd**, og så **fase 5**.
+1. **57 lyd** og **58 browser-notifikation**, når Claude venter på dig.
+2. **72 linjer fra shell-scripts** og **54 spillet i `/kontor panel`**.
+3. Derefter **fase 5** i ét plan, og **63 sæson og vejr**.
 
 ## 🧹 Oprydning
 

@@ -142,7 +142,7 @@ button.chip { cursor: pointer; }
 
 /* ── Progress ───────────────────────────────────────────────────────── */
 .progress-panel { display: grid; gap: 10px; }
-.tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.tiles { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; }
 .tile { padding: 10px; border-radius: 12px; background: var(--surface-2); display: grid; gap: 2px; }
 .tile strong { font-size: 18px; font-variant-numeric: tabular-nums; }
 .tile span { font-size: 11px; color: var(--soft); }

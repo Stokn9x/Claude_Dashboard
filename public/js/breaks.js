@@ -10,6 +10,7 @@ import { store, owns } from './store.js'
 import { hashOf, kr, stir } from './util.js'
 import { at, firstRoom, isBuilt, typeOf } from './plan.js'
 import { route, walkAt } from './routes.js'
+import { voice } from './voices.js'
 
 const BREAK_EVERY = 180_000
 const BREAK_AT = 20_000
@@ -97,13 +98,20 @@ const BANTER = [
   ({ people, top }) =>
     top && top.linesAdded >= 10 && people.length > 1 && [
       [top, `Jeg har skrevet ${top.linesAdded} linjer i dag.`],
-      [people.find(p => p !== top), 'Imponerende. Hvor mange af dem virker?'],
-      [top, 'Alle sammen. Næsten.'],
+      [people.find(p => p !== top), voice(people.find(p => p !== top), { kæk: 'Imponerende. Hvor mange af dem virker?', tør: 'Mange linjer. Få tests.', dramatisk: 'Og jeg har knap nok skrevet én!', positiv: 'Wauw, det er flot!' })],
+      [top, voice(top, { kæk: 'Alle sammen. Næsten.', tør: 'De virker.', dramatisk: 'Hver eneste én blev skrevet med blod og sved!', positiv: 'Tak! Vi er et godt hold.' })],
     ],
   ({ people, onFloor }) => {
     const f = people.find(p => onFloor.has(p.id))
     const d = people.find(p => !onFloor.has(p.id))
-    return f && d && [[f, 'Fint for jer med jeres skriveborde.'], [d, 'Du kan låne min stol, når jeg går hjem.'], [f, 'Du går aldrig hjem!']]
+    return (
+      f &&
+      d && [
+        [f, voice(f, { kæk: 'Fint for jer med jeres skriveborde.', tør: 'Gulvet er hårdt.', dramatisk: 'I aner ikke, hvad jeg har været igennem dernede!', positiv: 'Gulvet er faktisk ikke så slemt.' })],
+        [d, voice(d, { kæk: 'Du kan låne min stol, når jeg går hjem.', tør: 'Det ved jeg.', dramatisk: 'Jeg lider med dig. Fra min stol.', positiv: 'Du får snart et skrivebord, det er jeg sikker på!' })],
+        [f, voice(f, { kæk: 'Du går aldrig hjem!', tør: 'Mm.', dramatisk: 'Løfter, løfter!', positiv: 'Tak, det håber jeg!' })],
+      ]
+    )
   },
   ({ people }) => {
     const busy = people.find(p => (p.tools ?? 0) >= 8)
@@ -121,8 +129,12 @@ const BANTER = [
     const f = all.find(p => onFloor.has(p.id))
     return f && typeof price === 'number' && (game?.kroner ?? 0) >= price && [[a, `Vi har ${kr(game.kroner)}. Hvorfor sidder ${f.name} stadig på gulvet?`], [b, 'Claude sparer op til en bordtennisbat.']]
   },
-  ({ people: [a, b] }) => owns('meeting') && [[a, 'Skal vi virkelig til møde igen?'], [b, 'Ja. Mødet om mødet.']],
-  ({ people: [a, b] }) => [[a, 'Kaffen er bedre i dag.'], [b, 'Det er den samme kaffe.'], [a, 'Så er det mig, der er bedre i dag.']],
+  ({ people: [a, b] }) => owns('meeting') && [[a, voice(a, { kæk: 'Skal vi virkelig til møde igen?', tør: 'Møde om lidt.', dramatisk: 'Ikke ET møde til!', positiv: 'Jeg glæder mig til mødet!' })], [b, voice(b, { kæk: 'Ja. Mødet om mødet.', tør: 'Ja.', dramatisk: 'Det bliver vores sidste.', positiv: 'Det bliver hyggeligt.' })]],
+  ({ people: [a, b] }) => [
+    [a, voice(a, { kæk: 'Kaffen er bedre i dag.', tør: 'Kaffe.', dramatisk: 'Denne kaffe redder mit liv!', positiv: 'Mmm, dejlig kaffe i dag!' })],
+    [b, voice(b, { kæk: 'Det er den samme kaffe.', tør: 'Den samme som i går.', dramatisk: 'Den smager af nederlag.', positiv: 'Ja, den er rigtig god!' })],
+    [a, 'Så er det mig, der er bedre i dag.'],
+  ],
 ]
 
 // The exchange for this break in the kitchen: [who, line] in turn.

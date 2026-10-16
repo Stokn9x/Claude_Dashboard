@@ -13,6 +13,8 @@ const routes = await import(js('routes'))
 const breaks = await import(js('breaks'))
 const scenery = await import(js('scenery'))
 const { eventsBetween } = await import(js('activity'))
+const idle = await import(js('idle'))
+const voices = await import(js('voices'))
 const util = await import(js('util'))
 
 const { PLAN, WORLD, GROUNDS, typeOf, frameOf, deskSlots, desks, placeOf } = plan
@@ -56,13 +58,33 @@ test('ten desks in all; only the bought ones are used', () => {
   assert.equal(placeOf(4).isDesk, false)
 })
 
-test('helpers without a desk each get their own spot, then queue by the door', () => {
+test('helpers without a desk each get their own spot, then wait on the bench outside', () => {
   startOffice()
-  const spots = Array.from({ length: 30 }, (_, seat) => placeOf(seat).spot)
-  const keys = spots.map(s => `${s.x},${s.y}`)
+  const places = Array.from({ length: 30 }, (_, seat) => placeOf(seat))
+  const keys = places.map(p => `${p.spot.x},${p.spot.y}`)
   assert.equal(new Set(keys).size, keys.length, 'no two helpers share a spot')
-  const last = spots.at(-1)
-  assert.ok(Math.hypot(last.x - PLAN.entrance.x, last.y - PLAN.entrance.y) < 120, 'the queue is by the door')
+  const firstOutside = places.findIndex(p => p.isOutside)
+  assert.equal(firstOutside, deskSlots().length + 10, 'inside first: every desk, then the walls')
+  assert.deepEqual(places[firstOutside].spot, GROUNDS.benchSpots[0])
+  assert.ok(places.slice(firstOutside).every(p => p.isOutside && routes.isOutdoors(p.spot)))
+})
+
+test('buying a desk moves only the helper whose desk it is', () => {
+  owning(['claude', 'team'], 3)
+  const before = Array.from({ length: 14 }, (_, seat) => placeOf(seat).spot)
+  owning(['claude', 'team'], 4)
+  const after = Array.from({ length: 14 }, (_, seat) => placeOf(seat).spot)
+  const moved = before.map((spot, seat) => (spot.x !== after[seat].x || spot.y !== after[seat].y ? seat : null)).filter(seat => seat !== null)
+  assert.deepEqual(moved, [3])
+  assert.equal(placeOf(3).isDesk, true)
+})
+
+test('a helper on the bench goes in by the path and the front door', () => {
+  startOffice()
+  const bench = GROUNDS.benchSpots[0]
+  const points = routes.route(bench, plan.handoffFor(0))
+  assert.deepEqual(points[1], GROUNDS.walkway[1])
+  assert.deepEqual(points[2], GROUNDS.walkway[0])
 })
 
 // ── Routes and walks ─────────────────────────────────────────────────────
@@ -194,6 +216,48 @@ test('banter needs two in the kitchen, and only they and their colleagues speak'
   }
 })
 
+// ── Off work ─────────────────────────────────────────────────────────────
+
+test('helpers off work each get their own spot, and ping-pong is always two', () => {
+  everything()
+  const subs = team(9, () => ({ phase: 'idle' }))
+  for (let k = 0; k < 40; k++) {
+    const plan = idle.idlePlan(subs, k * idle.IDLE_SLOT_MS + 1000)
+    assert.equal(plan.size, 9)
+    const spots = [...plan.values()].map(p => `${p.spot.x},${p.spot.y}`)
+    assert.equal(new Set(spots).size, spots.length, `slot ${k}: no two on one spot`)
+    const players = [...plan.values()].filter(p => p.kind === 'pingpong').length
+    assert.ok(players === 0 || players === 2)
+  }
+})
+
+test('with nothing bought, helpers off work hang out on the lawn', () => {
+  startOffice()
+  const plan = idle.idlePlan(team(5, () => ({ phase: 'idle' })), 123_456)
+  assert.ok([...plan.values()].every(p => p.kind === 'garden'))
+  for (const p of plan.values()) assert.ok(!scenery.isClear(p.spot.x, p.spot.y), 'no tree on the lawn')
+})
+
+test('called on again, a helper walks back to its desk from where it was idling', () => {
+  startOffice()
+  const lawn = GROUNDS.hangout[0]
+  const back = helper('z', { phase: 'arriving', from: 'idle', since: 0, seat: 0 })
+  const first = routes.poseOf(back, 0, routes.WALKS, lawn)
+  assert.deepEqual([first.x, first.y], [lawn.x, lawn.y])
+  const home = helper('z', { phase: 'leaving', from: 'idle', since: 0 })
+  const out = routes.poseOf(home, 0, routes.WALKS, lawn)
+  assert.deepEqual([out.x, out.y], [lawn.x, lawn.y])
+  assert.equal(routes.poseOf(helper('z', { phase: 'idle' }), 0).isIdle, true)
+})
+
+test('every name has a temperament, and all four are in use', () => {
+  const names = ['Freja', 'Oskar', 'Ida', 'Malthe', 'Alma', 'Viggo', 'Clara', 'Emil', 'Karla', 'Storm', 'Lærke', 'Bertil']
+  const tempers = new Set(names.map(voices.temperOf))
+  assert.equal(tempers.size, 4)
+  for (const name of names) assert.equal(typeof voices.grumbleAt(name, 0, 0), 'string')
+  assert.equal(voices.grumbleAt('Freja', 5000, 0), null, 'quiet between the grumbles')
+})
+
 // ── Outside ──────────────────────────────────────────────────────────────
 
 test('trees grow on the grass, never on the office, the path, the road or the pond', () => {
@@ -247,6 +311,19 @@ test('the log hears of tests, waiting, new sessions, purchases and achievements'
   const texts = eventsBetween(before, after, 5).map(e => e.text)
   assert.deepEqual(texts, ['Testene er grønne', 'Claude venter på dig: Venter på din godkendelse', 'Ny session: andet', 'Købt: Køkken for 3.000 kr', 'Præstation: X (+10 kr)'])
   assert.deepEqual(eventsBetween(after, after, 6), [], 'nothing twice')
+})
+
+test('the log hears when a helper off work is called back or goes home', () => {
+  const before = { sessions: [session([helper('a', { phase: 'idle' }), helper('b', { phase: 'idle' })])], game: game() }
+  const after = { sessions: [session([helper('a', { phase: 'arriving', from: 'idle' }), helper('b', { phase: 'leaving', from: 'idle' })])], game: game() }
+  assert.deepEqual(eventsBetween(before, after, 1).map(e => e.text), ['a er tilbage på arbejde', 'b gik hjem'])
+})
+
+test('the log hears of the daily bonus once', () => {
+  const before = { sessions: [], game: game({ streak: { count: 1, isToday: false, at: 1 } }) }
+  const after = { sessions: [], game: game({ streak: { count: 3, isToday: true, bonus: 45, at: 2 } }) }
+  assert.deepEqual(eventsBetween(before, after, 3).map(e => e.text), ['Dagens bonus: +45 kr (3 dage i træk)'])
+  assert.deepEqual(eventsBetween(after, after, 4), [])
 })
 
 // ── Small helpers ────────────────────────────────────────────────────────

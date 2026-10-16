@@ -21,10 +21,10 @@ const sleep = ms => new Promise(r => setTimeout(r, ms))
 const start = () => spawn(process.execPath, [server], { env: { ...process.env, USERPROFILE: home, HOME: home, AGENT_KONTOR_PORT: PORT }, stdio: 'ignore' })
 const state = async () => (await fetch(`http://127.0.0.1:${PORT}/api/state`)).json()
 const game = async () => (await state()).game
-// The saldo without the rewards for achievements, which come on top
+// The saldo without the rewards for achievements and the daily bonus, which come on top
 const earnedKr = async () => {
   const g = await game()
-  return g.kroner - g.achievements.filter(a => a.at).reduce((sum, a) => sum + a.reward, 0)
+  return g.kroner - g.achievements.filter(a => a.at).reduce((sum, a) => sum + a.reward, 0) - (g.stats.totals.bonus ?? 0)
 }
 const write = (key, earned, extra = {}) =>
   fs.writeFileSync(path.join(dir, `${key}.json`), JSON.stringify({ v: 2, key, project: 'p', updatedAt: Date.now(), main: { state: 'idle', detail: 'x' }, subs: [], earned, ...extra }))
@@ -45,7 +45,7 @@ await sleep(900)
 const first = await game()
 const { rates } = first
 check('starts with no kroner', first.kroner, 0)
-check('starts with two desks', first.owned.desks, 2)
+check('starts with no desks', first.owned.desks, 0)
 check('a bare office has wellbeing 40', first.wellbeing.score, 40)
 const bare = first.wellbeing.multiplier
 
@@ -95,7 +95,7 @@ near('earned enough', await earnedKr(), total)
 check('buying the desk works', (await buy(page)).status, 200)
 total -= deskPrice
 const afterDesk = await game()
-check('three desks now', afterDesk.owned.desks, 3)
+check('one desk now', afterDesk.owned.desks, 1)
 near('and the price is paid', await earnedKr(), total)
 check('the next desk costs more', afterDesk.next.desk > deskPrice, true)
 
@@ -118,13 +118,13 @@ check('something unknown is refused', (await buy(page, 'castle')).status, 409)
 // Wellbeing: a kitchen lifts it; helpers on the floor bring it down.
 check('wellbeing with a kitchen is 55', withKitchen.wellbeing.score, 55)
 const helpers = n => Array.from({ length: n }, (_, i) => ({ id: `h${i}`, seat: i, phase: 'working' }))
-write('sB', { ...zero, added: linesB }, { subs: helpers(6) })
+write('sB', { ...zero, added: linesB }, { subs: helpers(4) })
 await sleep(900)
 const crowded = await game()
 check('three on the floor take 24 off', crowded.wellbeing.score, 31)
 check('and earnings are multiplied by 0.92', crowded.wellbeing.multiplier, 0.92)
 const before = crowded.kroner
-write('sB', { ...zero, added: linesB + 400 }, { subs: helpers(6) })
+write('sB', { ...zero, added: linesB + 400 }, { subs: helpers(4) })
 await sleep(900)
 near('400 lines earn less at that wellbeing', (await game()).kroner - before, 400 * rates.added * 0.92)
 

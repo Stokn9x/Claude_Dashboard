@@ -159,21 +159,34 @@ const findPath = (from, to) => {
   return [from, ...corners.map(centreOf), to].filter((p, k, all) => k === 0 || p.x !== all[k - 1].x || p.y !== all[k - 1].y)
 }
 
-export const route = (from, to) => {
+const inside = (from, to) => {
   ensureGrid()
   const key = `${from.x},${from.y}>${to.x},${to.y}`
   if (!routes.has(key)) routes.set(key, findPath(from, to))
   return routes.get(key)
 }
+
+// Outside the office is open grass: a walk between a place outside (the
+// bench, the path) and one inside goes by the corner of the path and the
+// front door.
+export const isOutdoors = p => !isIn(p.x, p.y, [WORLD.x, WORLD.y, WORLD.w, WORLD.h])
+export const route = (from, to) => {
+  const isFromOut = isOutdoors(from)
+  const isToOut = isOutdoors(to)
+  if (!isFromOut && !isToOut) return inside(from, to)
+  const [door, corner] = GROUNDS.walkway
+  const points = isFromOut && isToOut ? [from, to] : isFromOut ? [from, corner, ...inside(door, to)] : [...inside(from, door), corner, to]
+  return points.filter((p, k) => k === 0 || p.x !== points[k - 1].x || p.y !== points[k - 1].y)
+}
 // In from the corner of the path outside, through the front door.
-const arriveRoute = seat => [GROUNDS.walkway[1], ...route(PLAN.entrance, placeOf(seat).spot)]
+const arriveRoute = seat => route(GROUNDS.walkway[1], placeOf(seat).spot)
 const deliverRoute = seat => route(placeOf(seat).spot, handoffFor(seat))
 const leaveRoute = seat => route(handoffFor(seat), PLAN.entrance)
 
 // ── Walks ────────────────────────────────────────────────────────────────
 // Every walk takes as long as the status file says (the mod's WALKS),
 // however far it goes: a longer route is a brisker walk.
-export const WALKS = { arrive: 4000, deliver: 3500, handover: 2600, leave: 4000 }
+export const WALKS = { arrive: 4000, deliver: 3500, handover: 2600, leave: 4000, idle: 180_000 }
 
 const facingOf = (a, b) => (Math.abs(b.x - a.x) > Math.abs(b.y - a.y) ? (b.x > a.x ? 'right' : 'left') : b.y > a.y ? 'front' : 'back')
 const lengthOf = points => points.slice(1).reduce((d, p, i) => d + Math.hypot(p.x - points[i].x, p.y - points[i].y), 0)
@@ -194,11 +207,17 @@ export const walkAt = (points, k) => {
 }
 
 // What a helper is doing at this moment: at its place, or somewhere along a
-// walk; null once it is out of the door.
-export const poseOf = (sub, now, walks = WALKS) => {
+// walk; null once it is out of the door. A helper off work (idle) is placed
+// by the page (see idle.js); `origin` is where it was idling, for the walk
+// back to a desk or out of the door.
+export const poseOf = (sub, now, walks = WALKS, origin = null) => {
   const e = now - sub.since
   if (sub.phase === 'working') return { seated: true }
-  if (sub.phase === 'arriving') return e < walks.arrive ? walkAt(arriveRoute(sub.seat), e / walks.arrive) : { seated: true }
+  if (sub.phase === 'idle') return { isIdle: true }
+  if (sub.phase === 'arriving') {
+    if (e >= walks.arrive) return { seated: true }
+    return walkAt(sub.from === 'idle' && origin ? route(origin, placeOf(sub.seat).spot) : arriveRoute(sub.seat), e / walks.arrive)
+  }
   if (sub.phase === 'delivering') {
     if (e < walks.deliver) return walkAt(deliverRoute(sub.seat), e / walks.deliver)
     if (e < walks.deliver + walks.handover) {
@@ -208,7 +227,8 @@ export const poseOf = (sub, now, walks = WALKS) => {
     const e2 = e - walks.deliver - walks.handover
     return e2 < walks.leave ? walkAt(leaveRoute(sub.seat), e2 / walks.leave) : null
   }
-  return e < walks.leave ? walkAt(leaveRoute(sub.seat), e / walks.leave) : null
+  if (e >= walks.leave) return null
+  return walkAt(sub.from === 'idle' && origin ? route(origin, PLAN.entrance) : leaveRoute(sub.seat), e / walks.leave)
 }
 
 // ── Going home ───────────────────────────────────────────────────────────
@@ -243,11 +263,13 @@ export const checkRoutes = () => {
   const built = PLAN.rooms.filter(isBuilt)
   const floors = built.map(r => [r.x, r.y, typeOf(r).w, typeOf(r).h])
   const doors = PLAN.doors.filter(isOpenDoor).map(d => [d.x - 1, d.y - 1, d.w + 2, d.h + 2])
-  // The path outside counts as floor: arrivals come up its last bit.
-  const isFloor = (x, y) => floors.some(f => isIn(x, y, f)) || doors.some(d => isIn(x, y, d)) || GROUNDS.path.some(p => isIn(x, y, p))
+  // Outside is open ground: arrivals come up the path, and some wait on the bench.
+  const isFloor = (x, y) => floors.some(f => isIn(x, y, f)) || doors.some(d => isIn(x, y, d)) || isOutdoors({ x, y })
   const problems = []
   const check = (name, points) => {
-    if (points.length === 2 && Math.hypot(points[1].x - points[0].x, points[1].y - points[0].y) > 30) problems.push(`${name}: no route found`)
+    // A straight line indoors means A* found nothing; outdoors it is just a walk across the grass.
+    const isIndoors = !isOutdoors(points[0]) || !isOutdoors(points[1])
+    if (points.length === 2 && isIndoors && Math.hypot(points[1].x - points[0].x, points[1].y - points[0].y) > 30) problems.push(`${name}: no route found`)
     for (let i = 0; i + 1 < points.length; i++) {
       const a = points[i]
       const b = points[i + 1]
@@ -259,7 +281,8 @@ export const checkRoutes = () => {
       }
     }
   }
-  const seats = deskSlots().length + 4
+  // Every desk, every spot along the walls, and the bench outside
+  const seats = deskSlots().length + 10 + 6
   let count = 0
   const spots = []
   for (const room of built) {

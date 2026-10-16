@@ -8,8 +8,9 @@ export type Earned = { added: number; removed: number; delivered: number; tests:
 export type Step = { at: number; detail: string }
 
 // A subagent's walk through the office: in by the door, at a desk, over to
-// the main desk with its result, and out again.
-export type Phase = 'arriving' | 'working' | 'delivering' | 'leaving'
+// the main desk with its result, a while off work (idle), and out again.
+// Called on again while idle, it goes back to a desk (arriving, from idle).
+export type Phase = 'arriving' | 'working' | 'delivering' | 'idle' | 'leaving'
 
 export type Sub = {
   id: string
@@ -21,6 +22,8 @@ export type Sub = {
   activity: Activity
   // Set when the helper's loop failed or was stopped instead of finishing.
   outcome?: 'failed'
+  // Set on a walk that starts where the helper was idling, not at the door.
+  from?: 'idle'
   // For the details card. Absent on helpers an older version seated.
   startedAt?: number
   tools?: number

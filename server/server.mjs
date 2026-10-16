@@ -15,7 +15,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-const VERSION = '0.15.0'
+const VERSION = '0.16.0'
 const HOST = '127.0.0.1'
 const PORT = Number(process.env.AGENT_KONTOR_PORT || 4747)
 const HERE = path.dirname(fileURLToPath(import.meta.url))
@@ -51,9 +51,10 @@ const GAME = path.join(os.homedir(), '.claude', 'agent-kontor', 'spil.json')
 // A busy hour (some 2000 lines, ten tasks, a few tests and commits) earns
 // around 700 kr.
 const RATES = { added: 0.25, removed: 0.1, delivered: 10, tests: 20, commits: 15, prs: 50 }
-// What a new office starts with: Claude's corner and a small team room with
-// two desks. The rest is earned (phase 1 and on).
-const START = { desks: 2, rooms: ['claude', 'team'] }
+// What a new office starts with: Claude's corner and an empty team room,
+// not a single desk. Everything else is earned. An office saved earlier
+// keeps the desks it has.
+const START = { desks: 0, rooms: ['claude', 'team'] }
 // A session's credited counts are kept this long after it was last seen.
 const CREDIT_KEEP_MS = 7 * 24 * 60 * 60_000
 
@@ -207,7 +208,31 @@ const credit = (status, now) => {
   game.totals.kroner = (game.totals.kroner ?? 0) + gained
   game.days[day].kroner = (game.days[day].kroner ?? 0) + gained
   game.credited[status.key] = { earned: { ...earned }, at: now }
+  if (gained > 0) payDailyBonus(day, now)
   isGameChanged = true
+}
+
+// The first work of each day pays a small bonus, a little more for every
+// day in a row before it, up to a week. Not multiplied by wellbeing.
+const DAILY_BONUS = 25
+const STREAK_BONUS = 10
+const STREAK_MAX = 7
+const payDailyBonus = (day, now) => {
+  if (game.streak?.day === day) return
+  const count = game.streak?.day === dayOf(now - 24 * 60 * 60_000) ? game.streak.count + 1 : 1
+  const bonus = DAILY_BONUS + STREAK_BONUS * (Math.min(count, STREAK_MAX) - 1)
+  game.kroner += bonus
+  game.streak = { day, count, bonus, at: now }
+  game.totals.bonus = (game.totals.bonus ?? 0) + bonus
+  game.days[day].bonus = bonus
+}
+// The streak as it stands: it lives while the last day with work is today
+// or yesterday.
+const streakView = () => {
+  const s = game.streak
+  const now = Date.now()
+  const isAlive = s && (s.day === dayOf(now) || s.day === dayOf(now - 24 * 60 * 60_000))
+  return { count: isAlive ? s.count : 0, isToday: !!s && s.day === dayOf(now), bonus: s?.bonus ?? 0, at: s?.at ?? null, next: DAILY_BONUS + STREAK_BONUS * (Math.min(isAlive ? s.count + 1 : 1, STREAK_MAX) - 1) }
 }
 
 // The local date, as YYYY-MM-DD, for the day's statistics.
@@ -235,9 +260,9 @@ const pruneCredited = now => {
 
 // ── The shop ────────────────────────────────────────────────────────────
 // Prices live here and only here: the page asks to buy, the server decides.
-// Desks 1-2 come with the office; the team room has room for six, the
+// Every desk is bought, the first two cheaply; the team room has room for six, the
 // quiet room for four more.
-const DESK_PRICES = [0, 0, 800, 1200, 1800, 2500, 3500, 4500, 6000, 8000]
+const DESK_PRICES = [300, 500, 800, 1200, 1800, 2500, 3500, 4500, 6000, 8000]
 const MAX_DESKS = DESK_PRICES.length
 // Rooms, and furniture for the team room, bought once each.
 const ROOM_PRICES = { kitchen: 3000, toilet: 2500, lounge: 4000, pingpong: 6000, meeting: 12000 }
@@ -285,13 +310,14 @@ const ACHIEVEMENTS = [
   { id: 'tests-10', name: 'Grøn bølge', about: 'Kør grønne tests 10 gange', reward: 150, value: () => total('tests'), target: 10 },
   { id: 'commits-10', name: 'Committed', about: 'Lav 10 commits', reward: 150, value: () => total('commits'), target: 10 },
   { id: 'prs-5', name: 'Ship it', about: 'Åbn 5 pull requests', reward: 300, value: () => total('prs'), target: 5 },
-  { id: 'desk-3', name: 'Indflytning', about: 'Køb det første skrivebord', reward: 50, value: () => game.owned.desks, target: 3 },
+  { id: 'desk-3', name: 'Indflytning', about: 'Køb det første skrivebord', reward: 50, value: () => game.owned.desks, target: 1 },
   { id: 'desk-10', name: 'Fuldt hus', about: 'Køb alle ti skriveborde', reward: 1000, value: () => game.owned.desks, target: MAX_DESKS },
   { id: 'kitchen', name: 'Kaffekultur', about: 'Byg køkkenet', reward: 100, value: () => (game.owned.rooms.includes('kitchen') ? 1 : 0), target: 1 },
   { id: 'all-rooms', name: 'Hele kontoret', about: 'Byg alle rum og alt inventar', reward: 2000, value: () => ALL_ROOMS.filter(r => game.owned.rooms.includes(r)).length, target: ALL_ROOMS.length },
   { id: 'wellbeing-90', name: 'Trivselsguru', about: 'Nå en trivsel på 90', reward: 500, value: () => wellbeing().score, target: 90 },
   { id: 'days-5', name: 'Stabil', about: 'Arbejd på 5 forskellige dage', reward: 300, value: daysActive, target: 5 },
   { id: 'days-20', name: 'Stamgæst', about: 'Arbejd på 20 forskellige dage', reward: 1000, value: daysActive, target: 20 },
+  { id: 'streak-5', name: 'I stødet', about: 'Arbejd 5 dage i træk', reward: 300, value: () => game.streak?.count ?? 0, target: 5 },
 ]
 
 const checkAchievements = now => {
@@ -317,6 +343,7 @@ const gameView = () => ({
     return { score: w.score, multiplier: Math.round(w.multiplier * 100) / 100, parts: w.parts }
   })(),
   bought: (game.log ?? []).slice(-5),
+  streak: streakView(),
   stats: statsView(),
   achievements: ACHIEVEMENTS.map(a => ({ id: a.id, name: a.name, about: a.about, reward: a.reward, value: Math.min(a.value(), a.target), target: a.target, at: game.achieved?.[a.id] ?? null })),
 })
@@ -334,7 +361,7 @@ const statsView = () => {
     days,
     today: days[days.length - 1],
     best: { added: bestDay('added') },
-    totals: { added: total('added'), removed: total('removed'), delivered: total('delivered'), tests: total('tests'), commits: total('commits'), prs: total('prs'), kroner: Math.floor(total('kroner')) },
+    totals: { added: total('added'), removed: total('removed'), delivered: total('delivered'), tests: total('tests'), commits: total('commits'), prs: total('prs'), kroner: Math.floor(total('kroner')), bonus: total('bonus') },
     daysActive: daysActive(),
   }
 }

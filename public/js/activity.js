@@ -18,6 +18,8 @@ const sessionEvents = (before, after, now) => {
   for (const sub of after.subs ?? []) {
     const old = was.get(sub.id)
     if (!old && isAtWork(sub)) events.push(event(now, 'arrive', `${sub.name} kom ind: ${sub.task}`, project))
+    else if (old?.phase === 'idle' && isAtWork(sub)) events.push(event(now, 'back', `${sub.name} er tilbage på arbejde`, project))
+    else if (old?.phase === 'idle' && sub.phase === 'leaving') events.push(event(now, 'home', `${sub.name} gik hjem`, project))
     else if (old && isAtWork(old) && sub.phase === 'delivering') {
       events.push(sub.outcome === 'failed' ? event(now, 'stuck', `${sub.name} gik i stå: ${sub.task}`, project) : event(now, 'deliver', `${sub.name} afleverede: ${sub.task}`, project))
     }
@@ -36,6 +38,9 @@ const gameEvents = (before, after, now) => {
   const lastBought = Math.max(0, ...(before.bought ?? []).map(b => b.at))
   for (const b of after.bought ?? []) {
     if (b.at > lastBought) events.push(event(now, 'bought', `Købt: ${ITEMS[b.item]?.name ?? b.item} for ${kr(b.price)}`))
+  }
+  if (after.streak?.isToday && after.streak.at !== before.streak?.at) {
+    events.push(event(now, 'bonus', `Dagens bonus: +${kr(after.streak.bonus)}${after.streak.count > 1 ? ` (${after.streak.count} dage i træk)` : ''}`))
   }
   const had = new Set((before.achievements ?? []).filter(a => a.at).map(a => a.id))
   for (const a of after.achievements ?? []) {
