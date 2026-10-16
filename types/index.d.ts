@@ -34,7 +34,13 @@ export type Sub = {
   // the model it runs on, when the spawn said; the page draws them.
   type?: string
   model?: string
+  // The start of its final answer, once its loop has finished, for the card.
+  answer?: string
 }
+
+// Claude's last finished turn: when it ended, how long it took, and whether
+// it was cut short. The page tells you when a long one is done.
+export type LastTurn = { endedAt: number; ms: number; isAborted: boolean }
 
 // Another Claude session on this computer, as its own status file says.
 export type Other = {
@@ -82,6 +88,9 @@ export type Office = {
   editedSinceCommit: { added: number; removed: number }
   // The game as the server last told it, for the panel. Null until then.
   game: GameSummary | null
+  lastTurn: LastTurn | null
+  // How full the context window is, in per cent, as the engine last said.
+  context: number | null
 }
 
 export type GameSummary = { kroner: number; wellbeing: number; streak: number; unlocked: number; achievements: number }

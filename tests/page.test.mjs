@@ -631,3 +631,13 @@ test('two walking the same stretch at once go side by side, not through each oth
   assert.equal(c.y, 300)
   assert.ok(Math.abs(c.x - d.x) > 0, 'one walking down beside the other')
 })
+
+test('the log hears when Claude finishes a long turn, not a short or a cut one', () => {
+  const session = turn => ({ key: 'k', project: 'p', main: { state: 'idle', detail: 'Holder pause' }, subs: [], ...(turn ? { turn } : {}) })
+  const before = { sessions: [session({ endedAt: 1, ms: 300_000, isAborted: false })] }
+  const kinds = turn => eventsBetween(before, { sessions: [session(turn)] }).map(e => e.kind)
+  assert.deepEqual(kinds({ endedAt: 2, ms: 240_000, isAborted: false }), ['done'])
+  assert.deepEqual(kinds({ endedAt: 2, ms: 30_000, isAborted: false }), [])
+  assert.deepEqual(kinds({ endedAt: 2, ms: 240_000, isAborted: true }), [])
+  assert.deepEqual(kinds({ endedAt: 1, ms: 300_000, isAborted: false }), [], 'the same turn again is no news')
+})

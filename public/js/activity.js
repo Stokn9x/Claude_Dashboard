@@ -6,6 +6,8 @@ import { ITEMS } from './plan.js'
 import { kr } from './util.js'
 
 const isAtWork = sub => sub.phase === 'arriving' || sub.phase === 'working'
+// A turn at least this long, finished, is news
+export const DONE_AFTER_MS = 2 * 60_000
 
 // One event: when, what kind (for its icon), the line, and which project.
 const event = (at, kind, text, project = '') => ({ at, kind, text, project })
@@ -29,6 +31,11 @@ const sessionEvents = (before, after, now) => {
     events.push(event(now, after.party.kind, who ? `${who.name}: ${after.party.label}` : after.party.label, project))
   }
   if (after.main?.state === 'waiting' && before.main?.state !== 'waiting') events.push(event(now, 'waiting', `Claude venter på dig: ${after.main.detail.replace(/^Venter på dig:\s*/, '')}`, project))
+  // A long turn that ended on its own: worth telling you about.
+  const turn = after.turn
+  if (turn && turn.endedAt !== before.turn?.endedAt && !turn.isAborted && turn.ms >= DONE_AFTER_MS) {
+    events.push(event(now, 'done', `Claude er færdig efter ${Math.round(turn.ms / 60_000)} min`, project))
+  }
   return events
 }
 

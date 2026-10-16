@@ -400,3 +400,22 @@ test('each name keeps a tally for the month, and the most tasks lead it', async 
     await stop(child)
   }
 })
+
+test("a helper's answer is kept with its task, also when it comes after the hand-over", async () => {
+  const home = newHome()
+  const child = await start(home)
+  const file = path.join(home, '.claude', 'agent-kontor', 'sessions', 'sa.json')
+  const since = Date.now() - 1000
+  const write = sub => fs.writeFileSync(file, JSON.stringify({ v: 2, key: 'sa', project: 'p', updatedAt: Date.now(), main: { state: 'idle', detail: 'x' }, subs: [sub], earned: { added: 0, removed: 0, delivered: 0, tests: 0, commits: 0, prs: 0 } }))
+  try {
+    write({ id: 'a', name: 'Alma', task: 'Find fejlen', phase: 'delivering', since, seat: 0 })
+    await sleep(900)
+    write({ id: 'a', name: 'Alma', task: 'Find fejlen', phase: 'delivering', since, seat: 0, answer: 'Fejlen sad i parseren.' })
+    await sleep(900)
+    const { tasks } = JSON.parse((await get('/api/state')).body).game.stats.today
+    assert.equal(tasks.length, 1)
+    assert.equal(tasks[0].answer, 'Fejlen sad i parseren.')
+  } finally {
+    await stop(child)
+  }
+})

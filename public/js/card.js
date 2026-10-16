@@ -34,7 +34,7 @@ const subject = () => {
       tools: stats.tools,
       linesAdded: stats.linesAdded,
       linesRemoved: stats.linesRemoved,
-      note: typeof stats.costUsd === 'number' ? `$${stats.costUsd.toFixed(2)} i denne session` : null,
+      note: [typeof stats.costUsd === 'number' ? `$${stats.costUsd.toFixed(2)} i denne session` : null, typeof stats.context === 'number' ? `konteksten er ${Math.round(stats.context)} % fuld` : null].filter(Boolean).join(' · ') || null,
       recent: stats.recent,
     }
   }
@@ -70,6 +70,7 @@ export const renderCard = () => {
     el('div', { className: 'card-now', style: `color:${stateColor[who.activity.state] ?? 'inherit'}` }, [who.activity.detail]),
     ...(who.note ? [el('div', { className: 'card-note' }, [who.note])] : []),
     ...(facts.length ? [el('div', { className: 'card-facts' }, [facts.join(' · ')])] : []),
+    ...(who.answer ? [el('div', { className: 'card-label' }, ['Svar']), el('p', { className: 'card-answer' }, [who.answer])] : []),
     ...(steps.length
       ? [el('div', { className: 'card-label' }, ['Seneste']), el('ol', { className: 'card-steps' }, steps.map(step => el('li', {}, [el('time', {}, [clockTime(step.at)]), step.detail])))]
       : []),

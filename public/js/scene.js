@@ -10,7 +10,7 @@ import { MAIN, MAIN_SPOT, ROOM_TYPES, at, coffeeSpot, desks, firstRoom, isBuilt,
 import { HOMEWARD_MS, WALKS, homewardPose, outAt, poseOf, route, sideBySide, walkAt, walkMs } from './routes.js'
 import { STAY, banterFor, breakNow, errandPose, meetingNow } from './breaks.js'
 import { bowl, cat, claudeLook, hands, lookFor, onTheFloor, sitting, sittingBack, standing } from './figures.js'
-import { blueprint, board, chair, clock, desk, deskThingsFor, magnifier, mug, steam, wateringCan } from './furniture.js'
+import { blueprint, board, chair, clock, coffeePot, desk, deskPlant, deskThingsFor, magnifier, mug, steam, wateringCan } from './furniture.js'
 import { PAUSE_SLOT_MS, bowlOf, catNow, catPlaces, claudePause } from './cat.js'
 import { christmasLights, daylight, drawWeather, evening, timeOfDay, weatherNow } from './light.js'
 import { chatFor, grumbleAt } from './voices.js'
@@ -232,11 +232,16 @@ const errandsNow = (subs, now, meeting, pause) => {
 
 // Claude: at the desk, on the way to or at the meeting, in the kitchen with
 // a mug on a break, or walking between them.
-const drawClaude = ({ main, where, rest, meetingPose, claudeWalk, kitchenSpot, glowing, hits, t }) => {
+const drawClaude = ({ s, main, where, rest, meetingPose, claudeWalk, kitchenSpot, glowing, hits, t }) => {
   const isAtDesk = where === 'desk'
   chair(MAIN.cx, MAIN.dy)
   if (isAtDesk) sitting(MAIN.cx, MAIN.dy + 4, claudeLook, main.state === 'waiting', t, 7)
   desk(MAIN.cx, MAIN.dy, 128, isAtDesk ? main.state : null, t, 2)
+  // The session's limits, as things on the desk: the coffee left of the five
+  // hours, and a plant that wilts as the context fills.
+  const stats = s?.stats ?? {}
+  coffeePot(MAIN.cx - 30, MAIN.dy + 4, typeof stats.fiveHour === 'number' ? 1 - stats.fiveHour / 100 : null)
+  deskPlant(MAIN.cx + 24, MAIN.dy + 6, typeof stats.context === 'number' ? 1 - stats.context / 100 : null)
   if (isAtDesk) {
     glowing.push([MAIN.cx + 46, MAIN.dy + 8], [MAIN.cx - 46, MAIN.dy + 8])
     hands(MAIN.cx, MAIN.dy, claudeLook, main.state !== 'waiting', t)

@@ -753,3 +753,23 @@ test("a subagent's permission dialog marks the subagent as waiting, not Claude",
   expect((file.last()?.subs[0] as unknown as { activity: { state: string } }).activity.state).toBe('waiting')
   expect(file.last()?.main.state).not.toBe('waiting')
 })
+
+test("the status file carries Claude's last turn, the context's fill and a helper's answer", async ($, on) => {
+  const clock = engine(on, async e => {
+    if (e.tool === 'Agent') await $.agent.spawn({ tool_use_id: e.tool_use_id, prompt: 'p', description: 'Kortlæg API’et', subagentType: 'Explore', parentModel: 'm', background: true } as never)
+    return undefined
+  })
+  const file = statusFile(on)
+  on('session.measure', (_, e) => ({ changed: e.changed }) as never)
+  await $.session.start(start())
+  await $.tool.call({ tool: 'Agent', prompt: 'p', description: 'Kortlæg API’et', tool_use_id: 'q1', run_in_background: true } as never)
+  await $.turn.complete({ reason: 'answer', answer: '  API’et har tre endepunkter: /a, /b og /c.  ', durationMs: 5000, isAborted: false, turnId: 't2', agentId: 'sub-q1' } as never)
+  await $.turn.complete({ reason: 'answer', answer: 'Færdig', durationMs: 240_000, isAborted: false, turnId: 't3' } as never)
+  await $.session.measure({ context: { window: 200_000, tokens: 90_000, percent: 45 }, rateLimits: [], changed: ['context'] } as never)
+  await clock.advance(600)
+  const status = file.last() as unknown as { turn: { ms: number; isAborted: boolean }; stats: { context: number }; subs: { answer?: string }[] }
+  expect(status.turn.ms).toBe(240_000)
+  expect(status.turn.isAborted).toBe(false)
+  expect(status.stats.context).toBe(45)
+  expect(status.subs[0]?.answer).toBe('API’et har tre endepunkter: /a, /b og /c.')
+})

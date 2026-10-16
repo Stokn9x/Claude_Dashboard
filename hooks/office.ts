@@ -39,6 +39,8 @@ export const emptyOffice: Office = {
   lastTestAt: 0,
   editedSinceCommit: { added: 0, removed: 0 },
   game: null,
+  lastTurn: null,
+  context: null,
 }
 const office = atom({ plugin: 'agent-kontor', key: 'office' } as const, emptyOffice)
 

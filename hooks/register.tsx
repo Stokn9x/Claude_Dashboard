@@ -20,6 +20,8 @@ const office = atom({ plugin: 'agent-kontor', key: 'office' } as const, emptyOff
 // the machine.
 
 const PANE = 'kontor'
+// How much of a helper's answer the office keeps
+const ANSWER_MAX = 600
 
 // ─── Panel ──────────────────────────────────────────────────────────────
 
@@ -87,16 +89,24 @@ export const register: Register = on => {
 
   on('turn.complete', async ($, e, next) => {
     const result = await next(e)
-    if (e.agentId) return result
+    const now = await $.clock.now()
+    // A helper's last answer: the start of it, for its card and the day's list.
+    if (e.agentId) {
+      const answer = typeof e.answer === 'string' ? e.answer.trim().slice(0, ANSWER_MAX) : ''
+      if (answer) await quietly(update($, office, o => ({ ...o, subs: o.subs.map(s => (s.id === e.agentId ? { ...s, answer } : s)) })))
+      return result
+    }
     const u = e.usage
     if (u) await quietly(update($, office, o => ({ ...o, tokensOut: o.tokensOut + u.output_tokens, model: u.model })))
+    const lastTurn = { endedAt: now, ms: Math.max(0, Number(e.durationMs) || 0), isAborted: !!e.isAborted || e.reason !== 'answer' }
+    await quietly(update($, office, o => ({ ...o, lastTurn })))
     await quietly(setMain($, pause))
     return result
   })
 
   on('session.measure', async ($, e, next) => {
     const five = e.rateLimits.find(l => l.kind === 'five_hour')
-    await quietly(update($, office, o => ({ ...o, costUsd: e.cost?.usd ?? o.costUsd, fiveHour: five?.percentUsed ?? o.fiveHour })))
+    await quietly(update($, office, o => ({ ...o, costUsd: e.cost?.usd ?? o.costUsd, fiveHour: five?.percentUsed ?? o.fiveHour, context: e.context?.percent ?? o.context })))
     return next(e)
   })
 

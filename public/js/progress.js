@@ -15,18 +15,30 @@ const clock = at => new Date(at).toLocaleTimeString('da-DK', { hour: '2-digit', 
 const todayList = today => {
   const tasks = [...(today.tasks ?? [])].sort((a, b) => b.at - a.at)
   const isMixed = new Set(tasks.map(t => t.project)).size > 1
-  const rows = tasks.slice(0, TASKS_SHOWN).map(t =>
-    el('li', { className: t.failed ? 'is-stuck' : '' }, [
+  const rows = tasks.slice(0, TASKS_SHOWN).map(t => {
+    const id = `${t.at}|${t.name}`
+    const isOpen = opened.has(id)
+    return el('li', { className: `${t.failed ? 'is-stuck' : ''}${t.answer ? ' has-answer' : ''}`, title: t.answer && !isOpen ? 'Klik for at se svaret' : '', onclick: t.answer ? () => toggle(id) : null }, [
       el('span', { className: 'task-time' }, [clock(t.at)]),
       el('span', { className: 'task-what' }, [el('strong', {}, [t.name]), ` ${t.task}`, ...(isMixed && t.project ? [el('em', {}, [` · ${t.project}`])] : [])]),
-      el('span', { className: 'task-mark', title: t.failed ? 'Gik i stå' : 'Afleveret' }, [t.failed ? '⚠' : '✓']),
-    ]),
-  )
+      el('span', { className: 'task-mark', title: t.failed ? 'Gik i stå' : 'Afleveret' }, [t.answer ? '💬' : t.failed ? '⚠' : '✓']),
+      ...(isOpen ? [el('p', { className: 'task-answer' }, [t.answer])] : []),
+    ])
+  })
   return [
     el('div', { className: 'today-head' }, [el('h3', {}, ['I dag']), el('button', { type: 'button', className: 'copy', title: 'Kopiér dagens opsummering som tekst' }, ['📋 Kopiér'])]),
     tasks.length ? el('ul', { className: 'tasks' }, rows) : el('p', { className: 'hint' }, ['Ingen opgaver afleveret endnu i dag.']),
     ...(tasks.length > TASKS_SHOWN ? [el('p', { className: 'hint' }, [`og ${number(tasks.length - TASKS_SHOWN)} mere: de står alle i kopien.`])] : []),
   ]
+}
+
+// Which of today's tasks are open to their answer; a click opens or closes one.
+const opened = new Set()
+const toggle = id => {
+  if (opened.has(id)) opened.delete(id)
+  else opened.add(id)
+  progressKey = ''
+  renderProgress()
 }
 
 // The copy button lives in a list that is rebuilt as the day goes on, so the

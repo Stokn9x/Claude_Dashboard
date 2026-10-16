@@ -183,6 +183,7 @@ const renderPeople = s => {
     stats.linesAdded || stats.linesRemoved ? `+${stats.linesAdded} −${stats.linesRemoved} linjer` : null,
     typeof stats.costUsd === 'number' ? `$${stats.costUsd.toFixed(2)}` : null,
     typeof stats.fiveHour === 'number' ? `${Math.round(stats.fiveHour)} % af 5-timers-grænsen` : null,
+    typeof stats.context === 'number' ? `kontekst ${Math.round(stats.context)} %` : null,
   ].filter(Boolean)
   // Those waiting for you first, then the rest as they came in
   const subs = [...(s.subs ?? [])].sort((a, b) => (b.activity.state === 'waiting') - (a.activity.state === 'waiting') || a.seat - b.seat)

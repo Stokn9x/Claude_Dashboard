@@ -39,7 +39,8 @@ export const statusOf = (o: Office) => ({
   main: o.main,
   subs: o.subs,
   party: o.party,
-  stats: { linesAdded: o.linesAdded, linesRemoved: o.linesRemoved, costUsd: o.costUsd, fiveHour: o.fiveHour, model: o.model, tools: o.tools, recent: o.recent },
+  stats: { linesAdded: o.linesAdded, linesRemoved: o.linesRemoved, costUsd: o.costUsd, fiveHour: o.fiveHour, context: o.context, model: o.model, tools: o.tools, recent: o.recent },
+  turn: o.lastTurn,
   earned: o.earned,
   walks: WALKS,
 })

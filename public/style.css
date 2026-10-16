@@ -177,6 +177,10 @@ body.tv header:hover { opacity: 1; }
 .ranking { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
 .ranking li { display: grid; grid-template-columns: 24px 30px auto 1fr; gap: 8px; align-items: center; padding: 4px 10px; border-radius: 10px; background: var(--surface-2); font-size: 13px; }
 .ranking .hint { text-align: right; font-size: 11px; }
+.card-answer { margin: 0; max-height: 9.5em; overflow-y: auto; white-space: pre-wrap; font-size: 12px; line-height: 1.45; color: var(--ink); padding: 6px 8px; border-radius: 8px; background: var(--surface-2); scrollbar-width: thin; }
+.tasks li.has-answer { cursor: pointer; }
+.tasks li.has-answer:hover { background: color-mix(in srgb, var(--accent) 12%, var(--surface-2)); }
+.tasks .task-answer { grid-column: 1 / -1; margin: 2px 0 0; white-space: pre-wrap; color: var(--ink); font-size: 12px; line-height: 1.45; }
 .totals { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 4px 12px; font-size: 13px; }
 .totals strong { margin-right: 6px; font-variant-numeric: tabular-nums; }
 .achievements { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }

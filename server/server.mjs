@@ -15,7 +15,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-const VERSION = '0.25.1'
+const VERSION = '0.26.0'
 const HOST = '127.0.0.1'
 const PORT = Number(process.env.AGENT_KONTOR_PORT || 4747)
 const HERE = path.dirname(fileURLToPath(import.meta.url))
@@ -387,6 +387,8 @@ const pruneDays = () => {
 // a hundred a day, kept for a week.
 const TASK_DAYS_KEPT = 7
 const TASKS_PER_DAY = 100
+// How much of a helper's answer is kept with its task
+const ANSWER_KEPT = 400
 const noteTasks = (status, now) => {
   if (!status.key || !Array.isArray(status.subs)) return
   for (const sub of status.subs) {
@@ -397,9 +399,19 @@ const noteTasks = (status, now) => {
     game.days[day] ??= {}
     const tasks = (game.days[day].tasks ??= [])
     const id = `${status.key}/${sub.id}/${at}`
-    if (tasks.length >= TASKS_PER_DAY || tasks.some(t => t.id === id)) continue
+    const answer = typeof sub.answer === 'string' ? sub.answer.slice(0, ANSWER_KEPT) : ''
+    const known = tasks.find(t => t.id === id)
+    // The answer can come a moment after the hand-over: added when it does.
+    if (known) {
+      if (answer && !known.answer) {
+        known.answer = answer
+        isGameChanged = true
+      }
+      continue
+    }
+    if (tasks.length >= TASKS_PER_DAY) continue
     const name = String(sub.name ?? '').slice(0, 30)
-    tasks.push({ id, at, name, task: String(sub.task ?? '').slice(0, 100), project: String(status.project ?? '').slice(0, 60), ...(sub.outcome === 'failed' ? { failed: true } : {}) })
+    tasks.push({ id, at, name, task: String(sub.task ?? '').slice(0, 100), project: String(status.project ?? '').slice(0, 60), ...(sub.outcome === 'failed' ? { failed: true } : {}), ...(answer ? { answer } : {}) })
     noteStaff(day.slice(0, 7), name, sub)
     isGameChanged = true
   }

@@ -246,3 +246,30 @@ export const blueprint = (x, y) => {
   rect(x - 3, y - 2, 0.6, 6, '#BFD6F2')
   rounded(x + 4, y - 4, 4, 10, 2, '#5A8BD0', OUTLINE, 1)
 }
+
+// On Claude's desk, what is left of the session's limits, as things: a glass
+// coffee pot that empties as the five-hour limit is used (`left` 0 to 1, null
+// when not known: full), and a plant that wilts as the context fills
+// (`health` 0 to 1, null: well).
+export const coffeePot = (x, y, left) => {
+  const k = left === null ? 1 : Math.max(0, Math.min(1, left))
+  rounded(x - 1, y - 1, 10, 13, 2, OUTLINE)
+  rect(x, y, 8, 11, '#DDE7EE')
+  rect(x, y + 11 - 9 * k, 8, 9 * k, '#6E4426')
+  rect(x, y, 8, 2, '#3E4852')
+  rect(x + 8, y + 3, 2.5, 5, OUTLINE)
+  rect(x + 1, y + 3, 1, 6, 'rgba(255, 255, 255, 0.6)')
+}
+export const deskPlant = (x, y, health) => {
+  const k = health === null ? 1 : Math.max(0, Math.min(1, health))
+  // Green when well, yellow, then brown; the leaves droop as it goes.
+  const leaf = k > 0.5 ? '#3E8A55' : k > 0.25 ? '#B7A43A' : '#8B5E3C'
+  const light = k > 0.5 ? '#6CC082' : k > 0.25 ? '#D9C55A' : '#A97A52'
+  const droop = (1 - k) * 5
+  rect(x - 3, y + 5, 7, 6, '#B5683E')
+  rect(x - 3, y + 5, 7, 1.5, '#9C5A34')
+  for (const [dx, side] of [[-3.5, -1], [0, 0], [3.5, 1]]) {
+    circle(x + 0.5 + dx + side * droop * 0.6, y + 1 - (side === 0 ? 3 - droop : 1) + droop, 2.6, leaf, OUTLINE)
+  }
+  circle(x - 0.5, y - 1 + droop, 1.2, light)
+}

@@ -1,7 +1,8 @@
 // ── Telling you when the page is not in view ────────────────────────────
-// While Claude or a helper waits for you, the tab's title says so. With the
-// bell turned on (the browser asks first), a notice pops up too, but only
-// when the office's tab is hidden: in view, the page shows it already.
+// While Claude or a helper waits for you, the tab's title says so, and when
+// Claude has finished a long turn it says ✅ until you look. With the bell
+// turned on (the browser asks first), a notice pops up too, but only when
+// the office's tab is hidden: in view, the page shows it already.
 import { remember, remembered } from './util.js'
 
 const TITLE = 'Agent-kontor'
@@ -21,8 +22,8 @@ const render = () => {
     Notification.permission === 'denied'
       ? 'Browseren har blokeret beskeder fra kontoret. Det kan ændres i browserens indstillinger for siden.'
       : isActive
-        ? 'Du får en besked, når nogen venter på dig og fanen er skjult. Klik for at slå det fra.'
-        : 'Få en besked, når nogen venter på dig og fanen er skjult.'
+        ? 'Du får en besked, når nogen venter på dig, eller Claude er færdig med en lang opgave, og fanen er skjult. Klik for at slå det fra.'
+        : 'Få en besked, når nogen venter på dig, eller Claude er færdig med en lang opgave, og fanen er skjult.'
 }
 
 button.addEventListener('click', async () => {
@@ -36,12 +37,25 @@ button.addEventListener('click', async () => {
   render()
 })
 
-// A notice for each new wait, while the tab is hidden.
+// Finished while you were away: the title says so until the tab is seen.
+let doneUnseen = null
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden || !doneUnseen) return
+  doneUnseen = null
+  document.title = TITLE
+})
+
+// A notice for each new wait, and for Claude done with a long turn, while
+// the tab is hidden.
+const HEADS = { waiting: 'Claude venter på dig', done: 'Claude er færdig' }
 export const notifyFor = events => {
-  if (!isOn || !isAllowed() || !document.hidden) return
-  for (const e of events.filter(x => x.kind === 'waiting')) {
+  if (!document.hidden) return
+  const done = events.find(x => x.kind === 'done')
+  if (done) doneUnseen = done
+  if (!isOn || !isAllowed()) return
+  for (const e of events.filter(x => HEADS[x.kind])) {
     try {
-      const notice = new Notification('Claude venter på dig', { body: e.project ? `${e.project}: ${e.text}` : e.text, tag: 'agent-kontor-waiting' })
+      const notice = new Notification(HEADS[e.kind], { body: e.project ? `${e.project}: ${e.text}` : e.text, tag: `agent-kontor-${e.kind}` })
       notice.onclick = () => {
         window.focus()
         notice.close()
@@ -55,7 +69,7 @@ export const notifyFor = events => {
 // The tab's title: a red dot and the count while anyone waits for you.
 export const titleFor = state => {
   const waiting = (state.sessions ?? []).reduce((n, s) => n + (s.main?.state === 'waiting' ? 1 : 0) + (s.subs ?? []).filter(x => x.activity?.state === 'waiting').length, 0)
-  document.title = waiting ? `🔴 ${waiting === 1 ? 'Venter på dig' : `${waiting} venter på dig`} · ${TITLE}` : TITLE
+  document.title = waiting ? `🔴 ${waiting === 1 ? 'Venter på dig' : `${waiting} venter på dig`} · ${TITLE}` : doneUnseen ? `✅ Færdig · ${TITLE}` : TITLE
 }
 
 render()
