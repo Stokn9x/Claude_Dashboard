@@ -33,6 +33,7 @@ const emptyOffice: Office = {
   linesAdded: 0,
   linesRemoved: 0,
   fiveHour: null,
+  isOfficeOpen: false,
 }
 const office = atom({ plugin: 'agent-kontor', key: 'office' } as const, emptyOffice)
 
@@ -143,7 +144,8 @@ const arrive = async ($: $, id: string, task: string, activity: Activity) => {
 }
 
 // Done: walk the result over to Claude, hand it over, then out of the door.
-const deliver = async ($: $, id: string) => {
+// A helper whose loop failed or was stopped walks the same way, empty-handed.
+const deliver = async ($: $, id: string, outcome?: 'failed') => {
   const now = await $.clock.now()
   let seat: number | null = null
   await update($, office, o => ({
@@ -151,7 +153,8 @@ const deliver = async ($: $, id: string) => {
     subs: o.subs.map(s => {
       if (s.id !== id || (s.phase !== 'arriving' && s.phase !== 'working')) return s
       seat = s.seat
-      return { ...s, phase: 'delivering' as Phase, since: now, activity: { state: 'working' as AgentState, detail: `Afleverer: ${s.task}` } }
+      const detail = outcome === 'failed' ? `Gik i stå: ${s.task}` : `Afleverer: ${s.task}`
+      return { ...s, phase: 'delivering' as Phase, since: now, outcome, activity: { state: 'working' as AgentState, detail } }
     }),
   }))
   if (seat === null) return
@@ -169,6 +172,27 @@ const deliver = async ($: $, id: string) => {
       })(),
     )
   })
+}
+
+// Some ends raise no event: a subagent that fails (a rate limit, a stall) or
+// is stopped. The engine's list of agents says how each loop stands; one that
+// has ended goes home, and so does one the list no longer has (it drops ended
+// loops after a while, and a reload forgets the rest) once it has had a minute
+// to appear there.
+const ENDED = new Set(['completed', 'failed', 'killed'])
+const UNLISTED_MS = 60_000
+
+const sweepAgents = async ($: $) => {
+  const o = await readOffice($)
+  const desks = o.subs.filter(s => (s.phase === 'arriving' || s.phase === 'working') && !s.id.startsWith('demo-'))
+  if (desks.length === 0) return
+  const agents = await $.agent.list()
+  const now = await $.clock.now()
+  for (const s of desks) {
+    const agent = agents.find(a => a.id === s.id)
+    if (agent && ENDED.has(agent.status)) await deliver($, s.id, agent.status === 'completed' ? undefined : 'failed')
+    else if (!agent && now - s.since > UNLISTED_MS) await deliver($, s.id)
+  }
 }
 
 // Tests, commits and pull requests, recognised by the command that ran them.
@@ -283,6 +307,7 @@ const ADDRESS = `http://127.0.0.1:${PORT}`
 const WRITE_MS = 500
 const HEARTBEAT_MS = 30_000
 const READ_MS = 3000
+const SERVER_CHECK_MS = 60_000
 const NO_SERVER = 'Kontorets server kunne ikke starte. Den kræver Node.js 18 eller nyere.'
 const STALE_MS = 120_000
 let lastWritten = ''
@@ -394,7 +419,15 @@ const openOffice = async ($: $) => {
   const argv = os === 'Windows_NT' ? ['explorer.exe', ADDRESS] : [(await $.env.get("XDG_CURRENT_DESKTOP")) ? 'xdg-open' : 'open', ADDRESS]
   // explorer.exe answers 1 even when it opened the page.
   await $.process.run(argv, { timeoutMs: 10_000 }).catch(() => null)
+  await update($, office, o => ({ ...o, isOfficeOpen: true }))
   return true
+}
+
+// Once the office is open, its server is started again if it is gone (it
+// stopped while the computer slept, or a crash took it), and the page,
+// which keeps trying, reconnects by itself.
+const keepServer = async ($: $) => {
+  if ((await readOffice($)).isOfficeOpen) await ensureServer($)
 }
 
 // ─── Hooks ──────────────────────────────────────────────────────────────
@@ -411,6 +444,8 @@ export const register: Register = on => {
     await update($, office, o => ({ ...o, sessionKey: o.sessionKey || key, project: base(e.cwd) || 'Kontoret', startedAt: o.startedAt || now, main: pause, subs: [] }))
     $.clock.every(WRITE_MS, () => void quietly(writeStatus($)))
     $.clock.every(READ_MS, () => void quietly(readOthers($)))
+    $.clock.every(READ_MS, () => void quietly(sweepAgents($)))
+    $.clock.every(SERVER_CHECK_MS, () => void quietly(keepServer($)))
     return next(e)
   })
 
@@ -565,7 +600,7 @@ export const register: Register = on => {
         return row(
           `s-${s.id}`,
           s.name,
-          isBusy ? s.activity.detail : `${phaseText[s.phase]}: ${s.task}`,
+          isBusy ? s.activity.detail : s.outcome === 'failed' ? `Gik i stå: ${s.task}` : `${phaseText[s.phase]}: ${s.task}`,
           isBusy ? s.activity.state : 'working',
           s.phase === 'arriving' ? `${s.task} (på vej ind)` : s.phase === 'working' ? s.task : null,
         )

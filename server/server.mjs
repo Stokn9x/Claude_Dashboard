@@ -14,7 +14,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-const VERSION = '0.7.3'
+const VERSION = '0.7.4'
 const HOST = '127.0.0.1'
 const PORT = Number(process.env.AGENT_KONTOR_PORT || 4747)
 const HERE = path.dirname(fileURLToPath(import.meta.url))
@@ -23,9 +23,15 @@ const SESSIONS = path.join(os.homedir(), '.claude', 'agent-kontor', 'sessions')
 const STALE_MS = 120_000
 const IDLE_EXIT_MS = 30 * 60_000
 const TICK_MS = 400
+// Status files of sessions that ended, or went quiet a day ago, are removed.
+const FORGET_MS = 24 * 60 * 60_000
 
 if (process.argv.includes('--detach')) {
   const child = spawn(process.execPath, [fileURLToPath(import.meta.url)], { detached: true, stdio: 'ignore', windowsHide: true })
+  child.on('error', err => {
+    process.stderr.write(`Kunne ikke starte kontoret: ${err.message}\n`)
+    process.exit(1)
+  })
   child.unref()
   process.stdout.write(JSON.stringify({ started: child.pid }) + '\n')
   process.exit(0)
@@ -34,6 +40,15 @@ if (process.argv.includes('--detach')) {
 // ── The sessions, as their files say ────────────────────────────────────
 
 const previous = new Map()
+
+const forget = name => {
+  try {
+    fs.unlinkSync(path.join(SESSIONS, name))
+  } catch {
+    // Gone already, or held by its session for a moment: the next tick tries again.
+  }
+  previous.delete(name)
+}
 
 const readSessions = () => {
   let names = []
@@ -44,6 +59,7 @@ const readSessions = () => {
   }
   const now = Date.now()
   const sessions = []
+  for (const name of previous.keys()) if (!names.includes(name)) previous.delete(name)
   for (const name of names) {
     let status = null
     try {
@@ -53,39 +69,69 @@ const readSessions = () => {
       // Half-written: what the last read said, until the next tick reads it whole.
       status = previous.get(name) ?? null
     }
+    if (status && (status.ended || now - (status.updatedAt ?? 0) > FORGET_MS)) forget(name)
     if (!status || status.ended || !status.main || now - (status.updatedAt ?? 0) > STALE_MS) continue
     sessions.push(status)
   }
   return sessions.sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0))
 }
 
-let current = JSON.stringify({ sessions: readSessions() })
+// updatedAt moves with every heartbeat; only what the page draws counts as news.
+const shapeOf = sessions => JSON.stringify(sessions.map(({ updatedAt, ...rest }) => rest))
+
+let sessionsNow = readSessions()
+let current = JSON.stringify({ sessions: sessionsNow })
+let currentShape = shapeOf(sessionsNow)
 let lastBusyAt = Date.now()
 const listeners = new Set()
 
-const publish = () => {
-  const sessions = readSessions()
-  if (sessions.length > 0 || listeners.size > 0) lastBusyAt = Date.now()
-  // updatedAt moves with every heartbeat; only what the page draws counts as news.
-  const next = JSON.stringify({ sessions })
-  const shape = s => JSON.stringify(JSON.parse(s).sessions.map(({ updatedAt, ...rest }) => rest))
-  if (shape(next) === shape(current)) {
-    current = next
+const send = (res, text) => {
+  // A stream that cannot keep up (a sleeping laptop, a half-open connection)
+  // is closed; its page reconnects and starts from the whole state.
+  if (res.writableLength > 1_000_000) {
+    listeners.delete(res)
+    res.destroy()
     return
   }
-  current = next
-  for (const res of listeners) res.write(`data: ${current}\n\n`)
+  res.write(text)
+}
+
+const publish = () => {
+  sessionsNow = readSessions()
+  if (sessionsNow.length > 0) lastBusyAt = Date.now()
+  current = JSON.stringify({ sessions: sessionsNow })
+  const shape = shapeOf(sessionsNow)
+  if (shape === currentShape) return
+  currentShape = shape
+  for (const res of listeners) send(res, `data: ${current}\n\n`)
 }
 
 setInterval(publish, TICK_MS)
-try {
-  fs.mkdirSync(SESSIONS, { recursive: true })
-  fs.watch(SESSIONS, () => publish())
-} catch {
-  // Watching is a nicety; the interval does the work without it.
-}
 
-// Off when nobody has used the office for a while.
+// The folder is watched for quick news; a burst of events from one write is
+// one read. The interval does the work alone while watching fails.
+let soon = null
+const watchSessions = () => {
+  try {
+    fs.mkdirSync(SESSIONS, { recursive: true })
+    const watcher = fs.watch(SESSIONS, () => {
+      soon ??= setTimeout(() => {
+        soon = null
+        publish()
+      }, 50)
+    })
+    watcher.on('error', () => {
+      watcher.close()
+      setTimeout(watchSessions, 5000)
+    })
+  } catch {
+    setTimeout(watchSessions, 5000)
+  }
+}
+watchSessions()
+
+// Off when no Claude session has run for a while. An open page does not keep
+// it on: a session that wants the office starts it again.
 setInterval(() => {
   if (Date.now() - lastBusyAt > IDLE_EXIT_MS) process.exit(0)
 }, 60_000)
@@ -119,13 +165,16 @@ const server = http.createServer((req, res) => {
   }
   if (url.pathname === '/api/events') {
     res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-store', connection: 'keep-alive' })
-    res.write(`data: ${current}\n\n`)
+    // retry: how soon the page tries again after losing the stream.
+    res.write(`retry: 2000\ndata: ${current}\n\n`)
     listeners.add(res)
-    const ping = setInterval(() => res.write(': ping\n\n'), 15_000)
-    req.on('close', () => {
+    const ping = setInterval(() => send(res, ': ping\n\n'), 15_000)
+    const done = () => {
       clearInterval(ping)
       listeners.delete(res)
-    })
+    }
+    res.on('close', done)
+    res.on('error', done)
     return
   }
 

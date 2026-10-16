@@ -616,7 +616,7 @@ const draw = () => {
     const lines = ['Kaffepause', s?.stats?.linesAdded ? `${s.stats.linesAdded} linjer i dag` : 'Klar når du er', 'Godt arbejde, team', 'Hvad nu?']
     bubble(KITCHEN_SEAT.x, KITCHEN_SEAT.y - 46, lines[Math.floor(t / 3000) % lines.length], false, t)
   } else if (thanking) {
-    bubble(MAIN.cx, MAIN.dy - 30, `Tak, ${thanking.sub.name}!`, false, t)
+    bubble(MAIN.cx, MAIN.dy - 30, thanking.sub.outcome === 'failed' ? `Øv, ${thanking.sub.name}` : `Tak, ${thanking.sub.name}!`, false, t)
   } else {
     bubble(MAIN.cx, MAIN.dy - 30, main.detail, main.state === 'waiting', t)
   }
@@ -624,7 +624,9 @@ const draw = () => {
     const sub = subs.find(x => x.seat === seat && poseOf(x, now)?.seated)
     if (sub) bubble(seatAt(seat).cx, seatAt(seat).dy - 30, sub.activity.detail, sub.activity.state === 'waiting', t)
   }
-  for (const { sub, pose } of walkers) if (pose.handover) bubble(pose.x, pose.y - 46, `Afleverer: ${sub.task}`, false, t)
+  for (const { sub, pose } of walkers) {
+    if (pose.handover) bubble(pose.x, pose.y - 46, sub.outcome === 'failed' ? `Gik i stå: ${sub.task}` : `Afleverer: ${sub.task}`, sub.outcome === 'failed', t)
+  }
   others.forEach((o, i) => {
     if (o.main.state === 'idle') tag(72 + i * 112, 418, 'Holder pause', '#8A94A0')
     else bubble(72 + i * 112, 410, o.main.detail, o.main.state === 'waiting', t)
@@ -715,8 +717,10 @@ const connect = () => {
     statusLine.classList.remove('lost')
   }
   events.onmessage = e => receive(JSON.parse(e.data))
+  // The browser tries again by itself every two seconds; a session that has
+  // the office open starts the server again within a minute.
   events.onerror = () => {
-    statusLine.textContent = 'Forbindelsen til kontoret er tabt. Prøver igen…'
+    statusLine.textContent = 'Forbindelsen er tabt. Prøver igen… Er Claude lukket, så tryk på 🏢 Åbn kontor i Claude.'
     statusLine.classList.add('lost')
   }
 }

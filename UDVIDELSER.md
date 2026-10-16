@@ -15,6 +15,7 @@ Status: ✅ lavet · 🟡 delvist · ⬜ ikke lavet · ➖ ikke længere relevan
 | 0.7.0 | Kontoret tegnes i browseren af en lokal Node-server, i 60 billeder i sekundet uden hak, med en fane for hver session |
 | 0.7.2 | Knappen "🏢 Åbn kontor" over chatboksen starter serveren og åbner kontoret i din browser |
 | 0.7.3 | Kontoret fylder vinduet i både bredde og højde, er skarpt på alle skærme, og listen står ved siden af |
+| 0.7.4 | Hjælpere, der fejler eller stoppes, går hjem; serveren startes igen efter dvale; serveren er gjort mere robust |
 
 ## 🔧 Fejl og ting der driller
 
@@ -27,6 +28,9 @@ Status: ✅ lavet · 🟡 delvist · ⬜ ikke lavet · ➖ ikke længere relevan
 | 5 | **Genindlæses mod'en midt i en gåtur, går tidtagningen tabt,** og figuren kan hænge fast i "afleverer". Forløb, der er udløbet, bør ryddes op ved start. | S | ⬜ |
 | 6 | **Tegningen blinkede og hakkede ved hver ændring.** Løst ved at flytte tegningen til browseren. | M | ✅ |
 | 7 | **Kontorets bredde var et skøn** i panelet. Siden skalerer nu selv. | S | ➖ |
+| 36 | **Hjælpere, der fejler eller bliver stoppet, bliver siddende for evigt.** De går nu hjem, når Claudes liste over agenter siger, at de er stoppet, eller ikke længere har dem. | S | ✅ |
+| 37 | **Kontoret mister forbindelsen efter dvale.** Når kontoret er åbnet, starter mod'en serveren igen inden for et minut, og siden forbinder selv igen. | S | ✅ |
+| 38 | **Serveren:** fil-overvågningen kan ikke længere vælte den, faner med tabt forbindelse ryddes op, og statusfiler fra afsluttede sessioner slettes. | S | ✅ |
 | 8 | **Ruterne går ind over skrivebordskanter,** og to der går, kan overlappe hinanden. | M | ⬜ |
 
 ## ✅ Det skal være på plads

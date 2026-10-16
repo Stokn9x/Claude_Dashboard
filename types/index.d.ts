@@ -14,6 +14,8 @@ export type Sub = {
   phase: Phase
   since: number
   activity: Activity
+  // Set when the helper's loop failed or was stopped instead of finishing.
+  outcome?: 'failed'
 }
 
 // Another Claude session on this computer, as its own status file says.
@@ -47,6 +49,8 @@ export type Office = {
   linesAdded: number
   linesRemoved: number
   fiveHour: number | null
+  // The office was opened in this session: its server is kept running.
+  isOfficeOpen: boolean
 }
 
 declare module 'claude-code' {

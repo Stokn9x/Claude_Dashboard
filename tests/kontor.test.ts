@@ -1,5 +1,6 @@
 import type { On } from 'claude-code'
 import { expect, mock, test } from 'claude-code/testing'
+import type { TestBody } from 'claude-code/testing'
 
 const paneProps = { title: '🏢 Kontor', isFocused: true, bodyColumns: 80 } as never
 
@@ -285,4 +286,78 @@ test('the button above the chat box starts the server and opens the office in th
 
   expect(runs.find(argv => argv.includes('--detach'))?.[1]).toMatch(/\/server\/server\.mjs$/)
   expect(runs).toContainEqual(['explorer.exe', 'http://127.0.0.1:4747'])
+})
+
+// A background helper, as the model starts one: its Agent call returns at once.
+const backgroundHelper = (on: On, $: Parameters<TestBody>[0]) =>
+  engine(on, async e => {
+    if (e.tool === 'Agent') {
+      await $.agent.spawn({ tool_use_id: e.tool_use_id, prompt: 'p', description: 'Læs README', subagentType: 'Explore', parentModel: 'm', background: true } as never)
+    }
+  })
+
+const agentEntry = (id: string, status: string) => ({ id, description: 'Læs README', type: 'Explore', status })
+
+test('a helper whose loop failed goes home, and says so', async ($, on) => {
+  const clock = backgroundHelper(on, $)
+  const file = statusFile(on)
+  let status = 'running'
+  on('agent.list', () => ({ value: [agentEntry('sub-b1', status)] }) as never)
+  await $.session.start(start())
+  const ui = await $.ui.mount({ plugin: 'agent-kontor', surface: 'desktop', component: 'Pane', requestId: 'kontor', props: paneProps })
+
+  await $.tool.call({ tool: 'Agent', prompt: 'p', description: 'Læs README', tool_use_id: 'b1', run_in_background: true } as never)
+  await clock.advance(9000)
+  expect(file.last()?.subs[0]?.phase).toBe('working')
+
+  // A rate limit ends its loop: no SubagentStop, only the engine's list says so.
+  status = 'failed'
+  await clock.advance(3500)
+  expect(file.last()?.subs[0]?.phase).toBe('delivering')
+  expect(JSON.stringify(file.last()?.subs[0])).toContain('"outcome":"failed"')
+  expect(JSON.stringify(await ui.drawn())).toContain('Gik i stå: Læs README')
+})
+
+test('a helper the engine no longer lists goes home after a minute', async ($, on) => {
+  const clock = backgroundHelper(on, $)
+  const file = statusFile(on)
+  on('agent.list', () => ({ value: [] }) as never)
+  await $.session.start(start())
+
+  await $.tool.call({ tool: 'Agent', prompt: 'p', description: 'Læs README', tool_use_id: 'b1', run_in_background: true } as never)
+  await clock.advance(30_000)
+  expect(file.last()?.subs[0]?.phase).toBe('working')
+  await clock.advance(35_000)
+  expect(file.last()?.subs[0]?.phase).toBe('delivering')
+})
+
+test('once the office is open, a server that stopped is started again', async ($, on) => {
+  const clock = engine(on)
+  let isUp = false
+  let starts = 0
+  on('env.get', (_, e) => ({ value: e.name === 'OS' ? 'Windows_NT' : undefined }) as never)
+  on('http.fetch', () => {
+    if (!isUp) throw new Error('ECONNREFUSED')
+    return { value: { status: 200, ok: true, headers: {}, text: JSON.stringify({ ok: true, app: 'agent-kontor' }) } } as never
+  })
+  on('process.run', (_, e) => {
+    if (e.argv.includes('--detach')) {
+      starts += 1
+      isUp = true
+    }
+    return { value: { exitCode: 0, stdout: '', stderr: '' } } as never
+  })
+
+  await $.session.start(start())
+  // Not opened yet: nothing is kept running.
+  await clock.advance(61_000)
+  expect(starts).toBe(0)
+
+  await $.command.run({ command: 'kontor', args: '' } as never)
+  expect(starts).toBe(1)
+
+  // The computer slept and the server is gone.
+  isUp = false
+  await clock.advance(61_000)
+  expect(starts).toBe(2)
 })
