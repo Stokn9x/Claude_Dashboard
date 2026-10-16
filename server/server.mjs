@@ -15,7 +15,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-const VERSION = '0.14.0'
+const VERSION = '0.15.0'
 const HOST = '127.0.0.1'
 const PORT = Number(process.env.AGENT_KONTOR_PORT || 4747)
 const HERE = path.dirname(fileURLToPath(import.meta.url))
@@ -59,17 +59,51 @@ const CREDIT_KEEP_MS = 7 * 24 * 60 * 60_000
 
 const newGame = () => ({ v: 1, kroner: 0, owned: { ...START, rooms: [...START.rooms] }, credited: {}, startedAt: Date.now() })
 
-const loadGame = () => {
+// A copy of spil.json is put aside once a day, and the last week of them
+// kept: one bad write must never cost all the kroner.
+const BACKUPS = path.join(path.dirname(GAME), 'backup')
+const BACKUPS_KEPT = 7
+const backupNames = () => {
   try {
-    const saved = JSON.parse(fs.readFileSync(GAME, 'utf8'))
-    return { ...newGame(), ...saved, owned: { ...START, ...(saved.owned ?? {}) }, credited: saved.credited ?? {} }
+    return fs.readdirSync(BACKUPS).filter(name => /^spil-\d{4}-\d{2}-\d{2}\.json$/.test(name)).sort()
   } catch {
-    return newGame()
+    return []
   }
 }
 
+const readGame = file => {
+  const saved = JSON.parse(fs.readFileSync(file, 'utf8'))
+  if (!saved || typeof saved.kroner !== 'number') throw new Error('Ikke et spil')
+  return saved
+}
+
+// A spil.json that cannot be read is kept as spil.json.broken, and the game
+// goes on from the newest backup that can; with none, from the start.
+let isRecovered = false
+const loadGame = () => {
+  let saved = null
+  try {
+    saved = readGame(GAME)
+  } catch {
+    if (fs.existsSync(GAME)) {
+      try {
+        fs.copyFileSync(GAME, `${GAME}.broken`)
+      } catch {}
+      for (const name of backupNames().reverse()) {
+        try {
+          saved = readGame(path.join(BACKUPS, name))
+          isRecovered = true
+          break
+        } catch {}
+      }
+    }
+  }
+  if (!saved) return newGame()
+  return { ...newGame(), ...saved, owned: { ...START, ...(saved.owned ?? {}) }, credited: saved.credited ?? {} }
+}
+
 let game = loadGame()
-let isGameChanged = false
+let isGameChanged = isRecovered
 
 // Written whole to a side file first, then moved into place: a crash
 // half-way never leaves a broken spil.json.
@@ -82,6 +116,20 @@ const saveGame = () => {
     isGameChanged = false
   } catch {
     // Kept in memory; the next tick tries again.
+  }
+}
+
+let backedUpDay = ''
+const backupGame = now => {
+  const day = dayOf(now)
+  if (day === backedUpDay || !fs.existsSync(GAME)) return
+  try {
+    fs.mkdirSync(BACKUPS, { recursive: true })
+    fs.copyFileSync(GAME, path.join(BACKUPS, `spil-${day}.json`))
+    for (const old of backupNames().slice(0, -BACKUPS_KEPT)) fs.unlinkSync(path.join(BACKUPS, old))
+    backedUpDay = day
+  } catch {
+    // The next tick tries again.
   }
 }
 
@@ -363,6 +411,7 @@ const publish = (isForced = false) => {
   pruneCredited(Date.now())
   pruneDays()
   saveGame()
+  backupGame(Date.now())
   if (sessionsNow.length > 0) lastBusyAt = Date.now()
   current = stateOf(sessionsNow)
   const shape = shapeOf(sessionsNow)

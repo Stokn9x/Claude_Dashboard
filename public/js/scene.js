@@ -7,7 +7,7 @@ import { store, focused, owns } from './store.js'
 import { OUTLINE, bubble, canvas, circle, ctx, dashed, label, rect, rounded, say, shadow, tag } from './gfx.js'
 import { hashOf, kr } from './util.js'
 import { ITEMS, MAIN, MAIN_SPOT, PLAN, ROOM_TYPES, at, coffeeSpot, deskSlots, desks, firstRoom, isBuilt, placeOf, shiftOf, typeOf } from './plan.js'
-import { WALKS, poseOf, route, walkAt } from './routes.js'
+import { HOMEWARD_MS, WALKS, homewardPose, outAt, poseOf, route, walkAt } from './routes.js'
 import { STAY, banterFor, breakNow, errandPose, meetingNow } from './breaks.js'
 import { claudeLook, grumbleAt, hands, lookFor, onTheFloor, sitting, sittingBack, standing } from './figures.js'
 import { board, chair, clock, desk, deskThingsFor, mug, steam } from './furniture.js'
@@ -30,6 +30,9 @@ const standingBox = (x, y) => ({ x0: x - 19, y0: y - 52, x1: x + 19, y1: y + 15 
 // and walks there, rather than appearing at the desk.
 const lastPlaces = new Map()
 const moves = new Map()
+// Helpers on their way out, by id: { sub, out }, kept after the status file
+// has let them go, for the walk down the path.
+const homeward = new Map()
 
 // ── Celebrations ─────────────────────────────────────────────────────────
 const party = (p, spot, t) => {
@@ -311,7 +314,7 @@ const drawWalkers = ({ walkers, players, hits, t }) => {
     if (kind === 'coffee') mug(pose.x + 9, pose.y - 22)
     if (kind === 'pingpong') circle(pose.x + (pose.facing === 'right' ? 10 : -10), pose.y - 18, 3.2, '#E5484D', OUTLINE)
     tag(pose.x, pose.y + 3, sub.name, NAME)
-    hits.push({ kind: 'sub', id: sub.id, ...standingBox(pose.x, pose.y) })
+    if (!pose.isHomeward) hits.push({ kind: 'sub', id: sub.id, ...standingBox(pose.x, pose.y) })
   }
   // The ping-pong ball, while both players are at the table
   if (players.length === 2) {
@@ -420,9 +423,22 @@ export const draw = () => {
     .filter(sub => poses.get(sub.id)?.seated && sub.seat >= list.length && !onErrand.has(sub.id))
     .map(sub => ({ sub, spot: placeOf(sub.seat).spot }))
     .sort((a, b) => a.spot.y - b.spot.y)
+  for (const sub of subs) {
+    const out = outAt(sub, walks)
+    if (out !== null) homeward.set(sub.id, { sub, out })
+  }
+  const goingHome = []
+  for (const [id, { sub, out }] of homeward) {
+    if (now > out + HOMEWARD_MS) homeward.delete(id)
+    else if (now >= out && !subs.some(x => x.id === id && x.phase !== 'leaving' && x.phase !== 'delivering')) {
+      const pose = homewardPose(id, out, now)
+      if (pose) goingHome.push({ sub, pose: { ...pose, isHomeward: true } })
+    }
+  }
   const walkers = subs
     .map(sub => ({ sub, pose: onErrand.get(sub.id) ?? poses.get(sub.id) }))
     .filter(w => w.pose && !w.pose.seated)
+    .concat(goingHome)
     .sort((a, b) => a.pose.y - b.pose.y)
   const players = walkers.filter(w => w.pose.isThere && w.pose.errand.kind === 'pingpong')
   const sales = forSaleNow(list)

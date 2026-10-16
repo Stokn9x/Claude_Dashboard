@@ -1,52 +1,15 @@
 // ── Outdoors ─────────────────────────────────────────────────────────────
 // The grounds round the office: grass, trees, a pond, the path from the
 // front door, a hedge, the pavement and the road with its street lights.
-// Where every tree stands is worked out once, from fixed seeds, so it is
-// the same on every screen. The ground is drawn with the building; the cars
-// and the duck move, and are drawn every frame.
+// Where every tree stands comes from scenery.js. The ground is drawn with
+// the building; the cars and the duck move, and are drawn every frame.
 import { OUTLINE, ctx, rect, rounded, shadow } from './gfx.js'
-import { stir, isIn } from './util.js'
-import { GROUNDS, WORLD } from './plan.js'
+import { stir } from './util.js'
+import { GROUNDS } from './plan.js'
+import { FLOWERS, HEDGE_Y, TREES, TUFTS } from './scenery.js'
 
 export const GRASS = '#7FAE63'
 const S = GROUNDS.scene
-const HEDGE_Y = GROUNDS.pavement.y - 14
-
-// Where nothing may grow: the office and a strip round it, the path, the
-// street with its hedge and pavements, the pond's banks and the bench.
-const isClear = (x, y, r) => {
-  const keepOut = [
-    [WORLD.x - 30 - r, WORLD.y - 22 - r, WORLD.w + 60 + 2 * r, WORLD.h + 44 + 2 * r],
-    ...GROUNDS.path.map(([px, py, w, h]) => [px - 16 - r, py - 22 - r, w + 32 + 2 * r, h + 30 + 2 * r]),
-    [S.x, HEDGE_Y - 18 - r, S.w, GROUNDS.farPavement.y + GROUNDS.farPavement.h - HEDGE_Y + 30 + r],
-    [GROUNDS.bench.x - 30, GROUNDS.bench.y - 30, 60, 50],
-  ]
-  if (keepOut.some(box => isIn(x, y, box))) return false
-  const p = GROUNDS.pond
-  return ((x - p.x) / (p.rx + 24 + r)) ** 2 + ((y - p.y) / (p.ry + 22 + r)) ** 2 > 1
-}
-
-const random = (i, salt) => stir(i, salt) / 0xffffffff
-
-// Trees: leafy ones and pines, in loose groves, never too close together.
-const TREES = (() => {
-  const trees = []
-  for (let i = 0; trees.length < 230 && i < 4000; i++) {
-    const x = S.x + 20 + random(i, 101) * (S.w - 40)
-    const y = S.y + 30 + random(i, 102) * (S.h - 40)
-    const size = 0.8 + random(i, 103) * 0.6
-    const r = 20 * size
-    if (!isClear(x, y, r * 0.6)) continue
-    if (trees.some(t => Math.hypot(t.x - x, t.y - y) < (t.r + r) * 0.9)) continue
-    trees.push({ x, y, r, size, isPine: random(i, 104) < 0.38, shade: Math.floor(random(i, 105) * 3) })
-  }
-  return trees.sort((a, b) => a.y - b.y)
-})()
-
-// Tufts of darker grass and little clusters of flowers.
-const TUFTS = Array.from({ length: 700 }, (_, i) => ({ x: S.x + random(i, 201) * S.w, y: S.y + random(i, 202) * S.h, k: i % 3 })).filter(t => isClear(t.x, t.y, -16))
-const FLOWERS = Array.from({ length: 70 }, (_, i) => ({ x: S.x + random(i, 301) * S.w, y: S.y + random(i, 302) * S.h, colour: ['#F6F1E4', '#F2C94C', '#E07A9A', '#B9A6F0'][i % 4] })).filter(f => isClear(f.x, f.y, -10))
-
 const LEAVES = [['#3E8A55', '#56A86B', '#6CC082'], ['#357A4A', '#4C9A60', '#62B377'], ['#4A9150', '#62AC63', '#7DC27A']]
 const PINES = [['#2F6B48', '#3E8A5A'], ['#2A6142', '#377D52'], ['#336F4A', '#45905F']]
 

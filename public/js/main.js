@@ -8,6 +8,8 @@ import { draw } from './scene.js'
 import { renderPage } from './panel.js'
 import { placeCard, renderCard } from './card.js'
 import { onBought } from './shop.js'
+import { eventsBetween } from './activity.js'
+import { addEvents } from './feed.js'
 
 const conn = document.getElementById('conn')
 const lostBanner = document.getElementById('lost')
@@ -15,6 +17,7 @@ const lostBanner = document.getElementById('lost')
 onBought(renderPage)
 
 const receive = next => {
+  addEvents(eventsBetween(store.state, next))
   store.state = next
   if (store.selected) renderCard()
   // A session picked by hand stays in view while it lives. Until then the

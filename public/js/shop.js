@@ -6,6 +6,8 @@
 import { store, focused } from './store.js'
 import { el, kr } from './util.js'
 import { ITEMS } from './plan.js'
+import { eventsBetween } from './activity.js'
+import { addEvents } from './feed.js'
 
 const shop = document.getElementById('shop')
 let shopMessage = ''
@@ -33,7 +35,11 @@ export const buyItem = async item => {
   try {
     const res = await fetch('/api/buy', { method: 'POST', headers: { 'content-type': 'application/json', 'x-kontor-token': store.state.token }, body: JSON.stringify({ item }) })
     const answer = await res.json()
-    if (answer.game) store.state.game = answer.game
+    if (answer.game) {
+      // The log hears of the purchase now; the next state from the server already has it.
+      addEvents(eventsBetween(store.state, { ...store.state, game: answer.game }))
+      store.state.game = answer.game
+    }
     shopMessage = res.ok ? (item === 'desk' ? 'Købt! Den næste hjælper uden plads sætter sig ved det.' : `Købt! ${ITEMS[item]?.name ?? 'Det'} bliver bygget nu.`) : answer.error ?? 'Det gik ikke'
   } catch {
     shopMessage = 'Kontoret svarer ikke lige nu'

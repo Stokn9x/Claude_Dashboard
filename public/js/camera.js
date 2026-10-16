@@ -55,8 +55,9 @@ const clampView = v => {
   return v
 }
 
+// Glide on from where the camera is going, so presses in a row add up.
 export const glide = target => {
-  glideTo = clampView({ ...view, ...target })
+  glideTo = clampView({ ...(glideTo ?? view), ...target })
 }
 export const goHome = () => glide(HOME)
 export const isHome = () => !glideTo && Math.abs(view.zoom - 1) < 0.01 && Math.hypot(view.x - HOME.x, view.y - HOME.y) < 4
@@ -215,6 +216,28 @@ const release = e => {
 canvas.addEventListener('pointerup', release)
 canvas.addEventListener('pointercancel', release)
 canvas.addEventListener('dblclick', goHome)
+
+// The keyboard: arrows or WASD move, + and - zoom, 0 or Home shows the whole
+// office. Not while typing, and not inside the panel or the card, whose
+// lists the arrows scroll.
+const PAN_PX = 90
+document.addEventListener('keydown', e => {
+  if (e.ctrlKey || e.metaKey || e.altKey || e.target.closest?.('input, textarea, select, #side, .card')) return
+  const to = glideTo ?? view
+  const step = PAN_PX / scale(to.zoom)
+  const moves = {
+    ArrowLeft: { x: to.x - step }, a: { x: to.x - step },
+    ArrowRight: { x: to.x + step }, d: { x: to.x + step },
+    ArrowUp: { y: to.y - step }, w: { y: to.y - step },
+    ArrowDown: { y: to.y + step }, s: { y: to.y + step },
+    '+': { zoom: to.zoom * 1.25 }, '=': { zoom: to.zoom * 1.25 },
+    '-': { zoom: to.zoom / 1.25 },
+  }
+  if (e.key === '0' || e.key === 'Home') goHome()
+  else if (moves[e.key]) glide(moves[e.key])
+  else return
+  e.preventDefault()
+})
 
 // ── The minimap and "Vis hele" ───────────────────────────────────────────
 // Once the view has moved from the whole office, a small map in the corner

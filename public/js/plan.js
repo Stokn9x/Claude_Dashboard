@@ -155,8 +155,10 @@ export const WORLD = (() => {
 
 // ── The grounds ──────────────────────────────────────────────────────────
 // Grass all round the office, so it fills the window: a path from the front
-// door to the street, a road along the bottom, a pond, trees. Only drawn;
-// nobody walks out here (yet).
+// door to the street, a road along the bottom, a pond, trees. Helpers come
+// up the last bit of the path, and leave down it and along the pavement.
+// Everything stays in one plane: the office grows across the grounds, never
+// upwards.
 export const GROUNDS = {
   // Everything the camera may show, in world units
   scene: { x: -920, y: -560, w: 2320, h: 1740 },
@@ -167,6 +169,9 @@ export const GROUNDS = {
   farPavement: { y: 736, h: 12 },
   pond: { x: -250, y: 300, rx: 84, ry: 48 },
   bench: { x: 598, y: 226 },
+  // The walk between the front door and the street: out of the door, to
+  // the corner of the path, down to the pavement
+  walkway: [{ x: 478, y: 256 }, { x: 552, y: 256 }, { x: 552, y: 684 }],
   // Lamp posts along the pavement, every so often
   lamps: [-560, -400, -240, -80, 80, 240, 400, 620, 780, 940, 1100].map(x => ({ x, y: 680 })),
 }

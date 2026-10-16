@@ -112,10 +112,10 @@ I dag er kontoret tegnet i kode. Med rum, man kan købe, skal grundplanen beskri
 
 ### 5. Et kontor, der kan blive markant større
 
-Kontoret skal kunne vokse fra en håndfuld rum til mange gange sin nuværende størrelse, fx flere teamrum, en hel etage og senere flere etager. Derfor bygges det fra starten sådan:
+Kontoret skal kunne vokse fra en håndfuld rum til mange gange sin nuværende størrelse, fx flere teamrum og flere bygninger på grunden, men altid i ét plan: ingen etager. Derfor bygges det fra starten sådan:
 
 - **Et gitter.** Hele kontoret ligger på et gitter af felter (fx 24 × 24 enheder). Rum, møbler, døre og gange fylder hele felter. Et nyt rum er en blok af felter, der sættes på ved siden af de andre. Kortet har ingen fast størrelse: det vokser i den retning, man bygger.
-- **Udvidelser.** Ud over rum kan man købe **mere grund** (en ny række grunde ud mod siden), og senere en **ny etage** med elevator eller trappe. Hver etage er sit eget gitter.
+- **Udvidelser.** Ud over rum kan man købe **mere grund** (en ny række grunde ud mod siden) og senere bygge en **ny bygning** et andet sted på grunden. Alt ligger i det samme plan og det samme gitter; der kommer ingen etager.
 - **Kamera.** Siden viser ikke længere hele kontoret på én gang, når det bliver stort:
   - træk for at flytte rundt, rul eller knib for at zoome
   - en knap viser hele kontoret
@@ -136,7 +136,7 @@ Det betyder, at **fase 0 er større**, end den ellers ville være. Til gengæld 
 | **2. Rum** | Ledige grunde, køb rum, byggeri med stillads, køkken/toilet/sofa/bordtennis/mødelokale | L ✅ |
 | **3. Liv** | Rummene bliver brugt: kaffe, toiletbesøg, bordtennis, møder; trivsel; **drama og banter** mellem hjælperne, når de står i kantinen | L ✅ |
 | **4. Mere** | Pynt (planter, kunst, neonskilt, espressomaskine, akvarium), opgraderinger (ergonomiske stole, store skærme), 17 præstationer med belønning og notifikation, statistik for i dag, 14 dage, bedste dag og i alt | M ✅ |
-| **5. Vækst** | Mere grund, flere arbejdsrum, nye etager med elevator, hjælpere fordelt på flere rum; **en ny bygning eller stor udvidelse, hvor man kan se sine andre sessioner** (indtil da skifter man mellem dem med fanerne øverst) | L |
+| **5. Vækst** | Mere grund, flere arbejdsrum, hjælpere fordelt på flere rum, alt i ét plan; **en ny bygning eller stor udvidelse, hvor man kan se sine andre sessioner** (indtil da skifter man mellem dem med fanerne øverst) | L |
 
 Hver fase kan bruges for sig og skal være færdig og testet, før den næste starter.
 
@@ -148,3 +148,4 @@ Hver fase kan bruges for sig og skal være færdig og testet, før den næste st
 | Hvad tjener penge | **Linjer og bedrifter:** linjer tilføjet og fjernet, afleverede opgaver, grønne tests, commits og PR'er. |
 | Trivsel | **Ja, i fase 3.** |
 | Valuta | **Kroner.** |
+| Etager | **Nej.** Kontoret vokser kun ud over grunden, i ét plan. |

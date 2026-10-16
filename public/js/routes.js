@@ -4,8 +4,8 @@
 // a little extra for every turn so a route goes in straight runs. Routes are
 // kept until the floor plan changes.
 import { store } from './store.js'
-import { isIn } from './util.js'
-import { PLAN, WORLD, MAIN_SPOT, at, deskSlots, firstRoom, handoffFor, isBuilt, isOpenDoor, placeOf, shiftOf, typeOf } from './plan.js'
+import { hashOf, isIn } from './util.js'
+import { GROUNDS, PLAN, WORLD, MAIN_SPOT, at, deskSlots, firstRoom, handoffFor, isBuilt, isOpenDoor, placeOf, shiftOf, typeOf } from './plan.js'
 
 const STEP = 6
 const TURN = 0.6
@@ -165,7 +165,8 @@ export const route = (from, to) => {
   if (!routes.has(key)) routes.set(key, findPath(from, to))
   return routes.get(key)
 }
-const arriveRoute = seat => route(PLAN.entrance, placeOf(seat).spot)
+// In from the corner of the path outside, through the front door.
+const arriveRoute = seat => [GROUNDS.walkway[1], ...route(PLAN.entrance, placeOf(seat).spot)]
 const deliverRoute = seat => route(placeOf(seat).spot, handoffFor(seat))
 const leaveRoute = seat => route(handoffFor(seat), PLAN.entrance)
 
@@ -210,16 +211,40 @@ export const poseOf = (sub, now, walks = WALKS) => {
   return e < walks.leave ? walkAt(leaveRoute(sub.seat), e / walks.leave) : null
 }
 
+// ── Going home ───────────────────────────────────────────────────────────
+// Out of the front door a helper is gone from the status file, but the page
+// still sees it walk down the path and away along the pavement, left or
+// right as its id says. Only for show: a reload forgets it.
+export const HOMEWARD_MS = 9000
+
+// When a helper steps out of the front door, or null if it is not leaving.
+export const outAt = (sub, walks = WALKS) =>
+  sub.phase === 'leaving' ? sub.since + walks.leave : sub.phase === 'delivering' ? sub.since + walks.deliver + walks.handover + walks.leave : null
+
+export const homewardRoute = id => {
+  const [door, corner, street] = GROUNDS.walkway
+  const side = hashOf(id) % 2 === 0 ? 1 : -1
+  return [door, corner, street, { x: street.x + side * 560, y: street.y }]
+}
+
+// Where a helper on its way home is, or null before it is out or once it
+// is out of sight.
+export const homewardPose = (id, out, now) => {
+  const k = (now - out) / HOMEWARD_MS
+  return k < 0 || k >= 1 ? null : walkAt(homewardRoute(id), k)
+}
+
 // For checking the floor plan after a change: every route a helper or
 // Claude can take, walked in small steps; any that crosses a wall, or that A*
 // could not find and drew straight, is reported. In the browser console:
 // kontorCheckRoutes()
-window.kontorCheckRoutes = () => {
+export const checkRoutes = () => {
   ensureGrid()
   const built = PLAN.rooms.filter(isBuilt)
   const floors = built.map(r => [r.x, r.y, typeOf(r).w, typeOf(r).h])
   const doors = PLAN.doors.filter(isOpenDoor).map(d => [d.x - 1, d.y - 1, d.w + 2, d.h + 2])
-  const isFloor = (x, y) => floors.some(f => isIn(x, y, f)) || doors.some(d => isIn(x, y, d))
+  // The path outside counts as floor: arrivals come up its last bit.
+  const isFloor = (x, y) => floors.some(f => isIn(x, y, f)) || doors.some(d => isIn(x, y, d)) || GROUNDS.path.some(p => isIn(x, y, p))
   const problems = []
   const check = (name, points) => {
     if (points.length === 2 && Math.hypot(points[1].x - points[0].x, points[1].y - points[0].y) > 30) problems.push(`${name}: no route found`)
@@ -262,3 +287,4 @@ window.kontorCheckRoutes = () => {
   }
   return { checked: count, problems }
 }
+globalThis.kontorCheckRoutes = checkRoutes

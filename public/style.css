@@ -160,6 +160,18 @@ button.chip { cursor: pointer; }
 .achievement:not(.is-done) { opacity: 0.8; }
 .achievement:not(.is-done) .medal { filter: grayscale(1); opacity: 0.6; }
 
+/* The activity log, at the bottom beside the panel */
+.feed { position: fixed; left: calc(var(--side) + 2 * var(--gap)); bottom: var(--gap); width: min(420px, calc(100vw - var(--side) - 220px)); z-index: 2; padding: 6px 10px 8px; border-radius: 12px; background: var(--glass); border: 1px solid rgba(255, 255, 255, 0.07); box-shadow: var(--shadow); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); font-size: 13px; }
+.side[hidden] ~ .feed { left: var(--gap); }
+.feed-head { display: flex; justify-content: space-between; align-items: baseline; width: 100%; border: 0; background: none; padding: 2px 0 4px; cursor: pointer; }
+.feed-head strong { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--faint); }
+.feed-more { font-size: 12px; color: var(--soft); }
+.feed-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 3px; }
+.feed-item { display: grid; grid-template-columns: 40px 20px 1fr; align-items: baseline; }
+.feed-item time { color: var(--faint); font-variant-numeric: tabular-nums; font-size: 12px; }
+.feed-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.feed-item.is-waiting .feed-text, .feed-item.is-stuck .feed-text, .feed-item.is-rain .feed-text { color: #FFB4B6; }
+
 /* Notices at the bottom, in the middle */
 .toasts { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); display: grid; gap: 8px; z-index: 5; }
 .toast { display: flex; gap: 10px; align-items: center; padding: 10px 14px; border-radius: 12px; background: var(--surface); border: 1px solid color-mix(in srgb, var(--warn) 50%, var(--line)); box-shadow: var(--shadow); animation: toast-in 0.3s ease-out; transition: opacity 0.5s, transform 0.5s; }
@@ -179,4 +191,5 @@ button.chip { cursor: pointer; }
   .waiting { left: var(--gap); width: auto; }
   .side:not([hidden]) ~ .corner { bottom: calc(42vh + 2 * var(--gap)); }
   .side-open { top: auto; bottom: var(--gap); }
+  .feed { display: none; }
 }

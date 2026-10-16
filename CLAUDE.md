@@ -21,7 +21,9 @@ Rules that keep the parts apart:
 
 ### The page's modules
 
-`main.js` starts it and feeds it the server's state. `store.js` holds what the page knows (state, focused session, selection, hit boxes); no module keeps its own copy. `plan.js` is the floor plan and the grounds, `routes.js` A* and walks, `breaks.js` breaks, meetings and banter. Drawing: `gfx.js` (canvas and primitives), `figures.js` (people), `furniture.js`, `building.js` (the cached background: grounds, walls, rooms), `outdoors.js` (grass, trees, road; cars and the duck), `light.js`, `scene.js` (one frame). `camera.js` owns the view, input, the minimap and the free part of the window. The page around it: `panel.js`, `card.js`, `shop.js`, `progress.js`.
+`main.js` starts it and feeds it the server's state. `store.js` holds what the page knows (state, focused session, selection, hit boxes); no module keeps its own copy. `plan.js` is the floor plan and the grounds, `routes.js` A* and walks (also the walk home down the path), `breaks.js` breaks, meetings and banter, `scenery.js` where the trees stand, `activity.js` what happened between two states. Drawing: `gfx.js` (canvas and primitives), `figures.js` (people), `furniture.js`, `building.js` (the cached background: grounds, walls, rooms), `outdoors.js` (grass, trees, road; cars and the duck), `light.js`, `scene.js` (one frame). `camera.js` owns the view, input, the minimap and the free part of the window. The page around it: `panel.js`, `card.js`, `shop.js`, `progress.js`, `feed.js` (the activity log).
+
+The modules without drawing (`util`, `store`, `plan`, `routes`, `breaks`, `scenery`, `activity`) touch no DOM when loaded, so `tests/page.test.mjs` runs them in Node. Keep it that way: anything that needs `document` or `window` goes in a drawing or page module. `public/js/package.json` only tells Node they are ES modules; the server never serves it.
 
 The camera: the canvas covers the window; `view` is the world point in the middle of the free area (what the header and panel leave) and a zoom, where zoom 1 fits the office into that area. Panning is kept over `GROUNDS.scene`.
 
@@ -37,7 +39,7 @@ The mod runs from the session's dev-mods folder, not from this repo. After chang
 ```
 DEV=~/.claude/dev-mods/<session-id>/agent-kontor
 mkdir -p "$DEV/public/js"
-for p in hooks/register.tsx types/index.d.ts tests/kontor.test.ts server/server.mjs public/index.html public/style.css public/js/*.js .claude-plugin/plugin.json; do cp "$p" "$DEV/$p"; done
+for p in hooks/register.tsx types/index.d.ts tests/*.ts tests/*.mjs server/server.mjs public/index.html public/style.css public/js/*.js public/js/package.json .claude-plugin/plugin.json; do cp "$p" "$DEV/$p"; done
 ```
 
 Checks, all of which should pass before a commit:
@@ -45,6 +47,7 @@ Checks, all of which should pass before a commit:
 - Mod tests and validation, with the desktop app's own CLI: `claude.exe plugin test <dev-mod folder>` and `claude.exe plugin validate <dev-mod folder>` (on this machine `claude.exe` is under `%APPDATA%\Claude\claude-code\<version>\`).
 - Type-check: `npx -y -p typescript@5.6.3 tsc -p <tsconfig>` with a tsconfig that includes the engine's `claude-code.d.ts` and the mod's `hooks`, `types`, `tests`.
 - Server economy: `node tests/economy.check.mjs` (starts the server against a temporary home folder).
+- Page logic and server: `node --test tests/page.test.mjs tests/server.test.mjs` (floor plan, every route, breaks, trees, activity log; the files the server hands out, backups, recovery from a broken `spil.json`).
 - Page syntax: `for f in public/js/*.js; do node --check "$f"; done`.
 
 ### Previewing the page
@@ -75,4 +78,5 @@ Commit messages end with `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com
 - **Patch scripts:** heredocs mangle backslashes and quotes. Write larger patches as Python files with the Write tool, assert every replacement, and remember to actually run the script.
 - **A floor plan change can cut off a room.** Furniture in a narrow corridor, or a door that does not quite meet the floor on both sides, leaves A* without a route, and the walk then cuts straight through walls. After changing `ROOM_TYPES` or `PLAN`, run `kontorCheckRoutes()` in the page's console in an office that owns everything; it must report no problems.
 - **The balance is slow on purpose:** the office should take weeks of work. `tests/economy.check.mjs` reads rates and prices from the server, so changing them does not break it.
+- **One plane only.** The office grows across the grounds, never upwards: no floors, lifts or stairs (the user's decision).
 - **Deleting is refused by the auto-mode classifier.** Move things aside (e.g. to `~/.claude/dev-mods-arkiv`) instead.

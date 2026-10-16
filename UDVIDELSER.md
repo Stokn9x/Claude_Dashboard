@@ -28,6 +28,7 @@ Status: ✅ lavet · 🟡 delvist · ⬜ ikke lavet · ➖ ikke længere relevan
 | 0.11.1 | Fejlrettelser: ingen går gennem væggene (døre forbinder rummene i rutegitteret, og der er fri vej ud af Claudes kontor), nyt toilet med døren ud til et frit område, ingen fliser i væggene; langsommere indtjening og højere priser, så kontoret bygges over uger |
 | 0.12.0 | En lækrere side rundt om kontoret: topbjælke med ikon, trivsel, saldo og forbindelsesprik; kort med pixel-portræt og statuspille i listen; venteboks med "Gå til"; butik med ikoner og fremdrift; kun mørkt tema |
 | 0.13.0 | Spillets fase 4: pynt og opgraderinger i butikken, 17 præstationer med belønning og notifikation, statistik i den nye fane Fremskridt |
+| 0.15.0 | Hjælperne kommer op ad stien og går ned ad den og hen ad fortovet, når de går hjem; aktivitetslog nederst; kameraet styres også med tastaturet (pile/WASD, + og −, 0); serveren gemmer en kopi af spil.json hver dag (en uge tilbage) og redder et ødelagt spil.json fra den nyeste; 28 nye tests af sidens logik og serveren; planerne er nu i ét plan, uden etager |
 | 0.14.0 | Kontoret fylder hele vinduet: græs, træer, en sø, sti fra hoveddøren, hæk, fortov og en vej med biler og gadelygter rundt om; panelet svæver i venstre side og kan foldes sammen (på en telefon ligger det i bunden). Siden er delt op i små moduler i stedet for én fil på 2.800 linjer |
 | 0.13.1 | Fejl 47-51: en ældre server afløses efter en opdatering, en gulvsidder går hen til sit nye skrivebord, Claude tager imod afleveringer ved skrivebordet, skilte ligger under taleboblerne, og trivslen siger hvor gulvsidderne er |
 
@@ -123,9 +124,9 @@ Fundet ved en gennemgang af koden og det, vi har set undervejs. **P1** er fejl, 
 | # | Hvad | Str. | Status |
 |---|---|---|---|
 | 52 | **Brede skærme udnyttes ikke:** kontoret er bundet af højden, og panelet er smalt, så der er tomt på begge sider (set på 2000 px). Løst i 0.14.0: kontoret fylder hele vinduet med græs omkring, og panelet svæver ovenpå. | M | ✅ |
-| 53 | **Ingen backup af spil.json.** Én dårlig skrivning eller fejl kan koste alle kroner. Serveren bør gemme en daglig kopi (de sidste 7). | S | ⬜ |
+| 53 | **Ingen backup af spil.json.** Én dårlig skrivning eller fejl kan koste alle kroner. Serveren bør gemme en daglig kopi (de sidste 7). Lavet i 0.15.0, og et ødelagt spil.json redder sig selv fra den nyeste kopi. | S | ✅ |
 | 54 | **`/kontor panel` i Claude kender ikke spillet:** ingen saldo, trivsel eller præstationer i tekstpanelet. | S | ⬜ |
-| 55 | **Siden har ingen automatiske tests.** Ruterne tjekkes kun med `kontorCheckRoutes()` i hånden; et lille script, der kører siden uden browser (eller i preview), ville fange fx akvariet, der lukkede døren. | M | ⬜ |
+| 55 | **Siden har ingen automatiske tests.** Ruterne tjekkes kun med `kontorCheckRoutes()` i hånden; et lille script, der kører siden uden browser (eller i preview), ville fange fx akvariet, der lukkede døren. Lavet i 0.15.0: `tests/page.test.mjs` kører plan, ruter, pauser, træer og loggen i Node; `tests/server.test.mjs` tester filer, adgang og backup. Selve tegningen testes stadig kun i preview. | M | 🟡 |
 | 56 | **Statistikken starter først nu** (0.13.0); dagene før findes ikke. Intet at gøre ved det, men værd at vide. | – | ➖ |
 | 57 | **Ingen lyd** (punkt 16): dørklokke, aflevering, venter på dig, med en knap til at slå fra. | M | ⬜ |
 | 58 | **Ingen browser-notifikation**, når Claude venter på dig og fanen er skjult (punkt 30). | S | ⬜ |
@@ -136,7 +137,7 @@ Fundet ved en gennemgang af koden og det, vi har set undervejs. **P1** er fejl, 
 |---|---|---|---|
 | 59 | **Personlighed i dialogen:** hver hjælper får et temperament ud fra navnet (kæk, tør, dramatisk, positiv), så replikkerne lyder forskelligt (rest fra fase 3). | S | ⬜ |
 | 60 | **Claude laver noget i pauserne:** vander planter, går en tur, spiller bordtennis med en hjælper (rest af punkt 19). | M | ⬜ |
-| 61 | **Fase 5, vækst:** mere grund, teamrum 2, en ny etage med elevator, og en ny bygning hvor de andre sessioner sidder. | L | ⬜ |
+| 61 | **Fase 5, vækst:** mere grund, teamrum 2 og en ny bygning på grunden, hvor de andre sessioner sidder. Alt i ét plan, ingen etager. | L | ⬜ |
 | 62 | **Daglig bonus og stribe:** en lille bonus for første arbejde på dagen og for dage i træk. | S | ⬜ |
 | 63 | **Sæson og vejr:** jul i december, regn på ruderne, sne om vinteren (rest af punkt 22). | M | ⬜ |
 | 64 | **Kontorhund eller -kat** (punkt 23), evt. købt i butikken. | M | ⬜ |
@@ -144,15 +145,14 @@ Fundet ved en gennemgang af koden og det, vi har set undervejs. **P1** er fejl, 
 | 66 | **Månedens medarbejder:** hjælpernes navne går igen, så de kan få deres egen statistik og en pokal. | M | ⬜ |
 | 67 | **Tv-tilstand** til en ekstra skærm: fuld skærm, ingen panel, kameraet følger det, der sker (punkt 31). | S | ⬜ |
 
-| 69 | **Aktivitetslog:** en lille liste nederst over det seneste, der er sket (ny opgave, aflevering, grønne tests), med tid og hvem. | S | ⬜ |
-| 70 | **Liv udenfor:** hjælpere kommer gående op ad stien fra fortovet og går samme vej hjem; en hjælper uden plads venter på bænken. | M | ⬜ |
+| 69 | **Aktivitetslog:** en lille liste nederst over det seneste, der er sket (ny opgave, aflevering, grønne tests), med tid og hvem. Lavet i 0.15.0. | S | ✅ |
+| 70 | **Liv udenfor:** hjælpere kommer gående op ad stien fra fortovet og går samme vej hjem; en hjælper uden plads venter på bænken. De går op ad det sidste stykke sti og hele vejen hjem i 0.15.0; bænken mangler. | M | 🟡 |
 | 68 | **Gulvsidderne bytter plads, når et skrivebord købes,** fordi pladserne på gulvet tælles fra det første ledige skrivebord. De går pænt, men det ligner stoleleg. Hver gulvsidder bør beholde sin plads. | S | ⬜ |
 
 ### Forslag til rækkefølge
 
-1. **Fejlene 47-51** samlet i én runde: små, men de ses hver dag.
-2. **53 backup**: sikkerhed for kronerne (52 er løst i 0.14.0).
-3. Derefter det sjove: **59 personlighed**, **62 daglig bonus** og **57 lyd**, og så **fase 5**.
+1. **68 gulvsiddere bytter plads** og **70 bænken**: små ting, der ses hver dag (47-53 er lavet).
+2. Derefter det sjove: **59 personlighed**, **62 daglig bonus** og **57 lyd**, og så **fase 5**.
 
 ## 🧹 Oprydning
 
