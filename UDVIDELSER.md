@@ -20,6 +20,7 @@ Status: ✅ lavet · 🟡 delvist · ⬜ ikke lavet · ➖ ikke længere relevan
 | 0.7.6 | Klik på en figur for at se detaljer om den |
 | 0.7.7 | Hyggeligere kontor: tæpper, reol, sofahjørne og bordtennis i teamrummet, bistrobord og snackautomat i køkkenet, lænestol hos Claude, egne ting på hver hjælpers skrivebord |
 | 0.7.8 | Lys og dybde: skygger under figurerne, sollys fra vinduerne efter tidspunktet, mørke aftener med lamper og lysende skærme |
+| 0.7.9 | Mere levende figurer: lidt større, blinker, ånder, og en tænkeboble med … i stedet for "Tænker" |
 
 ## 🔧 Fejl og ting der driller
 
@@ -78,7 +79,7 @@ Status: ✅ lavet · 🟡 delvist · ⬜ ikke lavet · ➖ ikke længere relevan
 | 40 | **Egne ting på skrivebordet:** hver hjælper har altid de samme to ting (kop, plante, papirer, badeand, høretelefoner, billede eller snack). | S | ✅ |
 | 41 | **Lys og dybde:** skygger under figurer og stole, sollys fra vinduerne der følger solen, aftenmørke med lamper, loftslys og lysende skærme. Se en anden tid med `?tid=21:30` i adressen. | M | ✅ |
 | 42 | **Projektrummet står tit tomt:** bliv til mødelokale eller skrump, når der ikke er andre sessioner. | M | ⬜ |
-| 43 | **Mere levende figurer:** lidt større, blinker, tænkeboble med "…" i stedet for "Tænker". | M | ⬜ |
+| 43 | **Mere levende figurer:** lidt større, blinker hver på sit tidspunkt, ånder når de sidder, og en tænkeboble med … i stedet for "Tænker". | M | ✅ |
 | 34 | **Del kontoret med teamet igen,** fx via Supabase, nu hvor tegningen ikke længere ligger i panelet. | L | ⬜ |
 
 ## 🧹 Oprydning

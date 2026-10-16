@@ -80,7 +80,7 @@ const poseOf = (sub, now) => {
 
 // ── Look ─────────────────────────────────────────────────────────────────
 const OUTLINE = '#2B2230'
-const P = 3
+const P = 3.5
 const FONT = "'Segoe UI', system-ui, -apple-system, sans-serif"
 const stateColor = { working: '#8A94A0', reading: '#2BA39A', editing: '#3B8FE0', running: '#D9932B', browsing: '#7B6BDE', waiting: '#E5484D', idle: '#8A94A0' }
 const screens = { working: '#5E6B7A', reading: '#E9EEF2', editing: '#1F2A44', running: '#0F1418', browsing: '#D7E9FA', waiting: '#E5484D', idle: '#1B2433' }
@@ -168,22 +168,27 @@ const label = (text, x, y, size, color, weight = 700, align = 'center') => {
 }
 const clip = (text, max) => (text.length > max ? `${text.slice(0, max - 1)}…` : text)
 
-const paintRows = (rows, look, x, y) => {
-  const colour = { o: OUTLINE, h: look.hair, H: look.hairLight, s: look.skin, e: OUTLINE, t: look.shirt, T: look.shirtShade, p: '#3B4A6B', b: OUTLINE }
+const paintRows = (rows, look, x, y, isBlinking = false) => {
+  const colour = { o: OUTLINE, h: look.hair, H: look.hairLight, s: look.skin, e: isBlinking ? look.skin : OUTLINE, t: look.shirt, T: look.shirtShade, p: '#3B4A6B', b: OUTLINE }
   rows.forEach((row, r) => {
     let c = 0
     while (c < row.length) {
       const ch = row[c]
       let end = c
       while (end < row.length && row[end] === ch) end++
-      if (colour[ch]) rect(x + c * P, y + r * P, (end - c) * P, P, colour[ch])
+      if (colour[ch]) rect(x + c * P, y + r * P, (end - c) * P + 0.08, P + 0.08, colour[ch])
       c = end
     }
   })
 }
 
+// Everyone blinks now and then, each on their own beat (seed), and someone
+// sitting breathes: the body rises half a sprite pixel and settles.
+const isBlinking = (t, seed) => (t + seed * 613) % 4300 < 140
+const breath = (t, seed) => ((t + seed * 311) % 2600 < 1300 ? 0 : P / 2)
+
 // A person on their feet at (x, y).
-const standing = (x, y, look, facing, isWalking, t) => {
+const standing = (x, y, look, facing, isWalking, t, seed = 0) => {
   const body = facing === 'back' ? BACK : facing === 'front' ? BODY : SIDE
   const isSide = facing === 'left' || facing === 'right'
   const frames = isWalking ? (isSide ? SIDE_WALK : FRONT_WALK) : [isSide ? SIDE_STAND : LEGS]
@@ -191,21 +196,21 @@ const standing = (x, y, look, facing, isWalking, t) => {
   // Down a pixel as a foot lands: the bob of a step, body over the waist.
   const sink = isWalking && i % 2 === 0 ? P : 0
   const top = y - (body.length + 4) * P
-  shadow(x, y + 1, 8, 2.6)
+  shadow(x, y + 1, 9, 2.8)
   ctx.save()
   if (facing === 'left') {
     ctx.translate(x * 2, 0)
     ctx.scale(-1, 1)
   }
-  paintRows(body, look, x - 5 * P, top + sink)
+  paintRows(body, look, x - 5 * P, top + sink, facing !== 'back' && isBlinking(t, seed))
   paintRows(frames[i], look, x - 5 * P, top + body.length * P)
   ctx.restore()
 }
 
 // A person sitting at a desk, feet hidden: the body from (x, y) up.
-const sitting = (x, y, look, handUp, t) => {
-  const top = y - BODY.length * P
-  paintRows(BODY, look, x - 5 * P, top)
+const sitting = (x, y, look, handUp, t, seed = 0) => {
+  const top = y - BODY.length * P - breath(t, seed)
+  paintRows(BODY, look, x - 5 * P, top, isBlinking(t, seed))
   if (handUp) {
     const wave = Math.floor(t / 350) % 2
     const left = x + 5 * P + wave
@@ -362,6 +367,29 @@ const bubble = (cx, bottom, text, isAlert, t) => {
   rect(cx - 2.5, y + 12, 5, 2, fill)
   label(words, cx, y + 10, 8.5, isAlert ? '#FFFFFF' : OUTLINE, 600)
   ctx.globalAlpha = 1
+}
+
+// Thinking, with nothing to say yet: a cloud with three dots that bob in
+// turn, and two small puffs trailing down to the head.
+const thought = (cx, bottom, t) => {
+  const y = bottom - 15
+  const puff = (x, py, r) => circle(x, py, r, '#FFFFFF', OUTLINE)
+  puff(cx + 1, bottom + 1, 1.6)
+  puff(cx + 4, bottom - 3, 2.4)
+  for (const [dx, dy, r] of [[-9, 7, 6], [9, 7, 6], [-4, 3, 7], [5, 3, 7], [0, 8, 6.5]]) puff(cx + dx, y + dy, r)
+  // The outlines inside the cloud, painted over
+  for (const [dx, dy, r] of [[-9, 7, 5.2], [9, 7, 5.2], [-4, 3, 6.2], [5, 3, 6.2], [0, 8, 5.7]]) circle(cx + dx, y + dy, r, '#FFFFFF')
+  for (let i = 0; i < 3; i++) {
+    const lift = Math.max(0, Math.sin(t / 170 - i * 0.9)) * 1.6
+    circle(cx - 5 + i * 5, y + 7 - lift, 1.3, '#5B6672')
+  }
+}
+
+// What someone says: a thought cloud while they are only thinking, the
+// words otherwise, red while they wait for you.
+const say = (cx, bottom, activity, t) => {
+  if (activity.detail === 'Tænker' && activity.state !== 'waiting') thought(cx, bottom, t)
+  else bubble(cx, bottom, activity.detail, activity.state === 'waiting', t)
 }
 
 const tag = (cx, y, text, colour) => {
@@ -760,8 +788,8 @@ const drawBuilding = (project, hour) => {
 }
 
 // ── Clicking on someone ──────────────────────────────────────────────────
-const seatedBox = (cx, dy) => ({ x0: cx - 22, y0: dy - 30, x1: cx + 22, y1: dy + 42 })
-const standingBox = (x, y) => ({ x0: x - 17, y0: y - 46, x1: x + 17, y1: y + 15 })
+const seatedBox = (cx, dy) => ({ x0: cx - 22, y0: dy - 34, x1: cx + 22, y1: dy + 42 })
+const standingBox = (x, y) => ({ x0: x - 19, y0: y - 52, x1: x + 19, y1: y + 15 })
 
 // ── Celebrations ─────────────────────────────────────────────────────────
 const party = (p, spot, t) => {
@@ -847,7 +875,7 @@ const draw = () => {
 
   // Claude
   chair(MAIN.cx, MAIN.dy)
-  if (!isOut) sitting(MAIN.cx, MAIN.dy + 4, claudeLook, main.state === 'waiting', t)
+  if (!isOut) sitting(MAIN.cx, MAIN.dy + 4, claudeLook, main.state === 'waiting', t, 7)
   desk(MAIN.cx, MAIN.dy, 128, isOut ? null : main.state, t, 2)
   if (!isOut) glowing.push([MAIN.cx + 46, MAIN.dy + 8], [MAIN.cx - 46, MAIN.dy + 8])
   if (!isOut) {
@@ -856,7 +884,7 @@ const draw = () => {
     frameHits.push({ kind: 'claude', id: 'claude', ...seatedBox(MAIN.cx, MAIN.dy) })
   } else {
     frameHits.push({ kind: 'claude', id: 'claude', ...standingBox(KITCHEN_SEAT.x, KITCHEN_SEAT.y) })
-    standing(KITCHEN_SEAT.x, KITCHEN_SEAT.y, claudeLook, 'front', false, t)
+    standing(KITCHEN_SEAT.x, KITCHEN_SEAT.y, claudeLook, 'front', false, t, 7)
     // The mug, and its steam
     const mx = KITCHEN_SEAT.x + 15
     const my = KITCHEN_SEAT.y - 22
@@ -884,7 +912,7 @@ const draw = () => {
     const { cx, dy } = seatAt(seat)
     const sub = subs.find(x => x.seat === seat && poseOf(x, now)?.seated)
     chair(cx, dy)
-    if (sub) sitting(cx, dy + 4, lookFor(sub.id), sub.activity.state === 'waiting', t)
+    if (sub) sitting(cx, dy + 4, lookFor(sub.id), sub.activity.state === 'waiting', t, hashOf(sub.id))
     desk(cx, dy, 84, sub ? sub.activity.state : null, t)
     if (sub) deskThingsFor(sub.id, cx, dy)
     if (sub) glowing.push([cx + 24, dy + 8])
@@ -900,7 +928,7 @@ const draw = () => {
   }
   walkers.sort((a, b) => a.pose.y - b.pose.y)
   for (const { sub, pose } of walkers) {
-    standing(pose.x, pose.y, lookFor(sub.id), pose.facing, pose.isWalking, t)
+    standing(pose.x, pose.y, lookFor(sub.id), pose.facing, pose.isWalking, t, hashOf(sub.id))
     tag(pose.x, pose.y + 3, sub.name, '#4A5868')
     frameHits.push({ kind: 'sub', id: sub.id, ...standingBox(pose.x, pose.y) })
   }
@@ -913,7 +941,7 @@ const draw = () => {
     const look = { ...claudeLook, shirt: shirts[hashOf(o.key) % shirts.length][0], shirtShade: shirts[hashOf(o.key) % shirts.length][1] }
     const away = o.main.state === 'idle'
     chair(cx, dy)
-    if (!away) sitting(cx, dy + 4, look, o.main.state === 'waiting', t)
+    if (!away) sitting(cx, dy + 4, look, o.main.state === 'waiting', t, hashOf(o.key))
     desk(cx, dy, 80, away ? null : o.main.state, t)
     if (!away) hands(cx, dy, look, o.main.state !== 'waiting', t + i * 51)
     tag(cx, dy + 30, clip(o.project, 16), '#C8643B')
@@ -931,22 +959,22 @@ const draw = () => {
   const thanking = walkers.find(w => w.pose.handover)
   if (isOut) {
     const lines = ['Kaffepause', s?.stats?.linesAdded ? `${s.stats.linesAdded} linjer i dag` : 'Klar når du er', 'Godt arbejde, team', 'Hvad nu?']
-    bubble(KITCHEN_SEAT.x, KITCHEN_SEAT.y - 46, lines[Math.floor(t / 3000) % lines.length], false, t)
+    bubble(KITCHEN_SEAT.x, KITCHEN_SEAT.y - 52, lines[Math.floor(t / 3000) % lines.length], false, t)
   } else if (thanking) {
-    bubble(MAIN.cx, MAIN.dy - 30, thanking.sub.outcome === 'failed' ? `Øv, ${thanking.sub.name}` : `Tak, ${thanking.sub.name}!`, false, t)
+    bubble(MAIN.cx, MAIN.dy - 34, thanking.sub.outcome === 'failed' ? `Øv, ${thanking.sub.name}` : `Tak, ${thanking.sub.name}!`, false, t)
   } else {
-    bubble(MAIN.cx, MAIN.dy - 30, main.detail, main.state === 'waiting', t)
+    say(MAIN.cx, MAIN.dy - 34, main, t)
   }
   for (let seat = 0; seat < SEATS; seat++) {
     const sub = subs.find(x => x.seat === seat && poseOf(x, now)?.seated)
-    if (sub) bubble(seatAt(seat).cx, seatAt(seat).dy - 30, sub.activity.detail, sub.activity.state === 'waiting', t)
+    if (sub) say(seatAt(seat).cx, seatAt(seat).dy - 34, sub.activity, t + seat * 230)
   }
   for (const { sub, pose } of walkers) {
-    if (pose.handover) bubble(pose.x, pose.y - 46, sub.outcome === 'failed' ? `Gik i stå: ${sub.task}` : `Afleverer: ${sub.task}`, sub.outcome === 'failed', t)
+    if (pose.handover) bubble(pose.x, pose.y - 52, sub.outcome === 'failed' ? `Gik i stå: ${sub.task}` : `Afleverer: ${sub.task}`, sub.outcome === 'failed', t)
   }
   others.forEach((o, i) => {
-    if (o.main.state === 'idle') tag(72 + i * 112, 418, 'Holder pause', '#8A94A0')
-    else bubble(72 + i * 112, 410, o.main.detail, o.main.state === 'waiting', t)
+    if (o.main.state === 'idle') tag(72 + i * 112, 414, 'Holder pause', '#8A94A0')
+    else say(72 + i * 112, 406, o.main, t + i * 170)
   })
   // The one whose card is open, ringed.
   const ring = selected && frameHits.find(h => h.kind === selected.kind && h.id === selected.id)
