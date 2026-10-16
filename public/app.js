@@ -261,6 +261,66 @@ const desk = (cx, dy, w, state, t, monitors = 1) => {
   rect(cx - 9, dy + 16, 18, 1, '#AEB6BF')
 }
 
+// Little things on a helper's desk, left of the keyboard: two of these,
+// chosen by its id, so the same helper always has the same desk.
+const deskThings = [
+  // a mug
+  (x, y) => {
+    rect(x, y, 6, 6, OUTLINE)
+    rect(x + 1, y + 1, 4, 4, '#FFFFFF')
+    rect(x + 1, y + 1, 4, 1.5, '#7A4B2A')
+    rect(x + 6, y + 2, 1.5, 2.5, OUTLINE)
+  },
+  // a little plant
+  (x, y) => {
+    rect(x + 1, y + 4, 5, 4, '#B5683E')
+    circle(x + 3.5, y + 3, 3.4, '#3E8A55', OUTLINE)
+    circle(x + 2.5, y + 2, 1.4, '#6CC082')
+  },
+  // a stack of papers
+  (x, y) => {
+    rect(x + 1, y + 1, 9, 7, '#C9CED3')
+    rect(x, y, 9, 7, '#FFFFFF')
+    rect(x + 1.5, y + 2, 6, 0.8, '#AEB6BF')
+    rect(x + 1.5, y + 4, 4, 0.8, '#AEB6BF')
+  },
+  // a rubber duck
+  (x, y) => {
+    circle(x + 3, y + 4.5, 3, '#F2C94C', OUTLINE)
+    circle(x + 5, y + 2, 1.8, '#F2C94C', OUTLINE)
+    rect(x + 6.3, y + 1.8, 1.6, 1, '#E07A4F')
+  },
+  // headphones
+  (x, y) => {
+    ctx.beginPath()
+    ctx.arc(x + 4, y + 4, 3.4, Math.PI, 0)
+    ctx.lineWidth = 1.2
+    ctx.strokeStyle = OUTLINE
+    ctx.stroke()
+    rect(x - 0.5, y + 3.5, 2.5, 3.5, OUTLINE)
+    rect(x + 6, y + 3.5, 2.5, 3.5, OUTLINE)
+  },
+  // a framed photo
+  (x, y) => {
+    rect(x, y, 7, 6, OUTLINE)
+    rect(x + 1, y + 1, 5, 4, '#9CC4EC')
+    rect(x + 1, y + 3.5, 5, 1.5, '#56A86B')
+  },
+  // a snack
+  (x, y) => {
+    rect(x, y + 1, 8, 5, OUTLINE)
+    rect(x + 1, y + 2, 6, 3, '#E5484D')
+    rect(x + 2.5, y + 2.5, 3, 1, '#FFFFFF')
+  },
+]
+const deskThingsFor = (id, cx, dy) => {
+  const h = hashOf(id)
+  const first = h % deskThings.length
+  const second = (first + 1 + ((h >>> 5) % (deskThings.length - 1))) % deskThings.length
+  deskThings[first](cx - 38, dy + 3)
+  deskThings[second](cx - 27, dy + 12)
+}
+
 const hands = (cx, dy, look, isTyping, t) => {
   const lift = isTyping ? [0, -1.5, 0, -0.5][Math.floor(t / 75) % 4] : 0
   rect(cx - 11, dy + 9 + lift, 7, 5, OUTLINE)
@@ -450,9 +510,16 @@ const drawBuilding = (project, hour) => {
     fill(11, 23 + k * 44, 10, 38, '#8B5E3C')
     ;['#D45D7A', '#3E7CC9', '#D6A23C', '#2E9E8F', '#8A6FD6'].forEach((c, i) => fill(12, 25 + k * 44 + i * 7, 8, 5, ['#D45D7A', '#3E7CC9', '#D6A23C', '#2E9E8F', '#8A6FD6'][(i + k) % 5]))
   }
-  fill(196, 112, 26, 18, OUTLINE)
-  fill(198, 114, 22, 14, '#C8643B')
-  fill(200, 116, 18, 4, '#E3875E')
+  // An armchair by the door, and a side table with a lamp
+  fill(194, 106, 28, 24, OUTLINE)
+  fill(195, 107, 26, 6, '#A9512E')
+  fill(195, 107, 5, 22, '#B85A33')
+  fill(216, 107, 5, 22, '#B85A33')
+  fill(200, 113, 16, 15, '#D9744A')
+  fill(202, 115, 12, 3, '#E99A73')
+  dot(176, 120, 7, OUTLINE)
+  dot(176, 120, 5.8, '#B98F5E')
+  dot(176, 120, 3.2, '#F6E3A8', '#C9A55A')
   // The whiteboard; board() writes the day's numbers on it
   fill(BOARD.x - 1, BOARD.y - 1, BOARD.w + 2, BOARD.h + 2, OUTLINE)
   fill(BOARD.x, BOARD.y, BOARD.w, BOARD.h, '#F6F7F8')
@@ -477,6 +544,14 @@ const drawBuilding = (project, hour) => {
   fill(440, 18, 28, 34, OUTLINE)
   fill(441, 19, 26, 32, '#E9EEF2')
   fill(441, 33, 26, 1, '#B9C3CC')
+  // A round rug under the big table
+  dot(368, 92, 34, '#DDE6E0')
+  dot(368, 92, 31, '#E8EFEA')
+  g.strokeStyle = '#C9D6CD'
+  g.lineWidth = 1
+  g.beginPath()
+  g.arc(368, 92, 26, 0, Math.PI * 2)
+  g.stroke()
   dot(368, 92, 20, OUTLINE)
   dot(368, 92, 18.5, '#C9A273')
   dot(368, 92, 15, '#D9B88A')
@@ -488,22 +563,82 @@ const drawBuilding = (project, hour) => {
     dot(x, y, 7, OUTLINE)
     dot(x, y, 5.5, '#465566')
   }
+  // A small bistro table for two in the corner
+  for (const y of [74, 108]) {
+    dot(276, y, 5.5, OUTLINE)
+    dot(276, y, 4.2, '#C9A273')
+  }
+  dot(276, 91, 9, OUTLINE)
+  dot(276, 91, 7.8, '#F7F7F5')
+  dot(273, 89, 2, '#FFFFFF', '#B9C3CC')
+  dot(279, 93, 1.6, '#7A4B2A')
+  // A snack machine under the fridge
+  fill(436, 64, 32, 30, OUTLINE)
+  fill(437, 65, 30, 28, '#3E7CC9')
+  fill(439, 67, 19, 22, '#D7E9FA')
+  ;['#E5484D', '#D6A23C', '#2E9E8F', '#E07A4F', '#8A6FD6', '#56A86B'].forEach((c, i) => fill(441 + (i % 3) * 6, 69 + Math.floor(i / 3) * 10, 4, 6, c))
+  fill(460, 69, 5, 3, '#2B2F36')
+  fill(460, 76, 5, 10, '#2F5F9C')
 
-  // Team room
-  fill(40, 346, 2, 12, OUTLINE)
-  fill(88, 346, 2, 12, OUTLINE)
-  fill(34, 342, 62, 8, OUTLINE)
-  fill(35, 343, 60, 6, '#F6F7F8')
-  fill(38, 344, 14, 1.5, '#3E7CC9')
-  fill(56, 344, 20, 1.5, '#E07A4F')
-  fill(80, 344, 10, 1.5, '#2E9E8F')
+  // Team room. A soft rug under each desk, each its own colour.
+  const rugs = [['#BCD0C4', '#AFC4B7'], ['#CFC6DC', '#C2B8D1'], ['#DDCDB7', '#D1BFA6'], ['#BFD0DD', '#B0C3D2'], ['#DCC7CB', '#D0B7BC'], ['#CBD5B5', '#BDC9A5']]
+  for (let seat = 0; seat < SEATS; seat++) {
+    const { cx, dy } = seatAt(seat)
+    const [base, edge] = rugs[seat]
+    g.fillStyle = edge
+    g.beginPath()
+    g.roundRect(cx - 52, dy - 26, 104, 64, 6)
+    g.fill()
+    g.fillStyle = base
+    g.beginPath()
+    g.roundRect(cx - 49, dy - 23, 98, 58, 4)
+    g.fill()
+  }
+
+  // A bookshelf along the left wall
+  fill(8, 178, 14, 76, OUTLINE)
+  fill(9, 179, 12, 74, '#8B5E3C')
+  ;['#D45D7A', '#3E7CC9', '#D6A23C', '#2E9E8F', '#8A6FD6', '#E07A4F', '#56A86B', '#D45D7A', '#3E7CC9', '#D6A23C'].forEach((c, i) => fill(10, 181 + i * 7, 10, 5, c))
+
+  // The printer, and a plant beside it
   fill(14, 356, 30, 18, OUTLINE)
   fill(15, 357, 28, 16, '#D3D8DD')
   fill(19, 360, 20, 3, '#2B2F36')
-  dot(300, 360, 9, OUTLINE)
-  dot(300, 360, 7.5, '#E07A4F')
-  dot(324, 364, 9, OUTLINE)
-  dot(324, 364, 7.5, '#3E7CC9')
+  fill(21, 365, 16, 6, '#F6F7F8')
+
+  // The lounge corner: a rug, a sofa against the wall, a coffee table, a lamp
+  g.fillStyle = '#E6D3B3'
+  g.beginPath()
+  g.roundRect(138, 346, 84, 31, 4)
+  g.fill()
+  g.strokeStyle = '#D2BC97'
+  g.lineWidth = 1
+  g.strokeRect(141.5, 349.5, 77, 24)
+  fill(146, 361, 66, 16, OUTLINE)
+  fill(147, 368, 64, 8, '#4F7FA8')
+  fill(147, 362, 64, 7, '#3D6A92')
+  fill(147, 362, 6, 14, '#3D6A92')
+  fill(205, 362, 6, 14, '#3D6A92')
+  fill(155, 369, 22, 6, '#6C9BC4')
+  fill(181, 369, 22, 6, '#6C9BC4')
+  fill(163, 349, 32, 9, OUTLINE)
+  fill(164, 350, 30, 7, '#B98F5E')
+  fill(167, 351, 8, 4, '#F6F7F8')
+  dot(186, 353, 2.2, '#FFFFFF', '#B9C3CC')
+  dot(130, 366, 6, OUTLINE)
+  dot(130, 366, 4.8, '#F6E3A8')
+  dot(130, 366, 1.6, '#D6A23C')
+
+  // A ping-pong table, net across the middle
+  fill(290, 350, 52, 26, OUTLINE)
+  fill(291, 351, 50, 24, '#2E8B6E')
+  fill(291, 362.5, 50, 1, '#FFFFFF')
+  fill(315.5, 351, 1, 24, '#E9EEF2')
+  fill(315, 349, 2, 28, '#2B2F36')
+  dot(300, 356, 1.6, '#FFFFFF')
+  dot(286, 358, 3, '#E5484D', OUTLINE)
+  dot(346, 368, 3, '#3E7CC9', OUTLINE)
+
   fill(452, 334, 16, 24, OUTLINE)
   fill(453, 335, 14, 10, '#9CC4EC')
   fill(453, 346, 14, 11, '#E9EEF2')
@@ -513,7 +648,7 @@ const drawBuilding = (project, hour) => {
   g.fillText('Dine andre sessioner', 16, H - 12)
 
   // Plants
-  for (const [x, y, big] of [[228, 36, true], [22, 116], [462, 120], [462, 150, true], [20, 150], [380, 368]]) {
+  for (const [x, y, big] of [[228, 36, true], [22, 116], [462, 120], [462, 150, true], [20, 150], [380, 368], [56, 368], [234, 366, true], [262, 120]]) {
     const r = big ? 9 : 7
     fill(x - 5, y, 10, 8, '#B5683E')
     dot(x, y - 2, r, '#3E8A55', OUTLINE)
@@ -627,6 +762,13 @@ const draw = () => {
     for (let i = 0; i < 2; i++) rect(mx + 2 + i * 3, my - 3 - ((t / 40 + i * 10) % 12), 1.5, 3, '#C9D2DA')
     ctx.globalAlpha = 1
     tag(KITCHEN_SEAT.x, KITCHEN_SEAT.y + 3, 'Claude', '#C8643B')
+    // The coffee machine on the counter, just used
+    ctx.globalAlpha = 0.55
+    for (let i = 0; i < 3; i++) {
+      const rise = (t / 50 + i * 7) % 18
+      rect(270 + i * 2.5 + Math.sin((t / 300) + i) * 1.2, 20 - rise * 0.4 + 14 - rise, 1.5, 3, '#E9EEF2')
+    }
+    ctx.globalAlpha = 1
   }
 
   // The team room
@@ -637,6 +779,7 @@ const draw = () => {
     chair(cx, dy)
     if (sub) sitting(cx, dy + 4, lookFor(sub.id), sub.activity.state === 'waiting', t)
     desk(cx, dy, 84, sub ? sub.activity.state : null, t)
+    if (sub) deskThingsFor(sub.id, cx, dy)
     if (sub) {
       hands(cx, dy, lookFor(sub.id), sub.activity.state !== 'waiting', t + seat * 37)
       tag(cx, dy + 30, sub.name, '#4A5868')

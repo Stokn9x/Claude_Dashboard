@@ -18,6 +18,7 @@ Status: ✅ lavet · 🟡 delvist · ⬜ ikke lavet · ➖ ikke længere relevan
 | 0.7.4 | Hjælpere, der fejler eller stoppes, går hjem; serveren startes igen efter dvale; serveren er gjort mere robust |
 | 0.7.5 | Ventende hjælpere får et skrivebord, ingen hænger fast efter en genindlæsning, tavle med dagens tal og vægur |
 | 0.7.6 | Klik på en figur for at se detaljer om den |
+| 0.7.7 | Hyggeligere kontor: tæpper, reol, sofahjørne og bordtennis i teamrummet, bistrobord og snackautomat i køkkenet, lænestol hos Claude, egne ting på hver hjælpers skrivebord |
 
 ## 🔧 Fejl og ting der driller
 
@@ -72,6 +73,11 @@ Status: ✅ lavet · 🟡 delvist · ⬜ ikke lavet · ➖ ikke længere relevan
 | 32 | **Dagsstatistik på siden:** linjer, pris og antal hjælpere i dag og i ugen, gemt af serveren. | M | ⬜ |
 | 33 | **Flere kontorer:** ét rum pr. projekt, man kan gå mellem, i stedet for faner. | L | ⬜ |
 | 35 | **Et større kontor:** flere skriveborde, flere rum, mødelokale. Siden skalerer selv; grundplanen (`W`, `H`, pladser og ruter) skal ændres ens i `public/app.js` og `hooks/register.tsx`, som timer gåturene. | M | ⬜ |
+| 39 | **Liv i teamrummet og køkkenet:** tæpper under skrivebordene, reol, sofahjørne med lampe, bordtennisbord, bistrobord, snackautomat, damp fra kaffemaskinen i pausen. | M | ✅ |
+| 40 | **Egne ting på skrivebordet:** hver hjælper har altid de samme to ting (kop, plante, papirer, badeand, høretelefoner, billede eller snack). | S | ✅ |
+| 41 | **Lys og dybde:** skygger under figurerne, lys fra vinduerne efter tidspunktet, lamper om aftenen. | M | ⬜ |
+| 42 | **Projektrummet står tit tomt:** bliv til mødelokale eller skrump, når der ikke er andre sessioner. | M | ⬜ |
+| 43 | **Mere levende figurer:** lidt større, blinker, tænkeboble med "…" i stedet for "Tænker". | M | ⬜ |
 | 34 | **Del kontoret med teamet igen,** fx via Supabase, nu hvor tegningen ikke længere ligger i panelet. | L | ⬜ |
 
 ## 🧹 Oprydning
