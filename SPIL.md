@@ -16,34 +16,35 @@ Spillet må aldrig stå i vejen for arbejdet. Det er kun pynt: intet i spillet k
 
 ### Hvad tjener penge
 
-| Hændelse | Forslag | Hvorfor |
+Balancen er sat, så kontoret bygges over uger, ikke på en eftermiddag (justeret i 0.11.1).
+
+| Hændelse | Kroner | Hvorfor |
 |---|---|---|
-| Linje tilføjet | 1 kr | Det tydeligste mål for arbejde |
-| Linje fjernet | 0,5 kr | Oprydning tæller også |
-| Hjælper afleverer en opgave | 25 kr | Belønner at bruge subagenter |
-| Grønne tests | 50 kr, højst én gang hvert 10. minut | Belønner at teste, uden at man kan spamme |
-| Commit | 30 kr | |
-| Pull request | 100 kr | |
+| Linje tilføjet | 0,25 kr | Det tydeligste mål for arbejde |
+| Linje fjernet | 0,1 kr | Oprydning tæller også |
+| Hjælper afleverer en opgave | 10 kr | Belønner at bruge subagenter |
+| Grønne tests | 20 kr, højst én gang hvert 10. minut | Belønner at teste, uden at man kan spamme |
+| Commit | 15 kr | |
+| Pull request | 50 kr | |
 
-**Loft:** en enkelt redigering tæller højst 200 linjer, så en genereret fil på 10.000 linjer ikke køber hele kontoret. En hjælper, der *gik i stå*, giver ingenting.
+**Loft:** en enkelt redigering tæller højst 100 linjer, så en genereret fil på 10.000 linjer ikke køber hele kontoret. En hjælper, der *gik i stå*, giver ingenting. Det hele ganges med trivslen (0,8 til 1,2).
 
-En typisk dag med ca. 2.400 linjer giver omkring **3.000-4.000 kr**.
+En travl time (ca. 2.000 linjer, ti opgaver, et par tests og commits) giver omkring **700 kr**.
 
 ### Hvad koster ting
 
 | Ting | Pris | Effekt |
 |---|---|---|
 | Skrivebord nr. 1-2 | gratis | Man starter med to |
-| Skrivebord nr. 3, 4, 5, 6 | 500 / 750 / 1.000 / 1.500 kr | En hjælper mindre på gulvet |
-| Køkken | 2.000 kr | Claude holder pause med kaffe; hjælpere henter kaffe |
-| Toilet | 1.500 kr | Hjælpere går på toilet en gang imellem (ren pynt) |
-| Sofahjørne | 2.500 kr | Hjælpere, der venter, sætter sig der i stedet for at stå |
-| Bordtennisbord | 3.000 kr | To ledige hjælpere spiller |
-| Mødelokale | 5.000 kr | Når Claude har 3+ hjælpere i gang, holder de et kort møde |
-| Teamrum 2 | 8.000 kr | Plads til seks skriveborde mere |
-| Pynt (planter, lamper, billeder, tæpper) | 100-400 kr | Gør det hyggeligt; hæver trivslen |
+| Skrivebord nr. 3-6 (teamrummet) | 800 / 1.200 / 1.800 / 2.500 kr | En hjælper mindre på gulvet |
+| Skrivebord nr. 7-10 (stillerummet) | 3.500 / 4.500 / 6.000 / 8.000 kr | |
+| Toilet | 2.500 kr | Toiletbesøg i pauserne |
+| Køkken | 3.000 kr | Kaffepauser og snak; Claude holder pause med kaffe |
+| Sofahjørne | 4.000 kr | Hygge i teamrummet |
+| Bordtennisbord | 6.000 kr | To spiller i pauserne |
+| Mødelokale | 12.000 kr | Claude holder møde hvert 10. minut |
 
-Priserne er et første bud og skal justeres, når vi ser, hvor hurtigt pengene kommer.
+Alt i alt koster kontoret ca. 56.000 kr, svarende til 70-80 travle timer. Det første skrivebord kommer efter godt en time, køkkenet efter 5-6 timer.
 
 ## Hvordan det ser ud
 

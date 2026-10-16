@@ -188,7 +188,7 @@ const deliver = async ($: $, id: string, outcome?: 'failed') => {
 // One edit counts at most this many lines, so a generated file of ten
 // thousand lines does not buy the whole office; green tests count once in
 // this long.
-const LINES_PER_EDIT = 200
+const LINES_PER_EDIT = 100
 const TESTS_EVERY_MS = 10 * 60_000
 
 const earn = (earned: Earned | undefined, more: Partial<Earned>): Earned => {

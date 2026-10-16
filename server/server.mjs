@@ -15,7 +15,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-const VERSION = '0.11.0'
+const VERSION = '0.11.1'
 const HOST = '127.0.0.1'
 const PORT = Number(process.env.AGENT_KONTOR_PORT || 4747)
 const HERE = path.dirname(fileURLToPath(import.meta.url))
@@ -47,7 +47,10 @@ if (process.argv.includes('--detach')) {
 // grown since it last looked, session by session. See SPIL.md.
 
 const GAME = path.join(os.homedir(), '.claude', 'agent-kontor', 'spil.json')
-const RATES = { added: 1, removed: 0.5, delivered: 25, tests: 50, commits: 30, prs: 100 }
+// Slow on purpose: the office is built over weeks of work, not an afternoon.
+// A busy hour (some 2000 lines, ten tasks, a few tests and commits) earns
+// around 700 kr.
+const RATES = { added: 0.25, removed: 0.1, delivered: 10, tests: 20, commits: 15, prs: 50 }
 // What a new office starts with: Claude's corner and a small team room with
 // two desks. The rest is earned (phase 1 and on).
 const START = { desks: 2, rooms: ['claude', 'team'] }
@@ -142,10 +145,10 @@ const pruneCredited = now => {
 // Prices live here and only here: the page asks to buy, the server decides.
 // Desks 1-2 come with the office; the team room has room for six, the
 // quiet room for four more.
-const DESK_PRICES = [0, 0, 500, 750, 1000, 1500, 2000, 2500, 3000, 3500]
+const DESK_PRICES = [0, 0, 800, 1200, 1800, 2500, 3500, 4500, 6000, 8000]
 const MAX_DESKS = DESK_PRICES.length
 // Rooms, and furniture for the team room, bought once each.
-const ROOM_PRICES = { kitchen: 2000, toilet: 1500, lounge: 2500, pingpong: 3000, meeting: 5000 }
+const ROOM_PRICES = { kitchen: 3000, toilet: 2500, lounge: 4000, pingpong: 6000, meeting: 12000 }
 
 const priceOf = item => {
   if (item === 'desk') return game.owned.desks < MAX_DESKS ? DESK_PRICES[game.owned.desks] : null

@@ -23,9 +23,9 @@ const ROOM_TYPES = {
     handoff: seat => ({ x: 202 + (seat % 3) * 13, y: 82 + (Math.floor(seat / 3) % 2) * 14 }),
     board: { x: 196, y: 46, w: 44, h: 30 },
     plants: [[228, 36, true], [22, 116]],
-    lights: [[176, 120, 44, 0.4]],
-    bulbs: [[176, 120]],
-    blocks: [[10, 22, 12, 84], [64, 77, 128, 30], [107, 60, 42, 22], [194, 106, 28, 24], [169, 113, 14, 14], [196, 46, 44, 30], [220, 28, 16, 18]],
+    lights: [[70, 31, 44, 0.4]],
+    bulbs: [[70, 31]],
+    blocks: [[10, 22, 12, 84], [64, 77, 128, 30], [107, 60, 42, 22], [28, 22, 28, 24], [63, 24, 14, 14], [196, 46, 44, 30], [220, 28, 16, 18]],
   },
   kitchen: {
     home: { x: 252, y: 16 },
@@ -69,11 +69,11 @@ const ROOM_TYPES = {
     home: { x: 6, y: 514 },
     w: 114,
     h: 90,
-    plants: [[106, 588]],
+    plants: [[108, 548]],
     // Inside each stall, out of sight
-    stalls: [{ x: 35, y: 546 }, { x: 85, y: 546 }],
+    stalls: [{ x: 34, y: 588 }, { x: 86, y: 588 }],
     lights: [[63, 559, 44, 0.18, 'ceiling']],
-    blocks: [[10, 516, 100, 40], [12, 584, 44, 16]],
+    blocks: [[8, 566, 104, 36], [70, 516, 46, 16]],
   },
   meeting: {
     home: { x: 126, y: 514 },
@@ -117,7 +117,7 @@ const PLAN = {
     { x: 196, y: 132, w: 40, h: 6, colour: '#CDB892', between: ['claude', 'team'] },
     { x: 300, y: 132, w: 40, h: 6, colour: '#D5DAD2', between: ['kitchen', 'team'] },
     { x: 214, y: 378, w: 48, h: 6, colour: '#C3CCD6', between: ['team', 'quiet'] },
-    { x: 40, y: 502, w: 36, h: 12, colour: '#C3CCD6', between: ['quiet', 'toilet'] },
+    { x: 18, y: 502, w: 40, h: 12, colour: '#C3CCD6', between: ['quiet', 'toilet'] },
     { x: 280, y: 502, w: 48, h: 12, colour: '#C3CCD6', between: ['quiet', 'meeting'] },
     { x: 474, y: 236, w: 6, h: 40, colour: '#8C6B4A', isEntrance: true, between: ['team'] },
   ],
@@ -215,13 +215,23 @@ const placeOf = seat => {
 // a little extra for every turn so a route goes in straight runs. Routes are
 // kept until the floor plan changes.
 const STEP = 6
-const grid = (() => {
+// The grid is built when a route is first needed, and again whenever
+// something is bought: only rooms that stand have floor, and a door only
+// opens between two rooms that stand, so no walk cuts across an empty lot.
+let grid = null
+let gridKey = null
+
+const buildGrid = () => {
   const cols = Math.ceil(W / STEP)
   const rows = Math.ceil(H / STEP)
   const open = new Uint8Array(cols * rows)
   const isIn = (x, y, [rx, ry, rw, rh]) => x >= rx && x <= rx + rw && y >= ry && y <= ry + rh
-  const floors = PLAN.rooms.map(r => [r.x + 2, r.y + 2, typeOf(r).w - 4, typeOf(r).h - 4])
-  const doors = PLAN.doors.map(d => [d.x, d.y, d.w, d.h])
+  const built = PLAN.rooms.filter(isBuilt)
+  const floors = built.map(r => [r.x + 2, r.y + 2, typeOf(r).w - 4, typeOf(r).h - 4])
+  const isOpenDoor = d => (d.between ?? []).every(id => built.some(r => r.id === id))
+  // A door reaches a little into the rooms on both sides, so the floor on
+  // one side, the door and the floor on the other always meet in the grid.
+  const doors = PLAN.doors.filter(isOpenDoor).map(d => (d.w < d.h ? [d.x - 5, d.y, d.w + 10, d.h] : [d.x, d.y - 5, d.w, d.h + 10]))
   // Furniture, with a margin so feet keep clear of it
   const blocks = PLAN.rooms.flatMap(room => {
     const { dx, dy } = shiftOf(room)
@@ -236,7 +246,15 @@ const grid = (() => {
     }
   }
   return { cols, rows, open }
-})()
+}
+
+const ensureGrid = () => {
+  const key = (state.game?.owned?.rooms ?? ['*']).join(',')
+  if (key === gridKey) return
+  grid = buildGrid()
+  gridKey = key
+  routes.clear()
+}
 
 const cellOf = p => {
   const c = Math.min(grid.cols - 1, Math.max(0, Math.floor((p.x - WORLD.x) / STEP)))
@@ -352,6 +370,7 @@ const findPath = (from, to) => {
 
 const routes = new Map()
 const route = (from, to) => {
+  ensureGrid()
   const key = `${from.x},${from.y}>${to.x},${to.y}`
   if (!routes.has(key)) routes.set(key, findPath(from, to))
   return routes.get(key)
@@ -359,6 +378,60 @@ const route = (from, to) => {
 const arriveRoute = seat => route(PLAN.entrance, placeOf(seat).spot)
 const deliverRoute = seat => route(placeOf(seat).spot, handoffFor(seat))
 const leaveRoute = seat => route(handoffFor(seat), PLAN.entrance)
+
+// For checking the floor plan after a change: every route a helper or
+// Claude can take, walked in small steps; any that crosses a wall, or that A*
+// could not find and drew straight, is reported. In the browser console:
+// kontorCheckRoutes()
+window.kontorCheckRoutes = () => {
+  ensureGrid()
+  const built = PLAN.rooms.filter(isBuilt)
+  const inRect = (x, y, [rx, ry, rw, rh]) => x >= rx && x <= rx + rw && y >= ry && y <= ry + rh
+  const floors = built.map(r => [r.x, r.y, typeOf(r).w, typeOf(r).h])
+  const doors = PLAN.doors.filter(d => (d.between ?? []).every(id => built.some(r => r.id === id))).map(d => [d.x - 1, d.y - 1, d.w + 2, d.h + 2])
+  const isFloor = (x, y) => floors.some(f => inRect(x, y, f)) || doors.some(d => inRect(x, y, d))
+  const problems = []
+  const check = (name, points) => {
+    if (points.length === 2 && Math.hypot(points[1].x - points[0].x, points[1].y - points[0].y) > 30) problems.push(`${name}: no route found`)
+    for (let i = 0; i + 1 < points.length; i++) {
+      const a = points[i]
+      const b = points[i + 1]
+      const d = Math.hypot(b.x - a.x, b.y - a.y)
+      for (let k = 0; k <= d; k += 2) {
+        const x = a.x + ((b.x - a.x) * k) / d
+        const y = a.y + ((b.y - a.y) * k) / d
+        if (!isFloor(x, y) && Math.hypot(x - PLAN.entrance.x, y - PLAN.entrance.y) > 8) return problems.push(`${name}: through a wall at ${Math.round(x)},${Math.round(y)}`)
+      }
+    }
+  }
+  const seats = deskSlots().length + 4
+  let count = 0
+  const spots = []
+  for (const room of built) {
+    const t = typeOf(room)
+    for (const p of [...(t.standing ?? []), ...(t.stalls ?? []), ...(t.pingpong ?? []), ...(t.chairs ?? [])]) spots.push(at(room, p))
+  }
+  for (let seat = 0; seat < seats; seat++) {
+    const home = placeOf(seat).spot
+    check(`arrive ${seat}`, arriveRoute(seat))
+    check(`deliver ${seat}`, deliverRoute(seat))
+    check(`leave ${seat}`, leaveRoute(seat))
+    count += 3
+    for (const spot of spots) {
+      check(`seat ${seat} to ${spot.x},${spot.y}`, route(home, spot))
+      check(`${spot.x},${spot.y} to seat ${seat}`, route(spot, home))
+      count += 2
+    }
+  }
+  const meeting = firstRoom('meeting')
+  if (meeting && isBuilt(meeting)) {
+    const head = at(meeting, typeOf(meeting).head)
+    check('Claude to the meeting', route({ x: MAIN.cx, y: MAIN.dy - 6 }, head))
+    check('Claude back from the meeting', route(head, { x: MAIN.cx, y: MAIN.dy - 6 }))
+    count += 2
+  }
+  return { checked: count, problems }
+}
 
 // ── Walks ────────────────────────────────────────────────────────────────
 // Every walk takes as long as the status file says (the mod's WALKS),
@@ -1099,16 +1172,17 @@ const roomDrawers = {
       fill(11, 23 + k * 44, 10, 38, '#8B5E3C')
       ;['#D45D7A', '#3E7CC9', '#D6A23C', '#2E9E8F', '#8A6FD6'].forEach((c, i) => fill(12, 25 + k * 44 + i * 7, 8, 5, ['#D45D7A', '#3E7CC9', '#D6A23C', '#2E9E8F', '#8A6FD6'][(i + k) % 5]))
     }
-    // An armchair by the door, and a side table with a lamp
-    fill(194, 106, 28, 24, OUTLINE)
-    fill(195, 107, 26, 6, '#A9512E')
-    fill(195, 107, 5, 22, '#B85A33')
-    fill(216, 107, 5, 22, '#B85A33')
-    fill(200, 113, 16, 15, '#D9744A')
-    fill(202, 115, 12, 3, '#E99A73')
-    dot(176, 120, 7, OUTLINE)
-    dot(176, 120, 5.8, '#B98F5E')
-    dot(176, 120, 3.2, '#F6E3A8', '#C9A55A')
+    // A reading corner by the shelves: an armchair and a side table with a
+    // lamp, out of the way to the door
+    fill(28, 22, 28, 24, OUTLINE)
+    fill(29, 23, 26, 6, '#A9512E')
+    fill(29, 23, 5, 22, '#B85A33')
+    fill(50, 23, 5, 22, '#B85A33')
+    fill(34, 29, 16, 15, '#D9744A')
+    fill(36, 31, 12, 3, '#E99A73')
+    dot(70, 31, 7, OUTLINE)
+    dot(70, 31, 5.8, '#B98F5E')
+    dot(70, 31, 3.2, '#F6E3A8', '#C9A55A')
     // The whiteboard; board() writes the day's numbers on it
     const b = ROOM_TYPES.corner.board
     fill(b.x - 1, b.y - 1, b.w + 2, b.h + 2, OUTLINE)
@@ -1249,21 +1323,22 @@ const roomDrawers = {
     // Small pale tiles
     fill(6, 514, 114, 90, '#E3EEF2')
     for (let c = 0; c < 15; c++) for (let r = 0; r < 12; r++) if ((c + r) % 2 === 0) fill(6 + c * 8, 514 + r * 8, 8, 8, '#D4E3E9')
-    // Two stalls along the top wall, a door each
-    for (const x of [10, 60]) {
-      fill(x, 516, 50, 40, OUTLINE)
-      fill(x + 1, 517, 48, 38, '#F4F7F8')
-      dot(x + 25, 528, 7, OUTLINE)
-      dot(x + 25, 528, 5.8, '#FFFFFF')
-      dot(x + 25, 529, 3.2, '#CFE3EC')
-      fill(x + 18, 518, 14, 4, '#E9EEF2')
-      fill(x + 8, 553, 34, 3, '#7FA7C2')
+    // Two stalls along the bottom wall, their doors facing the room
+    for (const x of [8, 60]) {
+      fill(x, 566, 52, 38, OUTLINE)
+      fill(x + 1, 567, 50, 37, '#F4F7F8')
+      dot(x + 26, 590, 7, OUTLINE)
+      dot(x + 26, 590, 5.8, '#FFFFFF')
+      dot(x + 26, 589, 3.2, '#CFE3EC')
+      fill(x + 19, 598, 14, 5, '#E9EEF2')
+      fill(x + 9, 566, 34, 3, '#7FA7C2')
+      dot(x + 40, 571, 1.3, '#5B6672')
     }
-    // A sink and a mirror
-    fill(12, 584, 44, 16, OUTLINE)
-    fill(13, 585, 42, 14, '#F4F7F8')
-    dot(34, 592, 5, '#CFE3EC', '#9CB4C6')
-    fill(20, 598, 28, 2, '#9CC4EC')
+    // A sink and a mirror on the top wall, right of the door
+    fill(70, 516, 46, 16, OUTLINE)
+    fill(71, 517, 44, 14, '#F4F7F8')
+    dot(93, 524, 5, '#CFE3EC', '#9CB4C6')
+    fill(76, 516, 34, 2, '#9CC4EC')
   },
 
   meeting: (g, fill, dot) => {
@@ -1444,6 +1519,11 @@ const drawBuilding = (project, hour) => {
     const { dx, dy } = shiftOf(room)
     g.save()
     g.translate(dx, dy)
+    // Nothing a room draws spills into its walls
+    const home = typeOf(room).home
+    g.beginPath()
+    g.rect(home.x, home.y, typeOf(room).w, typeOf(room).h)
+    g.clip()
     roomDrawers[room.type]?.(g, fill, dot, owns)
     for (const [x, y, big] of typeOf(room).plants ?? []) {
       const r = big ? 9 : 7
@@ -1754,7 +1834,7 @@ const draw = () => {
     const kind = pose.isThere ? pose.errand.kind : null
     if (kind === 'toilet') {
       // In the stall: the door says so
-      tag(pose.x, pose.y - 18, 'Optaget', '#E5484D')
+      tag(pose.x, pose.y - 26, 'Optaget', '#E5484D')
       continue
     }
     if (kind === 'meeting') {

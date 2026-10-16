@@ -15,7 +15,7 @@ Talk to the user in Danish. All text the user sees (page, panel, button, README,
 Rules that keep the parts apart:
 
 - **The floor plan lives only in `public/app.js`** (`ROOM_TYPES`, `PLAN`). The mod knows no coordinates: every walk takes a fixed time (`WALKS` in the mod, sent in the status file), and the page sets the pace.
-- **The server owns money and prices.** The mod only counts earnings (`earned`, with the rules: 200 lines per edit at most, green tests at most every ten minutes); the server credits the growth of each session's counts, times wellbeing. The page never decides a price.
+- **The server owns money and prices.** The mod only counts earnings (`earned`, with the rules: 100 lines per edit at most, green tests at most every ten minutes); the server credits the growth of each session's counts, times wellbeing. The page never decides a price.
 - **Breaks, meetings and banter are page-only and deterministic** (from helper ids and the clock), so every viewer sees the same and a reload changes nothing.
 - **The mod must never get in Claude's way.** Everything it does runs through `quietly()`; a failure is dropped.
 
@@ -64,4 +64,6 @@ Commit messages end with `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com
 - **Don't rebuild buttons on every update.** The state arrives several times a second; a button replaced under the pointer swallows the click. Build once, then update text and `disabled` (see `buildShop`).
 - **CSS class names are shared.** `.note` in the people list carries `grid-column: 2`; use the shop's own classes (`.hint`).
 - **Patch scripts:** heredocs mangle backslashes and quotes. Write larger patches as Python files with the Write tool, assert every replacement, and remember to actually run the script.
+- **A floor plan change can cut off a room.** Furniture in a narrow corridor, or a door that does not quite meet the floor on both sides, leaves A* without a route, and the walk then cuts straight through walls. After changing `ROOM_TYPES` or `PLAN`, run `kontorCheckRoutes()` in the page's console in an office that owns everything; it must report no problems.
+- **The balance is slow on purpose:** the office should take weeks of work. `tests/economy.check.mjs` reads rates and prices from the server, so changing them does not break it.
 - **Deleting is refused by the auto-mode classifier.** Move things aside (e.g. to `~/.claude/dev-mods-arkiv`) instead.
