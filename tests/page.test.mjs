@@ -616,3 +616,18 @@ test('weather fades in and out at the edges of its three hours, and snow lies a 
     }
   }
 })
+
+test('two walking the same stretch at once go side by side, not through each other', () => {
+  const a = { x: 100, y: 300, facing: 'right', isWalking: true }
+  const b = { x: 104, y: 300, facing: 'right', isWalking: true }
+  const sitting = { x: 102, y: 300, isWalking: false }
+  routes.sideBySide([a, b, sitting])
+  assert.ok(Math.hypot(a.x - b.x, a.y - b.y) >= 11.9, 'apart')
+  assert.equal(a.x, 100, 'across the way, not along it')
+  assert.deepEqual([sitting.x, sitting.y], [102, 300], 'one standing still is not moved')
+  const c = { x: 200, y: 300, facing: 'front', isWalking: true }
+  const d = { x: 200, y: 310, facing: 'front', isWalking: true }
+  routes.sideBySide([c, d])
+  assert.equal(c.y, 300)
+  assert.ok(Math.abs(c.x - d.x) > 0, 'one walking down beside the other')
+})

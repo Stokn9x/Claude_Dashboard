@@ -399,6 +399,42 @@ export const pathJoin = origin => {
   return { x: corner.x, y: Math.max(corner.y, Math.min(GROUNDS.pavement.y - 4, origin.y)) }
 }
 
+// ── Side by side ─────────────────────────────────────────────────────────
+// Two on the same stretch at the same time (helpers sent off together, a
+// walk home beside a walk in) would walk through each other: each pair of
+// walkers closer than CLOSE is eased apart, across the way they go, each by
+// half of what is missing. A pose that is not walking keeps its place. In
+// place, on the poses given; the same for every viewer.
+const CLOSE = 12
+export const sideBySide = poses => {
+  const walking = poses.filter(p => p.isWalking)
+  for (let i = 0; i < walking.length; i++) {
+    for (let j = i + 1; j < walking.length; j++) {
+      const a = walking[i]
+      const b = walking[j]
+      const d = Math.hypot(b.x - a.x, b.y - a.y)
+      if (d >= CLOSE) continue
+      const isAcross = a.facing === 'left' || a.facing === 'right'
+      // Across the way they go: up and down for a walk east or west, else
+      // left and right; the one already on that side stays on it. Enough
+      // that, with the gap along the way, they are CLOSE apart.
+      const along = Math.abs(isAcross ? b.x - a.x : b.y - a.y)
+      const across = isAcross ? b.y - a.y : b.x - a.x
+      const push = (Math.sqrt(CLOSE * CLOSE - along * along) - Math.abs(across)) / 2
+      if (push <= 0) continue
+      const sign = across >= 0 ? 1 : -1
+      if (isAcross) {
+        a.y -= push * sign
+        b.y += push * sign
+      } else {
+        a.x -= push * sign
+        b.x += push * sign
+      }
+    }
+  }
+  return poses
+}
+
 // ── Late news ────────────────────────────────────────────────────────────
 // A new phase reaches the page a moment after it began: the mod notices it,
 // writes the status file, the server reads it, which together takes up to a

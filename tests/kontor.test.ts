@@ -738,3 +738,18 @@ test('a helper carries its agent type and model in the status file', async ($, o
   expect(sub.type).toBe('Explore')
   expect(sub.model).toBe('claude-haiku-5-5')
 })
+
+test("a subagent's permission dialog marks the subagent as waiting, not Claude", async ($, on) => {
+  const clock = engine(on, async e => {
+    if (e.tool === 'Agent') await $.agent.spawn({ tool_use_id: e.tool_use_id, prompt: 'p', description: 'Ryd op', subagentType: 'general-purpose', parentModel: 'm', background: true } as never)
+    return undefined
+  })
+  const file = statusFile(on)
+  await $.session.start(start())
+  await $.tool.call({ tool: 'Agent', prompt: 'p', description: 'Ryd op', tool_use_id: 'p1', run_in_background: true } as never)
+  await $.classic.PermissionRequest({ tool_name: 'Bash', tool_input: { command: 'rm x' }, agent_id: 'sub-p1' } as never)
+  await clock.advance(600)
+  expect(file.last()?.subs[0]?.phase).toBeDefined()
+  expect((file.last()?.subs[0] as unknown as { activity: { state: string } }).activity.state).toBe('waiting')
+  expect(file.last()?.main.state).not.toBe('waiting')
+})

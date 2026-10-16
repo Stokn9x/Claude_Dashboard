@@ -28,6 +28,7 @@ Status: ✅ lavet · 🟡 delvist · ⬜ ikke lavet · ⏸️ parkeret · ➖ ik
 | 0.11.1 | Fejlrettelser: ingen går gennem væggene (døre forbinder rummene i rutegitteret, og der er fri vej ud af Claudes kontor), nyt toilet med døren ud til et frit område, ingen fliser i væggene; langsommere indtjening og højere priser, så kontoret bygges over uger |
 | 0.12.0 | En lækrere side rundt om kontoret: topbjælke med ikon, trivsel, saldo og forbindelsesprik; kort med pixel-portræt og statuspille i listen; venteboks med "Gå til"; butik med ikoner og fremdrift; kun mørkt tema |
 | 0.13.0 | Spillets fase 4: pynt og opgraderinger i butikken, 17 præstationer med belønning og notifikation, statistik i den nye fane Fremskridt |
+| 0.25.1 | To, der går samme stykke vej samtidig, går side om side i stedet for gennem hinanden. Afprøvet: ingen gåtur krydser et købt skrivebord, og en subagent, der beder om lov, er den, der rækker hånden op, ikke Claude |
 | 0.25.0 | Månedens medarbejder: hjælpernes navne går igen, så serveren fører en tavle pr. navn og måned (opgaver, dem der gik i stå, linjer). Fremskridt viser sidste måneds medarbejder med pokal og månedens stilling med medaljer, og den, der fører måneden, har en ⭐ på navneskiltet. Ved skrivebordene står hjælperens navn nu i taleboblen, fordi rækken bagved dækker navneskiltet |
 | 0.24.0 | Sæson og vejr, uden at noget forlader computeren: vejret skifter hver tredje time ud fra uret (klart, overskyet, regn og om vinteren sne, oftest regn om efteråret) og glider ind og ud. Regn falder i streger og løber på ruderne, sne driver ned og bliver liggende en tid på græsset, grundene, hækken og væggene, og søen fryser til. Løvtræerne er grønne om sommeren, blomstrer om foråret, bliver orange og gule om efteråret og står nøgne om vinteren. I december står der et juletræ i receptionen, og der hænger lyskæder i gangen. Se et andet vejr med `?vejr=regn` (eller `sne`, `skyet`, `klart`) og en anden måned med `?maaned=12` |
 | 0.23.1 | Småting: en hjælper med fri på plænen går hjem ad stien uden først at gå op til hoveddøren; skriveborde, der ikke er købt, står ikke længere i vejen for en gåtur; ekstra pladser ved bænken og på plænen står aldrig i træerne; ni hjælpere kan aflevere side om side; depotet mod nord har rækkens tykke ydervæg; Claude vander planten lidt højere oppe, så navnet ikke ligger oven i skiltet ved døren |
@@ -52,8 +53,8 @@ Status: ✅ lavet · 🟡 delvist · ⬜ ikke lavet · ⏸️ parkeret · ➖ ik
 | # | Hvad | Str. | Status |
 |---|---|---|---|
 | 1 | **Baggrunds-subagenter går for tidligt.** De bliver nu, til subagenten selv stopper (`SubagentStop`). | M | ✅ |
-| 2 | **Hånden bliver oppe efter godkendelse.** "Venter på dig" fjernes ved næste skridt og ved afvisning, men der kommer stadig ingen hændelse lige når du klikker "Tillad". | S | 🟡 |
-| 3 | **Venter en subagent på godkendelse, ser det måske ud som om Claude venter.** Koden bruger `agent_id` fra godkendelses-hændelsen, men det er ikke set med en rigtig subagent. | S | ⬜ |
+| 2 | **Hånden bliver oppe efter godkendelse.** Kan ikke gøres bedre: motoren giver ingen hændelse, når du trykker "Tillad" (hooks kører, før dialogen vises, og selve kørslen ligger i samme kald som dialogen). Hånden går ned ved næste skridt, ved en afvisning, og når værktøjet er færdigt; et langt `npm test` efter "Tillad" holder den altså oppe, til det er kørt. Undersøgt 16.10.2026. | S | ➖ |
+| 3 | **Venter en subagent på godkendelse, ser det måske ud som om Claude venter.** Koden bruger `agent_id` fra godkendelses-hændelsen, og motorens typer siger, at den er der, når hændelsen kommer fra en subagent. Afprøvet med en test i 0.25.1. | S | ✅ |
 | 4 | **Hjælper nr. 7 og videre** venter ved døren og tager det første skrivebord, der bliver ledigt. | S | ✅ |
 | 5 | **Genindlæses mod'en midt i en gåtur,** regnes turen nu ud fra hvornår den begyndte, så ingen hænger fast. | S | ✅ |
 | 6 | **Tegningen blinkede og hakkede ved hver ændring.** Løst ved at flytte tegningen til browseren. | M | ✅ |
@@ -61,7 +62,7 @@ Status: ✅ lavet · 🟡 delvist · ⬜ ikke lavet · ⏸️ parkeret · ➖ ik
 | 36 | **Hjælpere, der fejler eller bliver stoppet, bliver siddende for evigt.** De går nu hjem, når Claudes liste over agenter siger, at de er stoppet, eller ikke længere har dem. | S | ✅ |
 | 37 | **Kontoret mister forbindelsen efter dvale.** Når kontoret er åbnet, starter mod'en serveren igen inden for et minut, og siden forbinder selv igen. | S | ✅ |
 | 38 | **Serveren:** fil-overvågningen kan ikke længere vælte den, faner med tabt forbindelse ryddes op, og statusfiler fra afsluttede sessioner slettes. | S | ✅ |
-| 8 | **Ruterne går ind over skrivebordskanter,** og to der går, kan overlappe hinanden. | M | ⬜ |
+| 8 | **Ruterne går ind over skrivebordskanter,** og to der går, kan overlappe hinanden. Rutegitteret holder alle gåture fri af skrivebordene (målt i 0.25.1: ingen krydser et købt skrivebord), og to på samme stykke vej samtidig går nu side om side. | M | ✅ |
 
 ## ✅ Det skal være på plads
 

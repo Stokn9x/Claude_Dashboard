@@ -7,7 +7,7 @@ import { store, focused, owns } from './store.js'
 import { OUTLINE, bubble, canvas, circle, ctx, dashed, label, rect, rounded, say, setPixelsPerUnit, shadow, tag } from './gfx.js'
 import { hashOf, modelFamily } from './util.js'
 import { MAIN, MAIN_SPOT, ROOM_TYPES, at, coffeeSpot, desks, firstRoom, isBuilt, placeOf, shiftOf, typeOf } from './plan.js'
-import { HOMEWARD_MS, WALKS, homewardPose, outAt, poseOf, route, walkAt, walkMs } from './routes.js'
+import { HOMEWARD_MS, WALKS, homewardPose, outAt, poseOf, route, sideBySide, walkAt, walkMs } from './routes.js'
 import { STAY, banterFor, breakNow, errandPose, meetingNow } from './breaks.js'
 import { bowl, cat, claudeLook, hands, lookFor, onTheFloor, sitting, sittingBack, standing } from './figures.js'
 import { blueprint, board, chair, clock, desk, deskThingsFor, magnifier, mug, steam, wateringCan } from './furniture.js'
@@ -539,7 +539,10 @@ export const draw = () => {
     .map(sub => ({ sub, pose: bridged.get(sub.id) ?? onErrand.get(sub.id) ?? poses.get(sub.id) }))
     .filter(w => w.pose && !w.pose.seated)
     .concat(goingHome)
-    .sort((a, b) => a.pose.y - b.pose.y)
+  // Copies, so the cached poses keep their places
+  for (const w of walkers) w.pose = { ...w.pose }
+  sideBySide(walkers.map(w => w.pose))
+  walkers.sort((a, b) => a.pose.y - b.pose.y)
   const players = walkers.filter(w => w.pose.isThere && w.pose.errand.kind === 'pingpong')
   const sales = forSaleNow(list)
   const frame = { s, main, where, rest, catPose, meeting, meetingPose, claudeWalk, pause, kitchenSpot, list, seatedAt, subs, walkers, players, floorSitters, glowing, hits, t }
