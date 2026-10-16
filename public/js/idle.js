@@ -12,7 +12,7 @@ import { hashOf, stir } from './util.js'
 export const IDLE_SLOT_MS = 45_000
 // The longest the walk to a new idle spot takes; most are shorter, at the
 // common pace.
-export const IDLE_WALK_MS = 9000
+export const IDLE_WALK_MS = 14_000
 
 const HOBBIES = ['gaming', 'sofa', 'pool', 'darts', 'bar', 'arcade', 'guitar']
 
@@ -33,17 +33,23 @@ const spotsFor = kind => {
 }
 
 // Where each helper off work is now and what it does: id → { kind, spot, index, slot }.
-export const idlePlan = (idleSubs, now) => {
+// Spots in `taken` ("x,y") are in use by a break or a meeting; ping-pong
+// needs both ends of the table.
+export const idlePlan = (idleSubs, now, taken = new Set()) => {
   const slot = Math.floor(now / IDLE_SLOT_MS)
+  const free = kind => {
+    const spots = spotsFor(kind).filter(p => !taken.has(`${p.x},${p.y}`))
+    return kind === 'pingpong' && spots.length < 2 ? [] : spots
+  }
   const picks = { pingpong: [], coffee: [], garden: [], ...Object.fromEntries(HOBBIES.map(kind => [kind, []])) }
-  const pastimes = HOBBIES.filter(kind => spotsFor(kind).length)
+  const pastimes = HOBBIES.filter(kind => free(kind).length)
   for (const sub of [...idleSubs].sort((a, b) => (a.id < b.id ? -1 : 1))) {
     const r = stir(hashOf(sub.id), slot + 31) % 100
     // With a lounge, half of them go to play; which pastime, the id says,
     // among those the lounge's steps have.
     if (pastimes.length && r >= 50) picks[pastimes[stir(hashOf(sub.id), slot + 77) % pastimes.length]].push(sub)
-    else if (owns('pingpong') && r < 25) picks.pingpong.push(sub)
-    else if (owns('kitchen') && r < 50) picks.coffee.push(sub)
+    else if (free('pingpong').length && r < 25) picks.pingpong.push(sub)
+    else if (free('coffee').length && r < 50) picks.coffee.push(sub)
     else picks.garden.push(sub)
   }
   // Ping-pong takes two, no more and no fewer; the rest go out on the lawn.
@@ -52,7 +58,7 @@ export const idlePlan = (idleSubs, now) => {
   const plan = new Map()
   const overflow = []
   for (const kind of ['pingpong', 'coffee', ...HOBBIES]) {
-    const spots = spotsFor(kind)
+    const spots = free(kind)
     picks[kind].forEach((sub, index) => (index < spots.length ? plan.set(sub.id, { kind, spot: spots[index], index, slot }) : overflow.push(sub)))
   }
   const lawn = spotsFor('garden')

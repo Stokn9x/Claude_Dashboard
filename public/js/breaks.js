@@ -3,9 +3,13 @@
 // takes which break, and when, is worked out from their ids and the clock,
 // so every viewer sees the same and a reload changes nothing. Every three
 // minutes there is a break: some fetch coffee (and talk), some go to the
-// toilet, two play ping-pong in the lounge, each only where it is bought. Every ten
-// minutes, with three or more helpers in, Claude holds a short meeting.
-// Nobody leaves while they wait for you.
+// toilet, two play ping-pong in the lounge, each only where it is bought.
+// Every ten minutes, with three or more helpers in, Claude holds a short
+// meeting; no break starts round a meeting. Who goes where is settled when
+// a break or meeting begins and kept until it ends (the caller keeps a
+// `lineups` map for that), so a helper who finishes or starts waiting
+// meanwhile changes nobody else's errand. Nobody leaves while they wait
+// for you.
 import { store, owns } from './store.js'
 import { hashOf, kr, stir } from './util.js'
 import { at, firstRoom, isBuilt, spotsIn, typeOf } from './plan.js'
@@ -17,8 +21,10 @@ const BREAK_AT = 20_000
 const MEETING_EVERY = 600_000
 const MEETING_AT = 60_000
 // The longest an errand's walk takes either way; most are shorter, at the
-// common pace.
-const ERRAND_WALK = 8000
+// common pace. Long enough for the far end of a full-grown house.
+const ERRAND_WALK = 14_000
+const MEETING_WINDOW = () => STAY.meeting + 2 * ERRAND_WALK
+const BREAK_WINDOW = () => STAY.pingpong + 2 * ERRAND_WALK + 9000
 export const STAY = { coffee: 22_000, toilet: 12_000, pingpong: 24_000, meeting: 25_000 }
 
 // Helpers who can take a break that starts at `start`: at their place well
@@ -28,28 +34,56 @@ const freeFor = (subs, start, walks) =>
     .filter(s => s.phase === 'working' && s.since + walks.arrive + 5000 < start && s.activity.state !== 'waiting')
     .sort((a, b) => (a.id < b.id ? -1 : 1))
 
+// A line-up settled once, the first time it is asked for: kept in the
+// caller's map, which holds only the latest few.
+const settled = (lineups, key, make) => {
+  if (!lineups) return make()
+  if (!lineups.has(key)) {
+    lineups.set(key, make())
+    while (lineups.size > 8) lineups.delete(lineups.keys().next().value)
+  }
+  return lineups.get(key)
+}
+
 // The meeting going on now, if any: who sits where, from when.
-export const meetingNow = (subs, now, walks, main) => {
+export const meetingNow = (subs, now, walks, main, lineups = null) => {
   const room = firstRoom('meeting')
   if (!room || !isBuilt(room)) return null
   const slot = Math.floor(now / MEETING_EVERY)
   const start = slot * MEETING_EVERY + MEETING_AT
-  if (now < start || now > start + STAY.meeting + 2 * ERRAND_WALK) return null
-  const people = freeFor(subs, start, walks)
-  if (people.length < 3) return null
-  const chairs = typeOf(room).chairs.map(c => at(room, c))
-  const order = people.slice(0, chairs.length)
-  const seats = new Map(order.map((s, i) => [s.id, chairs[i]]))
+  if (now < start || now > start + MEETING_WINDOW()) return null
+  const lineup = settled(lineups, `meeting ${slot}`, () => {
+    const people = freeFor(subs, start, walks)
+    if (people.length < 3) return null
+    const chairs = typeOf(room).chairs.map(c => at(room, c))
+    const order = people.slice(0, chairs.length)
+    return { order, seats: new Map(order.map((s, i) => [s.id, chairs[i]])) }
+  })
+  if (!lineup) return null
   // Claude joins when at work; on a break, or waiting for you, it stays put.
   const withClaude = main.state !== 'waiting' && main.state !== 'idle'
-  return { start, seats, head: at(room, typeOf(room).head), withClaude, order }
+  // The order holds the helpers as they were; who they are now is in subs.
+  const order = lineup.order.map(o => subs.find(s => s.id === o.id) ?? o)
+  return { start, seats: lineup.seats, head: at(room, typeOf(room).head), withClaude, order }
+}
+
+// Whether a break that starts at `start` would run into a meeting.
+const isNearMeeting = start => {
+  const room = firstRoom('meeting')
+  if (!room || !isBuilt(room)) return false
+  const first = Math.floor(start / MEETING_EVERY) * MEETING_EVERY + MEETING_AT
+  return [first - MEETING_EVERY, first, first + MEETING_EVERY].some(m => start < m + MEETING_WINDOW() && m < start + BREAK_WINDOW())
 }
 
 // The break going on now: who does what, where.
-export const breakNow = (subs, now, walks, meeting) => {
+export const breakNow = (subs, now, walks, meeting, lineups = null) => {
   const slot = Math.floor(now / BREAK_EVERY)
   const start = slot * BREAK_EVERY + BREAK_AT
-  if (now < start || now > start + STAY.pingpong + 2 * ERRAND_WALK + 9000) return null
+  if (now < start || now > start + BREAK_WINDOW() || isNearMeeting(start)) return null
+  return settled(lineups, `break ${slot}`, () => lineupFor(subs, slot, start, walks, meeting))
+}
+
+const lineupFor = (subs, slot, start, walks, meeting) => {
   const picks = { coffee: [], toilet: [], pingpong: [] }
   for (const sub of freeFor(subs, start, walks)) {
     if (meeting?.seats.has(sub.id)) continue

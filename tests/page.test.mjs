@@ -214,9 +214,10 @@ test('out of the door a helper walks down the path and off along the pavement', 
 
 // ── Breaks and meetings ──────────────────────────────────────────────────
 
-// A time inside a break (every three minutes, from 20 s in) and one inside
-// a meeting (every ten minutes, from a minute in).
-const BREAK = 180_000 * 50_000 + 20_000 + 4000
+// A time inside a break (every three minutes, from 20 s in, here 200 s into
+// a ten-minute slot, clear of its meeting) and one inside a meeting (every
+// ten minutes, from a minute in).
+const BREAK = 180_000 * 50_001 + 20_000 + 4000
 const MEETING = 600_000 * 20_000 + 60_000 + 4000
 const team = (count, extra = () => ({})) => Array.from({ length: count }, (_, i) => helper(`h${i}`, { seat: i, since: 0, ...extra(i) }))
 
@@ -267,12 +268,66 @@ test('an errand walks there, stays, and walks back', () => {
   const home = placeOf(0).spot
   const dest = plan.spotsIn(plan.roomById('kitchen'), typeOf(plan.roomById('kitchen')).standing)[0]
   const errand = { kind: 'coffee', start: 0, stay: breaks.STAY.coffee, dest }
-  const go = routes.walkMs(routes.route(home, dest), 8000)
-  const come = routes.walkMs(routes.route(dest, home), 8000)
+  const go = routes.walkMs(routes.route(home, dest), 14_000)
+  const come = routes.walkMs(routes.route(dest, home), 14_000)
   assert.equal(breaks.errandPose(home, errand, -1), null)
   assert.equal(breaks.errandPose(home, errand, go - 10).isThere, undefined)
   assert.equal(breaks.errandPose(home, errand, go + 10).isThere, true)
   assert.equal(breaks.errandPose(home, errand, go + breaks.STAY.coffee + come), null)
+})
+
+test('who goes where on a break or to a meeting is settled when it begins', () => {
+  everything()
+  const subs = team(8)
+  const lineups = new Map()
+  const before = breaks.breakNow(subs, BREAK, routes.WALKS, null, lineups)
+  assert.ok(before.errands.size >= 2)
+  // One of them finishes mid-break: the others keep their errands, as they were
+  const [first] = before.errands.keys()
+  const later = subs.map(sub => (sub.id === first ? { ...sub, phase: 'delivering', since: BREAK + 1000 } : sub))
+  const after = breaks.breakNow(later, BREAK + 5000, routes.WALKS, null, lineups)
+  assert.deepEqual([...after.errands.entries()], [...before.errands.entries()])
+  // A meeting stays when one of its three leaves
+  const three = team(3)
+  const m1 = breaks.meetingNow(three, MEETING, routes.WALKS, { state: 'working' }, lineups)
+  const m2 = breaks.meetingNow(three.slice(1), MEETING + 2000, routes.WALKS, { state: 'working' }, lineups)
+  assert.equal(m2.seats.size, m1.seats.size)
+})
+
+test('no break starts round a meeting', () => {
+  everything()
+  for (let k = 0; k < 10; k++) {
+    const start = 1_800_000 * 1000 + k * 180_000 + 20_000
+    const pause = breaks.breakNow(team(8), start + 1000, routes.WALKS, null)
+    const meetings = [60_000, 660_000, 1_260_000].map(m => 1_800_000 * 1000 + m)
+    const isNear = meetings.some(m => start < m + 53_000 && m < start + 61_000)
+    assert.equal(pause === null, isNear, `break ${k}`)
+  }
+})
+
+test('off work, nobody takes a spot a break is using', () => {
+  everything()
+  const kitchen = plan.roomById('kitchen')
+  const spots = plan.spotsIn(kitchen, typeOf(kitchen).standing).concat(plan.spotsIn(plan.roomById('lounge'), typeOf(plan.roomById('lounge')).pingpong))
+  const taken = new Set(spots.map(p => `${p.x},${p.y}`))
+  for (let k = 0; k < 30; k++) {
+    const used = [...idle.idlePlan(team(9, () => ({ phase: 'idle' })), k * idle.IDLE_SLOT_MS + 1, taken).values()]
+    assert.ok(used.every(p => !taken.has(`${p.spot.x},${p.spot.y}`)), `slot ${k}`)
+    assert.ok(used.every(p => p.kind !== 'pingpong' && p.kind !== 'coffee'))
+  }
+})
+
+test('a phase that arrives a little late begins when it is seen; one seen long after keeps its time', () => {
+  const seen = new Map()
+  const at = 1_000_000
+  const sessions = [{ key: 's', subs: [helper('a', { phase: 'delivering', since: at - 900 }), helper('b', { phase: 'working', since: at - 60_000 })] }]
+  const [first] = routes.settle(sessions, seen, at)
+  assert.equal(first.subs[0].since, at, 'late by 0.9 s: starts now')
+  assert.equal(first.subs[1].since, at - 60_000, 'seen a minute after: kept')
+  const [again] = routes.settle(sessions, seen, at + 3000)
+  assert.equal(again.subs[0].since, at, 'the same phase keeps the time it was first seen')
+  routes.settle([{ key: 's', subs: [] }], seen, at + 4000)
+  assert.equal(seen.size, 0, 'forgotten once gone')
 })
 
 test('banter needs two in the kitchen, and only they and their colleagues speak', () => {

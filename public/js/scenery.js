@@ -10,7 +10,8 @@ export const HEDGE_Y = GROUNDS.pavement.y - 14
 const LAWN = (() => {
   const xs = GROUNDS.hangout.map(p => p.x)
   const ys = GROUNDS.hangout.map(p => p.y)
-  return { x: Math.min(...xs) - 30, y: Math.min(...ys) - 50, w: Math.max(...xs) - Math.min(...xs) + 60, h: Math.max(...ys) - Math.min(...ys) + 70 }
+  // Wide enough for the extra pairs further out when the lawn is full (idle.js)
+  return { x: Math.min(...xs) - 30, y: Math.min(...ys) - 50, w: Math.max(...xs) - Math.min(...xs) + 210, h: Math.max(...ys) - Math.min(...ys) + 100 }
 })()
 
 // Where nothing may grow: the office and a strip round it, the path, the
@@ -21,7 +22,8 @@ export const isClear = (x, y, r = 0) => {
     [WORLD.x - 30 - r, WORLD.y - 22 - r, WORLD.w + 60 + 2 * r, WORLD.h + 44 + 2 * r],
     ...GROUNDS.path.map(([px, py, w, h]) => [px - 16 - r, py - 22 - r, w + 32 + 2 * r, h + 30 + 2 * r]),
     [S.x, HEDGE_Y - 18 - r, S.w, GROUNDS.farPavement.y + GROUNDS.farPavement.h - HEDGE_Y + 30 + r],
-    [GROUNDS.bench.x - 30, GROUNDS.bench.y - 30, 60, 50],
+    // The bench, and the grass west of it where more wait when it is full (plan.js)
+    [GROUNDS.bench.x - 150, GROUNDS.bench.y - 40, 180, 90],
     // The lawn where helpers off work hang out
     [LAWN.x - r, LAWN.y - r, LAWN.w + 2 * r, LAWN.h + 2 * r],
   ]

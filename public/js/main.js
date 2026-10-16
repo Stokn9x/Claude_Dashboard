@@ -12,6 +12,7 @@ import { eventsBetween } from './activity.js'
 import { addEvents, onEvents } from './feed.js'
 import { playFor } from './sound.js'
 import { notifyFor, titleFor } from './notify.js'
+import { settle } from './routes.js'
 import './tip.js'
 
 const conn = document.getElementById('conn')
@@ -21,7 +22,11 @@ onBought(renderPage)
 onEvents(playFor)
 onEvents(notifyFor)
 
-const receive = next => {
+// When each helper's phase was first seen here (see settle in routes.js)
+const seen = new Map()
+
+const receive = data => {
+  const next = { ...data, sessions: settle(data.sessions ?? [], seen, Date.now()) }
   addEvents(eventsBetween(store.state, next))
   store.state = next
   titleFor(next)

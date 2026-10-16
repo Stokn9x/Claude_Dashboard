@@ -307,10 +307,16 @@ const findRoute = (from, to) => {
   return withoutRepeats(points)
 }
 
+// Remembered until the floor plan changes, at most this many: walks from
+// wherever someone happened to be add new ones all day.
+const ROUTES_KEPT = 3000
 export const route = (from, to) => {
   ensureGrid()
   const key = `${from.x},${from.y}>${to.x},${to.y}`
-  if (!routes.has(key)) routes.set(key, findRoute(from, to))
+  if (!routes.has(key)) {
+    if (routes.size >= ROUTES_KEPT) routes.clear()
+    routes.set(key, findRoute(from, to))
+  }
   return routes.get(key)
 }
 // In from the corner of the path outside, through the front door.
@@ -383,6 +389,31 @@ export const poseOf = (sub, now, walks = WALKS, origin = null) => {
   }
   if (e >= walks.leave) return null
   return walkEndingAt(sub.from === 'idle' && origin ? route(origin, entrance()) : leaveRoute(sub.seat), e, walks.leave)
+}
+
+// ── Late news ────────────────────────────────────────────────────────────
+// A new phase reaches the page a moment after it began: the mod notices it,
+// writes the status file, the server reads it, which together takes up to a
+// second or so. Walked from when it began, the figure would jump ahead by
+// that much. So a phase that arrives a little late begins when the page
+// first sees it, and the walk starts from where the figure stands. Seen
+// long after it began (a reload), it keeps its own time. `seen` remembers
+// when each phase was first seen, for the subs there are now.
+const LATE_MS = 2500
+export const settle = (sessions, seen, now) => {
+  const keys = new Set()
+  const out = sessions.map(s => ({
+    ...s,
+    subs: (s.subs ?? []).map(sub => {
+      const key = `${s.key}|${sub.id}|${sub.phase}|${sub.since}`
+      keys.add(key)
+      if (!seen.has(key)) seen.set(key, now)
+      const late = seen.get(key) - sub.since
+      return late > 0 && late < LATE_MS ? { ...sub, since: seen.get(key) } : sub
+    }),
+  }))
+  for (const key of seen.keys()) if (!keys.has(key)) seen.delete(key)
+  return out
 }
 
 // ── Going home ───────────────────────────────────────────────────────────

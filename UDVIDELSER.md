@@ -28,6 +28,7 @@ Status: ✅ lavet · 🟡 delvist · ⬜ ikke lavet · ⏸️ parkeret · ➖ ik
 | 0.11.1 | Fejlrettelser: ingen går gennem væggene (døre forbinder rummene i rutegitteret, og der er fri vej ud af Claudes kontor), nyt toilet med døren ud til et frit område, ingen fliser i væggene; langsommere indtjening og højere priser, så kontoret bygges over uger |
 | 0.12.0 | En lækrere side rundt om kontoret: topbjælke med ikon, trivsel, saldo og forbindelsesprik; kort med pixel-portræt og statuspille i listen; venteboks med "Gå til"; butik med ikoner og fremdrift; kun mørkt tema |
 | 0.13.0 | Spillets fase 4: pynt og opgraderinger i butikken, 17 præstationer med belønning og notifikation, statistik i den nye fane Fremskridt |
+| 0.19.1 | Ingen figurer springer længere: et faseskift, der kommer lidt for sent, begynder, når siden ser det; hvem der skal til pause eller møde, ligger fast fra starten; ingen pause lige omkring et møde; hjælpere med fri tager ikke en plads, en pause bruger; og skal en figur alligevel pludselig et andet sted hen (fx Claude fra mødet til skrivebordet), går den derhen ad gangen. Længere ture i det store hus går i almindeligt tempo |
 | 0.19.0 | Den nye grundplan: en bred hovedgang med alle rum på hver sin side, Claude midt i huset over receptionen, have mellem huset og vejen. Teamrum, køkken, lounge og toilet starter små og vokser i trin (teamrummene mod vest, loungen og toilettet mod øst, køkkenet og loungen ind i et depot); 22 skriveborde i alt. Hjælperne går rum for rum: ud ad døren, i højre side af gangen og ind ad den næste dør, lige gennem dørene og i lige linjer inde i rummene, i samme tempo overalt. Bordtennisbordet står i loungen. Gemte spil flyttes over uden at miste noget |
 | 0.18.0 | Fase 5: teamrum 2 med seks skriveborde mere, en lounge med pool, bar, spillekonsol, dart, arkademaskine, jukebox, guitar og sofa, hvor hjælperne med fri slapper af, og en større reception foran hoveddøren, som står tom til den bliver indrettet, og hvor Bodil byder velkommen; vores egne tooltips i stedet for browserens; mødelokalets skærm hang under døren og er flyttet |
 | 0.17.0 | Lyd (slås fra med 🔊), en browser-besked når nogen venter på dig og fanen er skjult (🔔), og titlen på fanen siger det; saldo, trivsel og stribe i `/kontor panel`; linjer lavet med scripts tæller ved commit |
@@ -186,14 +187,14 @@ En samlet gennemgang før nye ting: koden læst igennem (mod, server og side), a
 
 | # | Hvad | Str. | Status |
 |---|---|---|---|
-| 81 | **Faseskift når frem op til et sekund for sent, så figuren springer.** Siden regner gåturen fra faseskiftets tidspunkt, men skiftet går gennem mod'ens oprydning, statusfilen og serveren først (målt 978 ms i dit kontor, op til ca. 80 enheder). Rettelse: siden starter en ny fase, når den ser den. | M | ⬜ |
-| 82 | **Pauser og møder regnes om hvert billede ud fra, hvem der er ledig lige nu.** Bliver én færdig midt i en pause, forsvinder dens ærinde, de andre bytter pladser, og nogle dukker op midt i en tur. Mødet forsvinder helt, hvis der bliver under tre. Rettelse: lås holdet, når pausen eller mødet begynder. | M | ⬜ |
-| 83 | **Møde og pause overlapper hvert 30. minut**, så hjælpere hopper fra køkkenet til skrivebordet og går derfra til mødet. | S | ⬜ |
-| 84 | **Hjælpere med fri og hjælpere på pause bruger de samme pladser** ved kaffen og bordtennisbordet, så to står på én plads, og med fire ved bordet er der ingen bold. | S | ⬜ |
-| 85 | **En hjælper, der afleverer, før den er nået ind** (fx fejler inden for 12 sekunder), eller som kaldes tilbage fra fri og bliver hurtigt færdig, springer til sit skrivebord. | S | ⬜ |
-| 86 | **Skifter siden session, går den forrige sessions hjælpere hjem ud ad hoveddøren** i det nye kontor, og en hjælper, der kaldes tilbage, kan starte fra plænen. | S | ⬜ |
-| 87 | **Claude hopper fra mødet eller køkkenet til skrivebordet**, når en hjælper kommer med et resultat, i stedet for at gå. | S | ⬜ |
-| 88 | **Lange ærinder går for hurtigt**, fx fra teamrum 1 til toilettet: loftet på 8 sekunder er for kort til det store hus. | S | ⬜ |
+| 81 | **Faseskift når frem op til et sekund for sent, så figuren springer.** Siden regner gåturen fra faseskiftets tidspunkt, men skiftet går gennem mod'ens oprydning, statusfilen og serveren først (målt 978 ms i dit kontor, op til ca. 80 enheder). Rettelse: siden starter en ny fase, når den ser den. | M | ✅ |
+| 82 | **Pauser og møder regnes om hvert billede ud fra, hvem der er ledig lige nu.** Bliver én færdig midt i en pause, forsvinder dens ærinde, de andre bytter pladser, og nogle dukker op midt i en tur. Mødet forsvinder helt, hvis der bliver under tre. Rettelse: lås holdet, når pausen eller mødet begynder. | M | ✅ |
+| 83 | **Møde og pause overlapper hvert 30. minut**, så hjælpere hopper fra køkkenet til skrivebordet og går derfra til mødet. | S | ✅ |
+| 84 | **Hjælpere med fri og hjælpere på pause bruger de samme pladser** ved kaffen og bordtennisbordet, så to står på én plads, og med fire ved bordet er der ingen bold. | S | ✅ |
+| 85 | **En hjælper, der afleverer, før den er nået ind** (fx fejler inden for 12 sekunder), eller som kaldes tilbage fra fri og bliver hurtigt færdig, springer til sit skrivebord. | S | ✅ |
+| 86 | **Skifter siden session, går den forrige sessions hjælpere hjem ud ad hoveddøren** i det nye kontor, og en hjælper, der kaldes tilbage, kan starte fra plænen. | S | ✅ |
+| 87 | **Claude hopper fra mødet eller køkkenet til skrivebordet**, når en hjælper kommer med et resultat, i stedet for at gå. | S | ✅ |
+| 88 | **Lange ærinder går for hurtigt**, fx fra teamrum 1 til toilettet: loftet på 8 sekunder er for kort til det store hus. | S | ✅ |
 | 89 | **Småting:** hjælpere på plænen går op til hoveddøren og ned igen, når de går hjem; skriveborde, der ikke er købt, spærrer stadig for gåture; listen over ruter vokser hele dagen; ekstra pladser på plænen og ved bænken kan stå i træerne; afleveringspladserne går igen for hver sjette hjælper; depotet mod nord mangler den tykke ydervæg. | S | ⬜ |
 
 ### Serveren og mod'en
@@ -208,8 +209,8 @@ En samlet gennemgang før nye ting: koden læst igennem (mod, server og side), a
 
 ### Forslag til rækkefølge
 
-1. **Pengene først:** 75-80, så ingen tjener for meget eller for lidt.
-2. **Bevægelserne:** 81-88, det man ser hver dag.
+1. **Bevægelserne:** 81-88, lavet i 0.19.1.
+2. **Pengene:** 75-80, så ingen tjener for meget eller for lidt.
 3. **Robusthed:** 90-93.
 4. **Småting:** 89 og 94.
 

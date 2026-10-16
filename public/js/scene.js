@@ -22,7 +22,7 @@ import { drawLife } from './outdoors.js'
 const BUILD_MS = 10_000
 const PARTY_AFTER_MS = 5000
 // The longest a walk to a newly bought desk takes; most are shorter
-const MOVE_MS = 6000
+const MOVE_MS = 12_000
 const NAME = '#4A5868'
 const CLAUDE = '#C8643B'
 
@@ -34,9 +34,15 @@ const standingBox = (x, y) => ({ x0: x - 19, y0: y - 52, x1: x + 19, y1: y + 15 
 // and walks there, rather than appearing at the desk.
 const lastPlaces = new Map()
 const moves = new Map()
-// Helpers on their way out, by id: { sub, out }, kept after the status file
-// has let them go, for the walk down the path.
+// Helpers on their way out, by session and id: { sub, out, key }, kept
+// after the status file has let them go, for the walk down the path.
 const homeward = new Map()
+// Each session's breaks and meetings, settled when they begin (breaks.js)
+const lineups = new Map()
+const lineupsOf = key => {
+  if (!lineups.has(key)) lineups.set(key, new Map())
+  return lineups.get(key)
+}
 // Helpers off work: the walk to their current idle spot, by id
 // ({ from, to, start }), and where each was last seen, for the walk back to
 // a desk or out of the door once they are called on or go home.
@@ -64,6 +70,43 @@ const idlePose = (sub, plan, now) => {
       : { x: target.spot.x, y: target.spot.y, facing: target.spot.facing ?? 'front', isWalking: false, isThere: true, there: now - walk.start - ms }
   lastIdle.set(sub.id, { x: pose.x, y: pose.y })
   return { ...pose, isIdle: true, errand: { kind: target.kind, dest: target.spot, index: target.index, slot: target.slot } }
+}
+
+// ── Never a jump ─────────────────────────────────────────────────────────
+// Where a figure should be is worked out afresh every frame. When that is
+// suddenly far from where it was drawn a moment ago (a helper called away
+// mid-errand, one that hands over before it got to its desk, Claude
+// leaving the kitchen), it does not jump: it walks there, briskly, along a
+// route, and carries on from there.
+const JUMP = 6
+// A walk over that heads for where the figure was to be, not where it is
+// to be now, is laid again from where it stands.
+const STRAY = 40
+const BRIDGE_PACE = 2.5
+const drawnAt = new Map()
+const bridges = new Map()
+const apart = (a, b) => Math.hypot(a.x - b.x, a.y - b.y)
+// The pose to draw instead while walking over, or null to draw the target.
+const unjumped = (key, target, now) => {
+  const last = drawnAt.get(key)
+  let bridge = bridges.get(key)
+  if (bridge && (now - bridge.start >= bridge.ms || apart(bridge.to, target) > STRAY)) {
+    bridges.delete(key)
+    bridge = null
+  }
+  if (!bridge && last && now - last.at < 500 && apart(target, last) > JUMP) {
+    const points = route({ x: last.x, y: last.y }, { x: target.x, y: target.y })
+    bridge = { points, to: { x: target.x, y: target.y }, start: now, ms: walkMs(points, Infinity) / BRIDGE_PACE }
+    bridges.set(key, bridge)
+  }
+  const pose = bridge ? { ...walkAt(bridge.points, (now - bridge.start) / bridge.ms), isBridging: true } : null
+  const at = pose ?? target
+  drawnAt.set(key, { x: at.x, y: at.y, at: now })
+  return pose
+}
+const forget = key => {
+  drawnAt.delete(key)
+  bridges.delete(key)
 }
 
 // ── Celebrations ─────────────────────────────────────────────────────────
@@ -337,9 +380,9 @@ const errandsNow = (subs, now, meeting, pause) => {
   return onErrand
 }
 
-// Claude: at the desk, on the way to or at the meeting, or in the kitchen
-// with a mug on a break.
-const drawClaude = ({ main, where, meetingPose, kitchenSpot, glowing, hits, t }) => {
+// Claude: at the desk, on the way to or at the meeting, in the kitchen with
+// a mug on a break, or walking between them.
+const drawClaude = ({ main, where, meetingPose, claudeWalk, kitchenSpot, glowing, hits, t }) => {
   const isAtDesk = where === 'desk'
   chair(MAIN.cx, MAIN.dy)
   if (isAtDesk) sitting(MAIN.cx, MAIN.dy + 4, claudeLook, main.state === 'waiting', t, 7)
@@ -349,6 +392,11 @@ const drawClaude = ({ main, where, meetingPose, kitchenSpot, glowing, hits, t })
     hands(MAIN.cx, MAIN.dy, claudeLook, main.state !== 'waiting', t)
     tag(MAIN.cx, MAIN.dy + 30, 'Claude', CLAUDE)
     hits.push({ kind: 'claude', id: 'claude', ...seatedBox(MAIN.cx, MAIN.dy) })
+  } else if (where === 'walking') {
+    const p = claudeWalk
+    standing(p.x, p.y, claudeLook, p.facing, p.isWalking, t, 7)
+    tag(p.x, p.y + 3, 'Claude', CLAUDE)
+    hits.push({ kind: 'claude', id: 'claude', ...standingBox(p.x, p.y) })
   } else if (where === 'meeting') {
     const p = meetingPose
     if (p.isThere) sitting(p.x, p.y, claudeLook, false, t, 7)
@@ -541,46 +589,66 @@ export const draw = () => {
   // A helper on its way with a result finds Claude at the desk, not an
   // empty chair: Claude leaves the kitchen or the meeting to take it.
   const isReceiving = subs.some(x => x.phase === 'delivering')
-  const meeting = meetingNow(subs, now, walks, main)
-  const pause = breakNow(subs, now, walks, meeting)
+  const settledHere = s ? lineupsOf(s.key) : null
+  const meeting = meetingNow(subs, now, walks, main, settledHere)
+  const pause = breakNow(subs, now, walks, meeting, settledHere)
   const onErrand = errandsNow(subs, now, meeting, pause)
   const meetingPose = meeting?.withClaude && !isReceiving ? errandPose(MAIN_SPOT, { kind: 'meeting', start: meeting.start, stay: STAY.meeting, dest: meeting.head }, now) : null
   // On a break Claude goes to the kitchen; with no kitchen it stays put.
-  const where = meetingPose ? 'meeting' : main.state === 'idle' && kitchenSpot && !isReceiving ? 'kitchen' : 'desk'
+  const claudeWhere = meetingPose ? 'meeting' : main.state === 'idle' && kitchenSpot && !isReceiving ? 'kitchen' : 'desk'
+  const claudeWalk = unjumped(`${s?.key}|claude`, claudeWhere === 'meeting' ? meetingPose : claudeWhere === 'kitchen' ? kitchenSpot : MAIN_SPOT, now)
+  const where = claudeWalk ? 'walking' : claudeWhere
 
-  const plan = idlePlan(subs.filter(sub => sub.phase === 'idle'), now)
+  // Off work, a helper keeps clear of the spots a break or the meeting uses.
+  const taken = new Set([...(pause?.errands.values() ?? [])].map(e => `${e.dest.x},${e.dest.y}`).concat([...(meeting?.seats.values() ?? [])].map(p => `${p.x},${p.y}`)))
+  const plan = idlePlan(subs.filter(sub => sub.phase === 'idle'), now, taken)
   const poses = new Map(
     subs.map(sub => [sub.id, sub.phase === 'idle' ? idlePose(sub, plan, now) : poseOf(sub, now, walks, sub.from === 'idle' ? lastIdle.get(sub.id) ?? GROUNDS.hangout[0] : null)]),
   )
-  // Forget the idle walks of those no longer off work.
+  // Forget the idle walks of those no longer off work, and where helpers
+  // idled once they are in no session at all.
+  const everyone = new Set(store.state.sessions.flatMap(x => (x.subs ?? []).map(sub => sub.id)))
   for (const id of idleWalks.keys()) if (!subs.some(sub => sub.id === id && sub.phase === 'idle')) idleWalks.delete(id)
-  for (const id of lastIdle.keys()) if (!subs.some(sub => sub.id === id)) lastIdle.delete(id)
-  const bySeat = new Map(subs.filter(sub => poses.get(sub.id)?.seated && !onErrand.has(sub.id)).map(sub => [sub.seat, sub]))
+  for (const id of lastIdle.keys()) if (!everyone.has(id)) lastIdle.delete(id)
+  // Nobody jumps: a helper far from where it was drawn walks over first.
+  const bridged = new Map()
+  for (const sub of subs) {
+    const pose = onErrand.get(sub.id) ?? poses.get(sub.id)
+    const key = `${s.key}|${sub.id}`
+    if (!pose || pose.isIdle === true && pose.x === undefined) {
+      forget(key)
+      continue
+    }
+    const walk = unjumped(key, pose.seated ? placeOf(sub.seat).spot : pose, now)
+    if (walk) bridged.set(sub.id, walk)
+  }
+  const isSeated = sub => poses.get(sub.id)?.seated && !onErrand.has(sub.id) && !bridged.has(sub.id)
+  const bySeat = new Map(subs.filter(isSeated).map(sub => [sub.seat, sub]))
   const seatedAt = seat => bySeat.get(seat)
   const floorSitters = subs
-    .filter(sub => poses.get(sub.id)?.seated && sub.seat >= list.length && !onErrand.has(sub.id))
+    .filter(sub => isSeated(sub) && sub.seat >= list.length)
     .map(sub => ({ sub, spot: placeOf(sub.seat).spot }))
     .sort((a, b) => a.spot.y - b.spot.y)
   for (const sub of subs) {
     const out = outAt(sub, walks)
-    if (out !== null) homeward.set(sub.id, { sub, out })
+    if (out !== null) homeward.set(`${s.key}|${sub.id}`, { sub, out, key: s.key })
   }
   const goingHome = []
-  for (const [id, { sub, out }] of homeward) {
+  for (const [id, { sub, out, key }] of homeward) {
     if (now > out + HOMEWARD_MS) homeward.delete(id)
-    else if (now >= out && !subs.some(x => x.id === id && x.phase !== 'leaving' && x.phase !== 'delivering')) {
-      const pose = homewardPose(id, out, now)
+    else if (key === s?.key && now >= out && !subs.some(x => x.id === sub.id && x.phase !== 'leaving' && x.phase !== 'delivering')) {
+      const pose = homewardPose(sub.id, out, now)
       if (pose) goingHome.push({ sub, pose: { ...pose, isHomeward: true } })
     }
   }
   const walkers = subs
-    .map(sub => ({ sub, pose: onErrand.get(sub.id) ?? poses.get(sub.id) }))
+    .map(sub => ({ sub, pose: bridged.get(sub.id) ?? onErrand.get(sub.id) ?? poses.get(sub.id) }))
     .filter(w => w.pose && !w.pose.seated)
     .concat(goingHome)
     .sort((a, b) => a.pose.y - b.pose.y)
   const players = walkers.filter(w => w.pose.isThere && w.pose.errand.kind === 'pingpong')
   const sales = forSaleNow(list)
-  const frame = { s, main, where, meeting, meetingPose, pause, kitchenSpot, list, seatedAt, subs, walkers, players, floorSitters, glowing, hits, t }
+  const frame = { s, main, where, meeting, meetingPose, claudeWalk, pause, kitchenSpot, list, seatedAt, subs, walkers, players, floorSitters, glowing, hits, t }
 
   const headlights = drawLife(now, t, visibleRect())
   daylight(timeNow)
