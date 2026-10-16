@@ -1,20 +1,20 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register, RenderElement } from 'claude-code'
 
-import type { Activity, AgentState, Office, Other, Party, Phase, Step, Sub } from '../types'
+import type { Activity, AgentState, Earned, Office, Other, Party, Phase, Step, Sub } from '../types'
 
 // A pixel office, seen from above: Claude at the big desk, its subagents at
-// the six desks of the team room. This module keeps track of who is where and
-// writes it to a status file; a small server on this computer streams every
+// desks in the team room. This module keeps track of who is where and writes
+// it to a status file; a small server on this computer streams every
 // session's file to a page that draws and animates the office. Nothing leaves
 // the machine.
 
 const PANE = 'kontor'
-const SEATS = 6
-// Walking pace, in scene units a second, and how long a helper stands at
-// Claude's desk with its result.
-const SPEED = 90
-const HANDOVER_MS = 2600
+
+// Every walk takes the same time, however far it goes: the page knows the
+// floor plan and sets the pace, this module only when each walk is over. The
+// status file carries these, so the two always agree.
+const WALKS = { arrive: 4000, deliver: 3500, handover: 2600, leave: 4000 }
 
 const thinking: Activity = { state: 'working', detail: 'Tænker' }
 const pause: Activity = { state: 'idle', detail: 'Holder pause' }
@@ -36,6 +36,8 @@ const emptyOffice: Office = {
   isOfficeOpen: false,
   tools: 0,
   recent: [],
+  earned: { added: 0, removed: 0, delivered: 0, tests: 0, commits: 0, prs: 0 },
+  lastTestAt: 0,
 }
 const office = atom({ plugin: 'agent-kontor', key: 'office' } as const, emptyOffice)
 
@@ -102,11 +104,12 @@ const hashOf = (id: string) => {
   return h
 }
 
+// A helper's place: the lowest number no one else holds. The page turns a
+// number into a desk, or into a spot on the floor once the desks run out.
 const freeSeat = (subs: Sub[]) => {
-  for (let seat = 0; seat < SEATS; seat++) {
-    if (!subs.some(s => s.seat === seat && s.phase !== 'leaving')) return seat
-  }
-  return -1
+  let seat = 0
+  while (subs.some(s => s.seat === seat && s.phase !== 'leaving')) seat++
+  return seat
 }
 
 const setMain = ($: $, activity: Activity) =>
@@ -172,26 +175,41 @@ const deliver = async ($: $, id: string, outcome?: 'failed') => {
       const detail = outcome === 'failed' ? `Gik i stå: ${s.task}` : `Afleverer: ${s.task}`
       return { ...s, phase: 'delivering' as Phase, since: now, outcome, activity: { state: 'working' as AgentState, detail } }
     }),
+    // A finished task earns; a failed one, or the demo's, does not.
+    earned:
+      outcome !== 'failed' && !id.startsWith('demo-') && o.subs.some(s => s.id === id && (s.phase === 'arriving' || s.phase === 'working'))
+        ? earn(o.earned, { delivered: 1 })
+        : o.earned,
   }))
+}
+
+// ─── Earnings ───────────────────────────────────────────────────────────
+
+// One edit counts at most this many lines, so a generated file of ten
+// thousand lines does not buy the whole office; green tests count once in
+// this long.
+const LINES_PER_EDIT = 200
+const TESTS_EVERY_MS = 10 * 60_000
+
+const earn = (earned: Earned | undefined, more: Partial<Earned>): Earned => {
+  const now = { ...emptyOffice.earned, ...(earned ?? {}) }
+  for (const [k, v] of Object.entries(more) as [keyof Earned, number][]) now[k] += v
+  return now
 }
 
 // Every walk is worked out from when it began, never from a timer, so a
 // reload of the mod or a sleeping computer cannot leave anyone stuck: a walk
-// that is over is over. A helper waiting by the door takes the first desk
-// that comes free.
+// that is over is over.
 const TIDY_MS = 500
 
 const nextPhase = (s: Sub, now: number): Sub | null => {
   const elapsed = now - s.since
-  if (s.phase === 'arriving') {
-    return s.seat < 0 || elapsed >= walkMs(arrivePath(s.seat)) ? { ...s, phase: 'working' } : s
-  }
+  if (s.phase === 'arriving') return elapsed >= WALKS.arrive ? { ...s, phase: 'working' } : s
   if (s.phase === 'delivering') {
-    const handedOver = s.seat < 0 ? HANDOVER_MS : walkMs(deliverPath(s.seat)) + HANDOVER_MS
-    if (elapsed < handedOver) return s
-    return s.seat < 0 ? null : { ...s, phase: 'leaving', since: s.since + handedOver }
+    const handedOver = WALKS.deliver + WALKS.handover
+    return elapsed < handedOver ? s : { ...s, phase: 'leaving', since: s.since + handedOver }
   }
-  if (s.phase === 'leaving') return elapsed >= walkMs(leavePath(s.seat)) ? null : s
+  if (s.phase === 'leaving') return elapsed >= WALKS.leave ? null : s
   return s
 }
 
@@ -199,10 +217,10 @@ const tidy = async ($: $) => {
   const now = await $.clock.now()
   await update($, office, o => {
     let subs = o.subs.map(s => nextPhase(s, now)).filter((s): s is Sub => s !== null)
-    for (const waiting of subs.filter(s => s.seat < 0 && s.phase === 'working')) {
+    // Helpers an older version left waiting by the door, without a place.
+    for (const waiting of subs.filter(s => s.seat < 0)) {
       const seat = freeSeat(subs)
-      if (seat < 0) break
-      subs = subs.map(s => (s.id === waiting.id ? { ...s, seat, phase: 'arriving', since: now } : s))
+      subs = subs.map(s => (s.id === waiting.id ? { ...s, seat } : s))
     }
     // A party whose timer a reload lost ends all the same.
     const party = o.party && now - o.party.at > PARTY_MS ? null : o.party
@@ -248,7 +266,16 @@ const partyFor = (command: string, isOk: boolean): Pick<Party, 'kind' | 'label'>
 
 const celebrate = async ($: $, who: string, party: Pick<Party, 'kind' | 'label'>) => {
   const at = await $.clock.now()
-  await update($, office, o => ({ ...o, party: { ...party, who, at } }))
+  await update($, office, o => {
+    const isGreen = party.kind === 'confetti'
+    const isTestPaid = isGreen && at - (o.lastTestAt ?? 0) >= TESTS_EVERY_MS
+    const earned =
+      party.label === 'Pull request åbnet' ? earn(o.earned, { prs: 1 })
+      : party.label === 'Committet' ? earn(o.earned, { commits: 1 })
+      : isTestPaid ? earn(o.earned, { tests: 1 })
+      : o.earned
+    return { ...o, party: { ...party, who, at }, earned, lastTestAt: isTestPaid ? at : o.lastTestAt }
+  })
   $.clock.after(PARTY_MS, () => void quietly(update($, office, o => (o.party?.at === at ? { ...o, party: null } : o))))
 }
 
@@ -286,36 +313,6 @@ const runDemo = async ($: $) => {
   $.clock.after(14_000 + demoTasks.length * 2600 + 12_000, () => void quietly(celebrate($, 'main', { kind: 'confetti', label: 'Testene er grønne' })))
   $.clock.after(14_000 + demoTasks.length * 2600 + 18_000, () => void quietly(setMain($, pause)))
 }
-
-// ─── Walks ──────────────────────────────────────────────────────────────
-
-// The page draws every walk; the office only needs to know how long each one
-// takes, to sit a helper down and see it out of the door. The floor plan is
-// public/app.js's, and the two must agree.
-type Point = { x: number; y: number }
-
-const seatAt = (seat: number) => ({ cx: 92 + (seat % 3) * 148, dy: 202 + Math.floor(seat / 3) * 102 })
-const DOOR = { x: 478, y: 256 }
-const handoffFor = (seat: number) => ({ x: 206 + (seat % 3) * 13, y: 96 + Math.floor(seat / 3) * 16 })
-
-const arrivePath = (seat: number): Point[] => {
-  const { cx, dy } = seatAt(seat)
-  const lane = dy - 52
-  return [DOOR, { x: DOOR.x, y: 256 }, { x: cx + 74, y: 256 }, { x: cx + 74, y: lane }, { x: cx, y: lane }, { x: cx, y: dy - 6 }]
-}
-const deliverPath = (seat: number): Point[] => {
-  const { cx, dy } = seatAt(seat)
-  const lane = dy - 52
-  const spot = handoffFor(seat)
-  return [{ x: cx, y: dy - 6 }, { x: cx, y: lane }, { x: cx + 74, y: lane }, { x: cx + 74, y: 148 }, { x: 214, y: 148 }, { x: 214, y: spot.y }, spot]
-}
-const leavePath = (seat: number): Point[] => {
-  const spot = handoffFor(seat)
-  return [spot, { x: 214, y: spot.y }, { x: 214, y: 148 }, { x: 446, y: 148 }, { x: 446, y: 256 }, DOOR]
-}
-
-const legSeconds = (a: Point, b: Point) => Math.hypot(b.x - a.x, b.y - a.y) / SPEED
-const walkMs = (points: Point[]) => Math.round(points.slice(1).reduce((t, p, i) => t + legSeconds(points[i] as Point, p), 0) * 1000) + 150
 
 // ─── Panel ──────────────────────────────────────────────────────────────
 
@@ -369,6 +366,8 @@ const statusOf = (o: Office) => ({
   subs: o.subs,
   party: o.party,
   stats: { linesAdded: o.linesAdded, linesRemoved: o.linesRemoved, costUsd: o.costUsd, fiveHour: o.fiveHour, model: o.model, tools: o.tools, recent: o.recent },
+  earned: o.earned,
+  walks: WALKS,
 })
 
 // Written when it changes, and now and then besides so the server knows the
@@ -413,7 +412,9 @@ const readOthers = async ($: $) => {
 const leaveOffice = async ($: $) => {
   const dir = await sessionsDir($)
   const o = await readOffice($)
-  if (dir && o.sessionKey) await $.fs.write(`${dir}/${o.sessionKey}.json`, JSON.stringify({ key: o.sessionKey, ended: true, updatedAt: 0 }))
+  // The last counts go with it, so the server credits what was earned since
+  // it last looked before it lets the file go.
+  if (dir && o.sessionKey) await $.fs.write(`${dir}/${o.sessionKey}.json`, JSON.stringify({ key: o.sessionKey, ended: true, earned: o.earned, updatedAt: 0 }))
 }
 
 const isServerUp = async ($: $) => {
@@ -577,6 +578,7 @@ export const register: Register = on => {
             ...o,
             linesAdded: o.linesAdded + counted.added,
             linesRemoved: o.linesRemoved + counted.removed,
+            earned: earn(o.earned, { added: Math.min(counted.added, LINES_PER_EDIT), removed: Math.min(counted.removed, LINES_PER_EDIT) }),
             subs: o.subs.map(s =>
               s.id === e.agentId ? { ...s, linesAdded: (s.linesAdded ?? 0) + counted.added, linesRemoved: (s.linesRemoved ?? 0) + counted.removed } : s,
             ),

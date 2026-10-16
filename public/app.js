@@ -3,79 +3,334 @@
 // every walk from those timestamps, so nothing reloads and nothing stutters.
 'use strict'
 
-// ── Geometry: must match hooks/register.tsx, which times the same walks ──
-const W = 480
-const H = 508
-// Canvas pixels per scene unit: set by fit() from the window and the screen's
-// pixel density, so the office fills the space and stays sharp at any size.
+// ── The floor plan ───────────────────────────────────────────────────────
+// The office is a list of rooms. A room type knows its size and where things
+// stand inside it: the desks, Claude's chair, the lamps, what is in the way.
+// Those are written in the coordinates of the place the type was first drawn
+// for, its home; a room placed elsewhere is shifted by the difference. So a
+// room can stand anywhere, a new room only adds to the list, and the world is
+// whatever the rooms cover.
+const ROOM_TYPES = {
+  // Claude's corner office
+  corner: {
+    home: { x: 6, y: 16 },
+    w: 240,
+    h: 116,
+    topWall: 16,
+    windows: [30, 120],
+    claude: { cx: 128, dy: 78 },
+    // Where a helper stands to hand over its result, right of Claude's desk
+    handoff: seat => ({ x: 202 + (seat % 3) * 13, y: 82 + (Math.floor(seat / 3) % 2) * 14 }),
+    board: { x: 196, y: 46, w: 44, h: 30 },
+    plants: [[228, 36, true], [22, 116]],
+    lights: [[176, 120, 44, 0.4]],
+    bulbs: [[176, 120]],
+    blocks: [[10, 22, 12, 84], [64, 77, 128, 30], [107, 60, 42, 22], [194, 106, 28, 24], [169, 113, 14, 14], [196, 46, 44, 30], [220, 28, 16, 18]],
+  },
+  kitchen: {
+    home: { x: 252, y: 16 },
+    w: 222,
+    h: 116,
+    topWall: 16,
+    windows: [290, 390],
+    coffee: { x: 318, y: 112 },
+    machine: { x: 270, y: 20 },
+    clock: { x: 461, y: 8, r: 6 },
+    plants: [[462, 120], [262, 120]],
+    lights: [[368, 92, 64, 0.34], [276, 91, 30, 0.22]],
+    blocks: [[256, 18, 150, 18], [440, 18, 28, 34], [436, 64, 32, 30], [344, 68, 48, 48], [267, 66, 18, 50]],
+  },
+  team: {
+    home: { x: 6, y: 138 },
+    w: 468,
+    h: 240,
+    desks: [0, 1, 2, 3, 4, 5].map(i => ({ cx: 92 + (i % 3) * 148, dy: 202 + Math.floor(i / 3) * 102 })),
+    sideWindows: [[0, 284, 40], [474, 300, 40]],
+    plants: [[462, 150, true], [20, 150], [380, 368], [56, 368], [234, 366, true]],
+    lights: [[130, 366, 54, 0.42], ...[[166, 200], [314, 200], [166, 300], [314, 300]].map(([x, y]) => [x, y, 66, 0.16, 'ceiling'])],
+    bulbs: [[130, 366]],
+    blocks: [
+      // Desks, and the chairs behind them: walkers go round, not over people
+      ...[0, 1, 2, 3, 4, 5].map(i => [50 + (i % 3) * 148, 201 + Math.floor(i / 3) * 102, 84, 30]),
+      ...[0, 1, 2, 3, 4, 5].map(i => [71 + (i % 3) * 148, 184 + Math.floor(i / 3) * 102, 42, 22]),
+      [8, 178, 14, 76], [14, 356, 30, 18], [138, 346, 84, 31], [290, 349, 52, 28], [452, 334, 16, 24],
+    ],
+  },
+  // Where the other sessions sit
+  project: {
+    home: { x: 6, y: 384 },
+    w: 468,
+    h: 118,
+    seats: [0, 1, 2, 3].map(i => ({ cx: 72 + i * 112, dy: 440 })),
+    lights: [[92, 440], [240, 440], [388, 440]].map(([x, y]) => [x, y, 66, 0.16, 'ceiling']),
+    blocks: [0, 1, 2, 3].flatMap(i => [[32 + i * 112, 439, 80, 30], [51 + i * 112, 422, 42, 22]]),
+  },
+}
+
+const PLAN = {
+  rooms: [
+    { id: 'claude', type: 'corner', x: 6, y: 16 },
+    { id: 'kitchen', type: 'kitchen', x: 252, y: 16 },
+    { id: 'team', type: 'team', x: 6, y: 138 },
+    { id: 'project', type: 'project', x: 6, y: 384 },
+  ],
+  // Openings in the walls, in world units, and the front door.
+  doors: [
+    { x: 246, y: 90, w: 6, h: 32, colour: '#CDB892' },
+    { x: 196, y: 132, w: 40, h: 6, colour: '#CDB892' },
+    { x: 300, y: 132, w: 40, h: 6, colour: '#D5DAD2' },
+    { x: 214, y: 378, w: 48, h: 6, colour: '#C3CCD6' },
+    { x: 474, y: 236, w: 6, h: 40, colour: '#8C6B4A', isEntrance: true },
+  ],
+  entrance: { x: 478, y: 256 },
+  doormat: [462, 242, 12, 28],
+}
+
+const typeOf = room => ROOM_TYPES[room.type]
+const shiftOf = room => ({ dx: room.x - typeOf(room).home.x, dy: room.y - typeOf(room).home.y })
+const roomsOf = type => PLAN.rooms.filter(r => r.type === type)
+const firstRoom = type => roomsOf(type)[0] ?? null
+// A point of a room type, where it stands in this room.
+const at = (room, p) => {
+  const { dx, dy } = shiftOf(room)
+  return 'cx' in p ? { ...p, cx: p.cx + dx, dy: p.dy + dy } : { ...p, x: p.x + dx, y: p.y + dy }
+}
+const frameOf = room => {
+  const t = typeOf(room)
+  return { x: room.x - 6, y: room.y - (t.topWall ?? 6), w: t.w + 12, h: t.h + (t.topWall ?? 6) + 6 }
+}
+
+// The world: everything the rooms and their walls cover.
+const WORLD = (() => {
+  const frames = PLAN.rooms.map(frameOf)
+  const x = Math.min(...frames.map(f => f.x))
+  const y = Math.min(...frames.map(f => f.y))
+  return { x, y, w: Math.max(...frames.map(f => f.x + f.w)) - x, h: Math.max(...frames.map(f => f.y + f.h)) - y }
+})()
+const W = WORLD.w
+const H = WORLD.h
+
+// Canvas pixels per world unit at the view that shows everything: set by
+// fit() from the window and the screen's pixel density.
 let S = 3
-const SPEED = 90
-const HANDOVER = 2.6
-const SEATS = 6
-const seatAt = seat => ({ cx: 92 + (seat % 3) * 148, dy: 202 + Math.floor(seat / 3) * 102 })
-const DOOR = { x: 478, y: 256 }
-const MAIN = { cx: 128, dy: 78 }
-const handoffFor = seat => ({ x: 206 + (seat % 3) * 13, y: 96 + Math.floor(seat / 3) * 16 })
-const KITCHEN_SEAT = { x: 318, y: 112 }
 
-const arrivePath = seat => {
-  const { cx, dy } = seatAt(seat)
-  const lane = dy - 52
-  return [DOOR, { x: DOOR.x, y: 256 }, { x: cx + 74, y: 256 }, { x: cx + 74, y: lane }, { x: cx, y: lane }, { x: cx, y: dy - 6 }]
+// Places, as the floor plan has them now.
+const desks = () => roomsOf('team').flatMap(room => typeOf(room).desks.map(d => at(room, d)))
+const MAIN = (() => {
+  const room = firstRoom('corner')
+  return at(room, typeOf(room).claude)
+})()
+const coffeeSpot = () => {
+  const room = firstRoom('kitchen')
+  return room ? at(room, typeOf(room).coffee) : null
 }
-const deliverPath = seat => {
-  const { cx, dy } = seatAt(seat)
-  const lane = dy - 52
-  const spot = handoffFor(seat)
-  return [{ x: cx, y: dy - 6 }, { x: cx, y: lane }, { x: cx + 74, y: lane }, { x: cx + 74, y: 148 }, { x: 214, y: 148 }, { x: 214, y: spot.y }, spot]
+const handoffFor = seat => {
+  const room = firstRoom('corner')
+  return at(room, typeOf(room).handoff(seat))
 }
-const leavePath = seat => {
-  const spot = handoffFor(seat)
-  return [spot, { x: 214, y: spot.y }, { x: 214, y: 148 }, { x: 446, y: 148 }, { x: 446, y: 256 }, DOOR]
+// A helper's place: its desk, or, once the desks run out, a spot by the door
+// to wait at (phase 1 gives it the floor and a laptop).
+const placeOf = seat => {
+  const list = desks()
+  if (seat >= 0 && seat < list.length) {
+    const d = list[seat]
+    return { isDesk: true, cx: d.cx, dy: d.dy, spot: { x: d.cx, y: d.dy - 6 } }
+  }
+  const n = Math.max(0, seat - list.length)
+  const e = PLAN.entrance
+  return { isDesk: false, spot: { x: e.x - 30 - (n % 3) * 14, y: e.y - 12 + Math.floor(n / 3) * 16 } }
 }
 
-const legSeconds = (a, b) => Math.hypot(b.x - a.x, b.y - a.y) / SPEED
-const pathSeconds = points => points.slice(1).reduce((t, p, i) => t + legSeconds(points[i], p), 0)
+// ── Routes ───────────────────────────────────────────────────────────────
+// Walks find their way on a grid of small cells, open where a room's floor
+// or a door is and nothing stands in the way, with A*: the fewest steps, and
+// a little extra for every turn so a route goes in straight runs. Routes are
+// kept until the floor plan changes.
+const STEP = 6
+const grid = (() => {
+  const cols = Math.ceil(W / STEP)
+  const rows = Math.ceil(H / STEP)
+  const open = new Uint8Array(cols * rows)
+  const isIn = (x, y, [rx, ry, rw, rh]) => x >= rx && x <= rx + rw && y >= ry && y <= ry + rh
+  const floors = PLAN.rooms.map(r => [r.x + 2, r.y + 2, typeOf(r).w - 4, typeOf(r).h - 4])
+  const doors = PLAN.doors.map(d => [d.x, d.y, d.w, d.h])
+  // Furniture, with a margin so feet keep clear of it
+  const blocks = PLAN.rooms.flatMap(room => {
+    const { dx, dy } = shiftOf(room)
+    return (typeOf(room).blocks ?? []).map(([x, y, w, h]) => [x + dx - 3, y + dy - 3, w + 6, h + 6])
+  })
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const x = WORLD.x + c * STEP + STEP / 2
+      const y = WORLD.y + r * STEP + STEP / 2
+      const isFloor = floors.some(f => isIn(x, y, f)) || doors.some(d => isIn(x, y, d))
+      open[r * cols + c] = isFloor && !blocks.some(b => isIn(x, y, b)) ? 1 : 0
+    }
+  }
+  return { cols, rows, open }
+})()
+
+const cellOf = p => {
+  const c = Math.min(grid.cols - 1, Math.max(0, Math.floor((p.x - WORLD.x) / STEP)))
+  const r = Math.min(grid.rows - 1, Math.max(0, Math.floor((p.y - WORLD.y) / STEP)))
+  return r * grid.cols + c
+}
+const centreOf = i => ({ x: WORLD.x + (i % grid.cols) * STEP + STEP / 2, y: WORLD.y + Math.floor(i / grid.cols) * STEP + STEP / 2 })
+
+// The nearest open cell, for a spot that lies on furniture or in a wall.
+const nearestOpen = start => {
+  if (grid.open[start]) return start
+  const seen = new Set([start])
+  const queue = [start]
+  while (queue.length) {
+    const i = queue.shift()
+    for (const j of [i - 1, i + 1, i - grid.cols, i + grid.cols]) {
+      if (j < 0 || j >= grid.open.length || seen.has(j)) continue
+      if (grid.open[j]) return j
+      seen.add(j)
+      queue.push(j)
+    }
+  }
+  return start
+}
+
+const TURN = 0.6
+const MOVES = [[1, 0], [-1, 0], [0, 1], [0, -1]]
+
+const findPath = (from, to) => {
+  const { cols, rows, open } = grid
+  const start = nearestOpen(cellOf(from))
+  const goal = nearestOpen(cellOf(to))
+  const gc = goal % cols
+  const gr = Math.floor(goal / cols)
+  const h = i => Math.abs((i % cols) - gc) + Math.abs(Math.floor(i / cols) - gr)
+  // States are cell × the direction it was entered by, so a turn can cost.
+  const cost = new Float64Array(cols * rows * 4).fill(Infinity)
+  const back = new Int32Array(cols * rows * 4).fill(-1)
+  const heap = []
+  const push = (f, s) => {
+    heap.push([f, s])
+    let k = heap.length - 1
+    while (k > 0) {
+      const p = (k - 1) >> 1
+      if (heap[p][0] <= heap[k][0]) break
+      ;[heap[p], heap[k]] = [heap[k], heap[p]]
+      k = p
+    }
+  }
+  const pop = () => {
+    const top = heap[0]
+    const last = heap.pop()
+    if (heap.length) {
+      heap[0] = last
+      let k = 0
+      for (;;) {
+        const l = 2 * k + 1
+        const r = l + 1
+        let m = k
+        if (l < heap.length && heap[l][0] < heap[m][0]) m = l
+        if (r < heap.length && heap[r][0] < heap[m][0]) m = r
+        if (m === k) break
+        ;[heap[m], heap[k]] = [heap[k], heap[m]]
+        k = m
+      }
+    }
+    return top
+  }
+  for (let d = 0; d < 4; d++) {
+    cost[start * 4 + d] = 0
+    push(h(start), start * 4 + d)
+  }
+  let end = -1
+  while (heap.length) {
+    const [, s] = pop()
+    const i = s >> 2
+    const dir = s & 3
+    if (i === goal) {
+      end = s
+      break
+    }
+    const c = i % cols
+    const r = Math.floor(i / cols)
+    MOVES.forEach(([mx, my], d) => {
+      const nc = c + mx
+      const nr = r + my
+      if (nc < 0 || nr < 0 || nc >= cols || nr >= rows) return
+      const j = nr * cols + nc
+      if (!open[j]) return
+      const next = cost[s] + 1 + (d === dir ? 0 : TURN)
+      const t = j * 4 + d
+      if (next < cost[t]) {
+        cost[t] = next
+        back[t] = s
+        push(next + h(j), t)
+      }
+    })
+  }
+  if (end < 0) return [from, to]
+  // Back to the start, then only the corners kept.
+  const cells = []
+  for (let s = end; s >= 0; s = back[s]) cells.push(s >> 2)
+  cells.reverse()
+  const corners = cells.filter((cell, k) => {
+    if (k === 0 || k === cells.length - 1) return true
+    const a = cells[k - 1]
+    const b = cells[k + 1]
+    return b - cell !== cell - a
+  })
+  const points = corners.map(centreOf)
+  return [from, ...points, to].filter((p, k, all) => k === 0 || p.x !== all[k - 1].x || p.y !== all[k - 1].y)
+}
+
+const routes = new Map()
+const route = (from, to) => {
+  const key = `${from.x},${from.y}>${to.x},${to.y}`
+  if (!routes.has(key)) routes.set(key, findPath(from, to))
+  return routes.get(key)
+}
+const arriveRoute = seat => route(PLAN.entrance, placeOf(seat).spot)
+const deliverRoute = seat => route(placeOf(seat).spot, handoffFor(seat))
+const leaveRoute = seat => route(handoffFor(seat), PLAN.entrance)
+
+// ── Walks ────────────────────────────────────────────────────────────────
+// Every walk takes as long as the status file says (the mod's WALKS),
+// however far it goes: a longer route is a brisker walk.
+const WALKS = { arrive: 4000, deliver: 3500, handover: 2600, leave: 4000 }
+
 const facingOf = (a, b) => (Math.abs(b.x - a.x) > Math.abs(b.y - a.y) ? (b.x > a.x ? 'right' : 'left') : b.y > a.y ? 'front' : 'back')
+const lengthOf = points => points.slice(1).reduce((d, p, i) => d + Math.hypot(p.x - points[i].x, p.y - points[i].y), 0)
 
-// Where a walk has got to after e seconds.
-const walkAt = (points, e) => {
-  let t = 0
+// Where a walk has got to at the fraction k of its time.
+const walkAt = (points, k) => {
+  let left = Math.max(0, k) * lengthOf(points)
   for (let i = 0; i + 1 < points.length; i++) {
     const a = points[i]
     const b = points[i + 1]
-    const d = legSeconds(a, b)
+    const d = Math.hypot(b.x - a.x, b.y - a.y)
     if (d <= 0) continue
-    if (e < t + d) {
-      const k = (e - t) / d
-      return { x: a.x + (b.x - a.x) * k, y: a.y + (b.y - a.y) * k, facing: facingOf(a, b), isWalking: true }
-    }
-    t += d
+    if (left < d) return { x: a.x + ((b.x - a.x) * left) / d, y: a.y + ((b.y - a.y) * left) / d, facing: facingOf(a, b), isWalking: true }
+    left -= d
   }
   const last = points[points.length - 1]
   return { x: last.x, y: last.y, facing: 'front', isWalking: false }
 }
 
-// What a helper is doing in the office at this moment.
-const poseOf = (sub, now) => {
-  if (sub.seat < 0) return null
-  const e = (now - sub.since) / 1000
+// What a helper is doing at this moment: at its place, or somewhere along a
+// walk; null once it is out of the door.
+const poseOf = (sub, now, walks = WALKS) => {
+  const e = now - sub.since
   if (sub.phase === 'working') return { seated: true }
-  if (sub.phase === 'arriving') {
-    const p = arrivePath(sub.seat)
-    return e < pathSeconds(p) ? walkAt(p, e) : { seated: true }
-  }
+  if (sub.phase === 'arriving') return e < walks.arrive ? walkAt(arriveRoute(sub.seat), e / walks.arrive) : { seated: true }
   if (sub.phase === 'delivering') {
-    const p = deliverPath(sub.seat)
-    const d = pathSeconds(p)
-    if (e < d) return walkAt(p, e)
-    if (e < d + HANDOVER) return { ...p[p.length - 1], facing: 'left', isWalking: false, handover: true }
-    const l = leavePath(sub.seat)
-    const e2 = e - d - HANDOVER
-    return e2 < pathSeconds(l) ? walkAt(l, e2) : null
+    if (e < walks.deliver) return walkAt(deliverRoute(sub.seat), e / walks.deliver)
+    if (e < walks.deliver + walks.handover) {
+      const spot = handoffFor(sub.seat)
+      return { x: spot.x, y: spot.y, facing: 'left', isWalking: false, handover: true }
+    }
+    const e2 = e - walks.deliver - walks.handover
+    return e2 < walks.leave ? walkAt(leaveRoute(sub.seat), e2 / walks.leave) : null
   }
-  const l = leavePath(sub.seat)
-  return e < pathSeconds(l) ? walkAt(l, e) : null
+  return e < walks.leave ? walkAt(leaveRoute(sub.seat), e / walks.leave) : null
 }
 
 // ── Look ─────────────────────────────────────────────────────────────────
@@ -85,7 +340,9 @@ const FONT = "'Segoe UI', system-ui, -apple-system, sans-serif"
 const stateColor = { working: '#8A94A0', reading: '#2BA39A', editing: '#3B8FE0', running: '#D9932B', browsing: '#7B6BDE', waiting: '#E5484D', idle: '#8A94A0' }
 const screens = { working: '#5E6B7A', reading: '#E9EEF2', editing: '#1F2A44', running: '#0F1418', browsing: '#D7E9FA', waiting: '#E5484D', idle: '#1B2433' }
 
-const skins = ['#F6D5B8', '#EFC39C', '#D9A06B', '#B9784A', '#8A5634']
+// Skin tones from light to deep, evenly spread so an office of six looks
+// like a real mix of people.
+const skins = ['#F7DCC4', '#EFC39C', '#E0A97A', '#C68A5C', '#A86F45', '#8A5634', '#6B3F25']
 const hairs = [['#3A2A22', '#5C4436'], ['#7A4B2A', '#9C6A43'], ['#D9B25C', '#F0D48A'], ['#2B2B33', '#4A4A57'], ['#B5523B', '#D27358'], ['#9AA0A8', '#C3C8CE']]
 const shirts = [['#3E7CC9', '#2F5F9C'], ['#2E9E8F', '#21776B'], ['#E07A4F', '#B85E38'], ['#8A6FD6', '#6A52AE'], ['#D6A23C', '#AD7F26'], ['#D45D7A', '#AC4560'], ['#4F9A5B', '#3A7644']]
 const hashOf = id => {
@@ -93,11 +350,20 @@ const hashOf = id => {
   for (const ch of String(id)) h = (h * 31 + ch.charCodeAt(0)) >>> 0
   return h
 }
+// Ids that differ only at the end ("agent-1", "agent-2") hash to neighbouring
+// numbers, whose high bits are the same: each trait is picked from the hash
+// stirred with its own salt, so neighbours look nothing alike.
+const stir = (h, salt) => {
+  let x = (h ^ Math.imul(salt, 0x9e3779b1)) >>> 0
+  x = Math.imul(x ^ (x >>> 16), 0x85ebca6b) >>> 0
+  x = Math.imul(x ^ (x >>> 13), 0xc2b2ae35) >>> 0
+  return (x ^ (x >>> 16)) >>> 0
+}
 const lookFor = id => {
   const h = hashOf(id)
-  const [hair, hairLight] = hairs[h % hairs.length]
-  const [shirt, shirtShade] = shirts[(h >>> 3) % shirts.length]
-  return { hair, hairLight, skin: skins[(h >>> 6) % skins.length], shirt, shirtShade }
+  const [hair, hairLight] = hairs[stir(h, 1) % hairs.length]
+  const [shirt, shirtShade] = shirts[stir(h, 2) % shirts.length]
+  return { hair, hairLight, skin: skins[stir(h, 3) % skins.length], shirt, shirtShade }
 }
 const claudeLook = { hair: '#C8643B', hairLight: '#E3875E', skin: '#F6D5B8', shirt: '#2F3A4A', shirtShade: '#222B37' }
 
@@ -410,28 +676,33 @@ const plant = (x, y, big = false) => {
 }
 
 // ── Things on the walls that change ──────────────────────────────────────
-const BOARD = { x: 196, y: 46, w: 44, h: 30 }
-const CLOCK = { x: 461, y: 8, r: 6 }
+const kr = n => `${Math.floor(n).toLocaleString('da-DK')} kr`
 
-// The day's numbers on Claude's whiteboard, in marker.
-const board = stats => {
-  const left = BOARD.x + 4
-  label('I dag', left, BOARD.y + 7, 5.5, '#5B6672', 700, 'left')
-  if (!stats || (!stats.linesAdded && !stats.linesRemoved && typeof stats.costUsd !== 'number')) {
-    rect(left, BOARD.y + 12, 26, 1.5, '#3E7CC9')
-    rect(left, BOARD.y + 17, 18, 1.5, '#E07A4F')
+// The day's lines and the money in the bank, in marker on Claude's board.
+const board = (stats, kroner) => {
+  const room = firstRoom('corner')
+  if (!room) return
+  const b = at(room, typeOf(room).board)
+  const left = b.x + 4
+  label('I dag', left, b.y + 7, 5.5, '#5B6672', 700, 'left')
+  if (!stats || (!stats.linesAdded && !stats.linesRemoved && typeof kroner !== 'number')) {
+    rect(left, b.y + 12, 26, 1.5, '#3E7CC9')
+    rect(left, b.y + 17, 18, 1.5, '#E07A4F')
     return
   }
-  label(`+${stats.linesAdded ?? 0}`, left, BOARD.y + 15, 7, '#2E9E8F', 700, 'left')
+  label(`+${stats.linesAdded ?? 0}`, left, b.y + 15, 7, '#2E9E8F', 700, 'left')
   ctx.font = `700 7px ${FONT}`
   const shift = ctx.measureText(`+${stats.linesAdded ?? 0} `).width
-  label(`−${stats.linesRemoved ?? 0}`, left + shift, BOARD.y + 15, 7, '#E5484D', 700, 'left')
-  if (typeof stats.costUsd === 'number') label(`$${stats.costUsd.toFixed(2)}`, left, BOARD.y + 24, 7, '#3E7CC9', 700, 'left')
+  label(`−${stats.linesRemoved ?? 0}`, left + shift, b.y + 15, 7, '#E5484D', 700, 'left')
+  if (typeof kroner === 'number') label(kr(kroner), left, b.y + 24, 7, '#3E7CC9', 700, 'left')
 }
 
 // A wall clock showing the time it is.
 const clock = date => {
-  const { x, y, r } = CLOCK
+  const room = firstRoom('kitchen')
+  if (!room) return
+  const { x, y } = at(room, typeOf(room).clock)
+  const r = typeOf(room).clock.r
   circle(x, y, r + 1, OUTLINE)
   circle(x, y, r, '#FFFFFF')
   for (let i = 0; i < 12; i += 3) {
@@ -476,9 +747,17 @@ const darknessAt = h => {
   return NIGHT
 }
 
-const TOP_WINDOWS = [30, 120, 290, 390]
-// The team room's windows in the side walls: x, y, height.
-const SIDE_WINDOWS = [[0, 284, 40], [W - 6, 300, 40]]
+// The windows of every room, where they are now: in a top wall (x, the top
+// of the room) and in side walls (x of the wall, y, height, which way in).
+const topWindows = () =>
+  PLAN.rooms.flatMap(room => (typeOf(room).windows ?? []).map(x => ({ x: x + shiftOf(room).dx, y: room.y })))
+const sideWindows = () =>
+  PLAN.rooms.flatMap(room =>
+    (typeOf(room).sideWindows ?? []).map(([x, y, h]) => {
+      const { dx, dy } = shiftOf(room)
+      return { x: x + dx, y: y + dy, h, isLeft: x + dx < room.x }
+    }),
+  )
 
 // Sunlight through the windows, falling at an angle that follows the sun:
 // from the east in the morning, from the west in the afternoon.
@@ -498,17 +777,16 @@ const daylight = h => {
     ctx.closePath()
     ctx.fill()
   }
-  for (const x of TOP_WINDOWS) {
-    beam([[x, 16], [x + 56, 16], [x + 64 + slant, 92], [x - 8 + slant, 92]], 0, 16, 0, 92)
+  for (const { x, y } of topWindows()) {
+    beam([[x, y], [x + 56, y], [x + 64 + slant, y + 76], [x - 8 + slant, y + 76]], 0, y, 0, y + 76)
   }
-  const [[lx, ly, lh], [rx, ry, rh]] = SIDE_WINDOWS
   // The low sun reaches in through one side or the other.
-  const fromLeft = h < 12 ? 1 : 0.35
-  const fromRight = h >= 12 ? 1 : 0.35
-  ctx.globalAlpha = fromLeft
-  beam([[lx + 6, ly], [lx + 6, ly + lh], [lx + 90, ly + lh + 18], [lx + 90, ly - 18]], lx + 6, 0, lx + 90, 0)
-  ctx.globalAlpha = fromRight
-  beam([[rx, ry], [rx, ry + rh], [rx - 84, ry + rh + 18], [rx - 84, ry - 18]], rx, 0, rx - 84, 0)
+  for (const w of sideWindows()) {
+    ctx.globalAlpha = w.isLeft ? (h < 12 ? 1 : 0.35) : h >= 12 ? 1 : 0.35
+    const inner = w.isLeft ? w.x + 6 : w.x
+    const far = w.isLeft ? inner + 84 : inner - 84
+    beam([[inner, w.y], [inner, w.y + w.h], [far, w.y + w.h + 18], [far, w.y - 18]], inner, 0, far, 0)
+  }
   ctx.globalAlpha = 1
 }
 
@@ -518,7 +796,7 @@ const evening = (h, screens) => {
   const dark = darknessAt(h)
   if (dark <= 0) return
   ctx.fillStyle = `rgba(12, 18, 42, ${dark})`
-  ctx.fillRect(0, 0, W, H)
+  ctx.fillRect(WORLD.x, WORLD.y, W, H)
   const k = dark / NIGHT
   const glow = (x, y, r, colour, alpha) => {
     const g = ctx.createRadialGradient(x, y, 0, x, y, r)
@@ -528,33 +806,255 @@ const evening = (h, screens) => {
     ctx.fillRect(x - r, y - r, r * 2, r * 2)
   }
   ctx.globalCompositeOperation = 'lighter'
-  const lamp = '255, 196, 120'
-  glow(130, 366, 54, lamp, 0.42)
-  glow(176, 120, 44, lamp, 0.4)
-  glow(368, 92, 64, lamp, 0.34)
-  glow(276, 91, 30, lamp, 0.22)
-  for (const [x, y] of [[166, 200], [314, 200], [166, 300], [314, 300], [92, 440], [240, 440], [388, 440]]) glow(x, y, 66, '255, 228, 180', 0.16)
+  for (const room of visibleRooms()) {
+    const { dx, dy } = shiftOf(room)
+    for (const [x, y, r, alpha, kind] of typeOf(room).lights ?? []) glow(x + dx, y + dy, r, kind === 'ceiling' ? '255, 228, 180' : '255, 196, 120', alpha)
+  }
   for (const [x, y] of screens) glow(x, y, 26, '130, 180, 255', 0.3)
   ctx.globalCompositeOperation = 'source-over'
   // The bulbs themselves
-  for (const [x, y] of [[130, 366], [176, 120]]) circle(x, y, 1.8, '#FFF3C4')
+  for (const room of visibleRooms()) {
+    const { dx, dy } = shiftOf(room)
+    for (const [x, y] of typeOf(room).bulbs ?? []) circle(x + dx, y + dy, 1.8, '#FFF3C4')
+  }
 }
 
-// ── The building, drawn once per light ───────────────────────────────────
+// ── The building, drawn once for each light and view ─────────────────────
 const WALL = '#3E4852'
 const WALL_TOP = '#5A6672'
 const background = document.createElement('canvas')
 let backgroundKey = ''
 
+// Each room type's own floor and furniture, in its home coordinates.
+const roomDrawers = {
+  corner: (g, fill, dot) => {
+    // Oak planks
+    fill(6, 16, 240, 116, '#DCC194')
+    for (let i = 0; i < 11; i++) {
+      fill(6, 18 + i * 10, 240, 1, '#C9AC7E')
+      fill(20 + ((i * 47) % 210), 18 + i * 10, 1, 10, '#C9AC7E')
+    }
+    // The rug under Claude's desk
+    g.globalAlpha = 0.35
+    fill(52, 40, 152, 86, OUTLINE)
+    g.globalAlpha = 1
+    fill(54, 42, 148, 82, '#6F9C8E')
+    g.strokeStyle = '#9CC2B5'
+    g.lineWidth = 2
+    g.strokeRect(58, 46, 140, 74)
+    for (const k of [0, 1]) {
+      fill(10, 22 + k * 44, 12, 40, OUTLINE)
+      fill(11, 23 + k * 44, 10, 38, '#8B5E3C')
+      ;['#D45D7A', '#3E7CC9', '#D6A23C', '#2E9E8F', '#8A6FD6'].forEach((c, i) => fill(12, 25 + k * 44 + i * 7, 8, 5, ['#D45D7A', '#3E7CC9', '#D6A23C', '#2E9E8F', '#8A6FD6'][(i + k) % 5]))
+    }
+    // An armchair by the door, and a side table with a lamp
+    fill(194, 106, 28, 24, OUTLINE)
+    fill(195, 107, 26, 6, '#A9512E')
+    fill(195, 107, 5, 22, '#B85A33')
+    fill(216, 107, 5, 22, '#B85A33')
+    fill(200, 113, 16, 15, '#D9744A')
+    fill(202, 115, 12, 3, '#E99A73')
+    dot(176, 120, 7, OUTLINE)
+    dot(176, 120, 5.8, '#B98F5E')
+    dot(176, 120, 3.2, '#F6E3A8', '#C9A55A')
+    // The whiteboard; board() writes the day's numbers on it
+    const b = ROOM_TYPES.corner.board
+    fill(b.x - 1, b.y - 1, b.w + 2, b.h + 2, OUTLINE)
+    fill(b.x, b.y, b.w, b.h, '#F6F7F8')
+    fill(b.x + 2, b.y + b.h - 1, b.w - 4, 2, '#B9C3CC')
+    fill(b.x + 6, b.y + b.h - 1.5, 5, 1.5, '#E5484D')
+    fill(b.x + 13, b.y + b.h - 1.5, 5, 1.5, '#3E7CC9')
+  },
+
+  kitchen: (g, fill, dot) => {
+    // Tiles
+    fill(252, 16, 222, 116, '#F3F5F6')
+    for (let c = 0; c < 19; c++) for (let r = 0; r < 10; r++) if ((c + r) % 2 === 0) fill(252 + c * 12, 16 + r * 12, 12, 12, '#E4E8EB')
+    // The counter, with the coffee machine, sink and stove
+    fill(256, 18, 150, 16, OUTLINE)
+    fill(257, 19, 148, 14, '#F7F7F5')
+    fill(257, 31, 148, 2, '#C9CED3')
+    fill(266, 20, 14, 12, '#2B2F36')
+    dot(273, 26, 2, '#E07A4F')
+    fill(300, 21, 22, 9, '#B9C3CC')
+    fill(330, 21, 20, 10, '#9CB4C6')
+    fill(336, 23, 8, 5, '#D7E9FA')
+    dot(386, 26, 4, '#E9EEF2', OUTLINE)
+    for (const x of [280, 312, 344, 376]) {
+      dot(x, 44, 5, OUTLINE)
+      dot(x, 44, 3.8, '#C9A273')
+    }
+    // The fridge
+    fill(440, 18, 28, 34, OUTLINE)
+    fill(441, 19, 26, 32, '#E9EEF2')
+    fill(441, 33, 26, 1, '#B9C3CC')
+    // A round rug under the big table
+    dot(368, 92, 34, '#DDE6E0')
+    dot(368, 92, 31, '#E8EFEA')
+    g.strokeStyle = '#C9D6CD'
+    g.lineWidth = 1
+    g.beginPath()
+    g.arc(368, 92, 26, 0, Math.PI * 2)
+    g.stroke()
+    dot(368, 92, 20, OUTLINE)
+    dot(368, 92, 18.5, '#C9A273')
+    dot(368, 92, 15, '#D9B88A')
+    dot(368, 92, 6, '#F7F7F5', OUTLINE)
+    dot(366, 90, 2, '#E07A4F')
+    dot(370, 91, 2, '#D6A23C')
+    dot(368, 94, 2, '#56A86B')
+    for (const [x, y] of [[368, 64], [396, 92], [368, 120]]) {
+      dot(x, y, 7, OUTLINE)
+      dot(x, y, 5.5, '#465566')
+    }
+    // A small bistro table for two in the corner
+    for (const y of [74, 108]) {
+      dot(276, y, 5.5, OUTLINE)
+      dot(276, y, 4.2, '#C9A273')
+    }
+    dot(276, 91, 9, OUTLINE)
+    dot(276, 91, 7.8, '#F7F7F5')
+    dot(273, 89, 2, '#FFFFFF', '#B9C3CC')
+    dot(279, 93, 1.6, '#7A4B2A')
+    // A snack machine under the fridge
+    fill(436, 64, 32, 30, OUTLINE)
+    fill(437, 65, 30, 28, '#3E7CC9')
+    fill(439, 67, 19, 22, '#D7E9FA')
+    ;['#E5484D', '#D6A23C', '#2E9E8F', '#E07A4F', '#8A6FD6', '#56A86B'].forEach((c, i) => fill(441 + (i % 3) * 6, 69 + Math.floor(i / 3) * 10, 4, 6, c))
+    fill(460, 69, 5, 3, '#2B2F36')
+    fill(460, 76, 5, 10, '#2F5F9C')
+  },
+
+  team: (g, fill, dot) => {
+    // Sage carpet
+    fill(6, 138, 468, 240, '#CBD9C7')
+    for (let c = 0; c < 20; c++) fill(6 + c * 24, 138, 1, 240, '#BCCBB8')
+    for (let r = 0; r < 10; r++) fill(6, 138 + r * 24, 468, 1, '#BCCBB8')
+    // A soft rug under each desk, each its own colour
+    const rugs = [['#BCD0C4', '#AFC4B7'], ['#CFC6DC', '#C2B8D1'], ['#DDCDB7', '#D1BFA6'], ['#BFD0DD', '#B0C3D2'], ['#DCC7CB', '#D0B7BC'], ['#CBD5B5', '#BDC9A5']]
+    ROOM_TYPES.team.desks.forEach(({ cx, dy }, i) => {
+      const [base, edge] = rugs[i % rugs.length]
+      g.fillStyle = edge
+      g.beginPath()
+      g.roundRect(cx - 52, dy - 26, 104, 64, 6)
+      g.fill()
+      g.fillStyle = base
+      g.beginPath()
+      g.roundRect(cx - 49, dy - 23, 98, 58, 4)
+      g.fill()
+    })
+    // A bookshelf along the left wall
+    fill(8, 178, 14, 76, OUTLINE)
+    fill(9, 179, 12, 74, '#8B5E3C')
+    ;['#D45D7A', '#3E7CC9', '#D6A23C', '#2E9E8F', '#8A6FD6', '#E07A4F', '#56A86B', '#D45D7A', '#3E7CC9', '#D6A23C'].forEach((c, i) => fill(10, 181 + i * 7, 10, 5, c))
+    // The printer
+    fill(14, 356, 30, 18, OUTLINE)
+    fill(15, 357, 28, 16, '#D3D8DD')
+    fill(19, 360, 20, 3, '#2B2F36')
+    fill(21, 365, 16, 6, '#F6F7F8')
+    // The lounge corner: a rug, a sofa against the wall, a coffee table, a lamp
+    g.fillStyle = '#E6D3B3'
+    g.beginPath()
+    g.roundRect(138, 346, 84, 31, 4)
+    g.fill()
+    g.strokeStyle = '#D2BC97'
+    g.lineWidth = 1
+    g.strokeRect(141.5, 349.5, 77, 24)
+    fill(146, 361, 66, 16, OUTLINE)
+    fill(147, 368, 64, 8, '#4F7FA8')
+    fill(147, 362, 64, 7, '#3D6A92')
+    fill(147, 362, 6, 14, '#3D6A92')
+    fill(205, 362, 6, 14, '#3D6A92')
+    fill(155, 369, 22, 6, '#6C9BC4')
+    fill(181, 369, 22, 6, '#6C9BC4')
+    fill(163, 349, 32, 9, OUTLINE)
+    fill(164, 350, 30, 7, '#B98F5E')
+    fill(167, 351, 8, 4, '#F6F7F8')
+    dot(186, 353, 2.2, '#FFFFFF', '#B9C3CC')
+    dot(130, 366, 6, OUTLINE)
+    dot(130, 366, 4.8, '#F6E3A8')
+    dot(130, 366, 1.6, '#D6A23C')
+    // A ping-pong table, net across the middle
+    fill(290, 350, 52, 26, OUTLINE)
+    fill(291, 351, 50, 24, '#2E8B6E')
+    fill(291, 362.5, 50, 1, '#FFFFFF')
+    fill(315.5, 351, 1, 24, '#E9EEF2')
+    fill(315, 349, 2, 28, '#2B2F36')
+    dot(300, 356, 1.6, '#FFFFFF')
+    dot(286, 358, 3, '#E5484D', OUTLINE)
+    dot(346, 368, 3, '#3E7CC9', OUTLINE)
+    // The water cooler
+    fill(452, 334, 16, 24, OUTLINE)
+    fill(453, 335, 14, 10, '#9CC4EC')
+    fill(453, 346, 14, 11, '#E9EEF2')
+  },
+
+  project: (g, fill) => {
+    fill(6, 384, 468, 118, '#D6DCE6')
+    for (let r = 0; r < 5; r++) fill(6, 384 + r * 24, 468, 1, '#C7CED9')
+    g.font = `700 8.5px ${FONT}`
+    g.fillStyle = '#5B6672'
+    g.textAlign = 'left'
+    g.fillText('Dine andre sessioner', 16, 496)
+  },
+}
+
+// ── The camera ───────────────────────────────────────────────────────────
+// What part of the world is in view: its top-left corner in world units and
+// how far in it is zoomed (1 shows everything). glide() moves it smoothly.
+const view = { x: WORLD.x, y: WORLD.y, zoom: 1 }
+let glideTo = null
+const ZOOM_MAX = 4
+
+const clampView = v => {
+  v.zoom = Math.min(ZOOM_MAX, Math.max(1, v.zoom))
+  v.x = Math.min(WORLD.x + W - W / v.zoom, Math.max(WORLD.x, v.x))
+  v.y = Math.min(WORLD.y + H - H / v.zoom, Math.max(WORLD.y, v.y))
+  return v
+}
+// The view centred on a point at a zoom
+const centredOn = (x, y, zoom) => clampView({ x: x - W / zoom / 2, y: y - H / zoom / 2, zoom })
+const glide = target => {
+  glideTo = clampView({ ...target })
+}
+const stepGlide = () => {
+  if (!glideTo) return
+  const k = 0.18
+  view.x += (glideTo.x - view.x) * k
+  view.y += (glideTo.y - view.y) * k
+  view.zoom += (glideTo.zoom - view.zoom) * k
+  if (Math.abs(glideTo.x - view.x) < 0.2 && Math.abs(glideTo.y - view.y) < 0.2 && Math.abs(glideTo.zoom - view.zoom) < 0.002) {
+    Object.assign(view, glideTo)
+    glideTo = null
+  }
+}
+const applyView = g => {
+  const k = S * view.zoom
+  g.setTransform(k, 0, 0, k, -view.x * k, -view.y * k)
+}
+const isInView = (x, y, w, h) => x < view.x + W / view.zoom && x + w > view.x && y < view.y + H / view.zoom && y + h > view.y
+const visibleRooms = () => PLAN.rooms.filter(room => {
+  const f = frameOf(room)
+  return isInView(f.x, f.y, f.w, f.h)
+})
+
+// The walls, floors and furniture: everything that does not move, drawn
+// again only when the light or the view changes. Rooms out of view are
+// skipped, so a large office costs no more than what is on screen.
 const drawBuilding = (project, hour) => {
   const isNight = hour < 7 || hour >= 19
-  const key = `${project}|${isNight}|${hour < 9 || hour >= 17}`
+  const key = `${project}|${isNight}|${hour < 9 || hour >= 17}|${canvas.width}x${canvas.height}|${view.x.toFixed(2)},${view.y.toFixed(2)},${view.zoom.toFixed(3)}`
   if (key === backgroundKey) return
   backgroundKey = key
+  if (background.width !== canvas.width || background.height !== canvas.height) {
+    background.width = canvas.width
+    background.height = canvas.height
+  }
   const g = background.getContext('2d')
-  g.setTransform(S, 0, 0, S, 0, 0)
+  g.setTransform(1, 0, 0, 1, 0, 0)
+  g.clearRect(0, 0, background.width, background.height)
+  applyView(g)
   g.imageSmoothingEnabled = false
-  g.clearRect(0, 0, W, H)
   const fill = (x, y, w, h, c) => {
     g.fillStyle = c
     g.fillRect(x, y, w, h)
@@ -571,220 +1071,54 @@ const drawBuilding = (project, hour) => {
     }
   }
   const sky = isNight ? '#16233D' : hour < 9 || hour >= 17 ? '#F4B88A' : '#A9D8F5'
+  const rooms = visibleRooms()
 
-  fill(0, 0, W, H, isNight ? '#1C2430' : '#7FB069')
-  // Claude's corner office: oak planks
-  fill(6, 16, 240, 116, '#DCC194')
-  for (let i = 0; i < 11; i++) {
-    fill(6, 18 + i * 10, 240, 1, '#C9AC7E')
-    fill(20 + ((i * 47) % 210), 18 + i * 10, 1, 10, '#C9AC7E')
+  // The ground outside, then each room's walls
+  fill(WORLD.x, WORLD.y, W, H, isNight ? '#1C2430' : '#7FB069')
+  for (const room of rooms) {
+    const f = frameOf(room)
+    fill(f.x, f.y, f.w, f.h, WALL)
+    if (typeOf(room).topWall) {
+      fill(f.x, f.y, f.w, 6, WALL_TOP)
+      for (const x of typeOf(room).windows ?? []) {
+        const wx = x + shiftOf(room).dx
+        fill(wx, f.y + 1, 56, 5, sky)
+        fill(wx + 27, f.y + 1, 2, 5, WALL_TOP)
+      }
+    }
   }
-  // Kitchen: tiles
-  fill(252, 16, 222, 116, '#F3F5F6')
-  for (let c = 0; c < 19; c++) for (let r = 0; r < 10; r++) if ((c + r) % 2 === 0) fill(252 + c * 12, 16 + r * 12, 12, 12, '#E4E8EB')
-  // Team room: sage carpet
-  fill(6, 138, 468, 240, '#CBD9C7')
-  for (let c = 0; c < 20; c++) fill(6 + c * 24, 138, 1, 240, '#BCCBB8')
-  for (let r = 0; r < 10; r++) fill(6, 138 + r * 24, 468, 1, '#BCCBB8')
-  // Project room
-  fill(6, 384, 468, H - 390, '#D6DCE6')
-  for (let r = 0; r < 5; r++) fill(6, 384 + r * 24, 468, 1, '#C7CED9')
-
-  // Walls and windows
-  fill(0, 0, W, 16, WALL)
-  fill(0, 0, W, 6, WALL_TOP)
-  for (const x of [30, 120, 290, 390]) {
-    fill(x, 1, 56, 5, sky)
-    fill(x + 27, 1, 2, 5, WALL_TOP)
+  // Floors and furniture, each room in its own place
+  for (const room of rooms) {
+    const { dx, dy } = shiftOf(room)
+    g.save()
+    g.translate(dx, dy)
+    roomDrawers[room.type]?.(g, fill, dot)
+    for (const [x, y, big] of typeOf(room).plants ?? []) {
+      const r = big ? 9 : 7
+      fill(x - 5, y, 10, 8, '#B5683E')
+      dot(x, y - 2, r, '#3E8A55', OUTLINE)
+      dot(x - r / 2, y - 4, r / 2, '#56A86B')
+      dot(x + r / 3, y - r, r / 3, '#6CC082')
+    }
+    g.restore()
   }
-  fill(0, 0, 6, H, WALL)
-  fill(W - 6, 0, 6, H, WALL)
-  fill(246, 16, 6, 74, WALL)
-  fill(246, 122, 6, 16, WALL)
-  fill(0, 132, 196, 6, WALL)
-  fill(236, 132, 64, 6, WALL)
-  fill(340, 132, W - 340, 6, WALL)
-  fill(246, 90, 6, 32, '#CDB892')
-  fill(196, 132, 40, 6, '#CDB892')
-  fill(300, 132, 40, 6, '#D5DAD2')
-  fill(0, 378, 214, 6, WALL)
-  fill(262, 378, W - 262, 6, WALL)
-  fill(214, 378, 48, 6, '#C3CCD6')
-  fill(0, H - 6, W, 6, WALL)
-  fill(W - 6, 236, 6, 40, '#8C6B4A')
-  for (const [x, y, h] of SIDE_WINDOWS) {
-    fill(x, y, 6, h, sky)
-    fill(x + 1, y + h / 2 - 1, 4, 2, WALL_TOP)
+  // Doors, the front door's mat, and windows in the side walls
+  for (const d of PLAN.doors) fill(d.x, d.y, d.w, d.h, d.colour)
+  if (PLAN.doormat) fill(...PLAN.doormat, '#6E5A44')
+  for (const w of sideWindows()) {
+    fill(w.x, w.y, 6, w.h, sky)
+    fill(w.x + 1, w.y + w.h / 2 - 1, 4, 2, WALL_TOP)
   }
-  fill(W - 18, 242, 12, 28, '#6E5A44')
-  // Name plate on the top wall
+  // The name plate over the middle of the building
+  const mid = WORLD.x + W / 2
   g.fillStyle = '#20262E'
   g.beginPath()
-  g.roundRect(W / 2 - 60, 3, 120, 11, 2)
+  g.roundRect(mid - 60, WORLD.y + 3, 120, 11, 2)
   g.fill()
   g.font = `700 8px ${FONT}`
   g.fillStyle = '#E9EEF2'
   g.textAlign = 'center'
-  g.fillText(clip(project || 'Kontoret', 26), W / 2, 11.5)
-
-  // Corner office
-  g.globalAlpha = 0.35
-  fill(52, 40, 152, 86, OUTLINE)
-  g.globalAlpha = 1
-  fill(54, 42, 148, 82, '#6F9C8E')
-  g.strokeStyle = '#9CC2B5'
-  g.lineWidth = 2
-  g.strokeRect(58, 46, 140, 74)
-  for (const k of [0, 1]) {
-    fill(10, 22 + k * 44, 12, 40, OUTLINE)
-    fill(11, 23 + k * 44, 10, 38, '#8B5E3C')
-    ;['#D45D7A', '#3E7CC9', '#D6A23C', '#2E9E8F', '#8A6FD6'].forEach((c, i) => fill(12, 25 + k * 44 + i * 7, 8, 5, ['#D45D7A', '#3E7CC9', '#D6A23C', '#2E9E8F', '#8A6FD6'][(i + k) % 5]))
-  }
-  // An armchair by the door, and a side table with a lamp
-  fill(194, 106, 28, 24, OUTLINE)
-  fill(195, 107, 26, 6, '#A9512E')
-  fill(195, 107, 5, 22, '#B85A33')
-  fill(216, 107, 5, 22, '#B85A33')
-  fill(200, 113, 16, 15, '#D9744A')
-  fill(202, 115, 12, 3, '#E99A73')
-  dot(176, 120, 7, OUTLINE)
-  dot(176, 120, 5.8, '#B98F5E')
-  dot(176, 120, 3.2, '#F6E3A8', '#C9A55A')
-  // The whiteboard; board() writes the day's numbers on it
-  fill(BOARD.x - 1, BOARD.y - 1, BOARD.w + 2, BOARD.h + 2, OUTLINE)
-  fill(BOARD.x, BOARD.y, BOARD.w, BOARD.h, '#F6F7F8')
-  fill(BOARD.x + 2, BOARD.y + BOARD.h - 1, BOARD.w - 4, 2, '#B9C3CC')
-  fill(BOARD.x + 6, BOARD.y + BOARD.h - 1.5, 5, 1.5, '#E5484D')
-  fill(BOARD.x + 13, BOARD.y + BOARD.h - 1.5, 5, 1.5, '#3E7CC9')
-
-  // Kitchen
-  fill(256, 18, 150, 16, OUTLINE)
-  fill(257, 19, 148, 14, '#F7F7F5')
-  fill(257, 31, 148, 2, '#C9CED3')
-  fill(266, 20, 14, 12, '#2B2F36')
-  dot(273, 26, 2, '#E07A4F')
-  fill(300, 21, 22, 9, '#B9C3CC')
-  fill(330, 21, 20, 10, '#9CB4C6')
-  fill(336, 23, 8, 5, '#D7E9FA')
-  dot(386, 26, 4, '#E9EEF2', OUTLINE)
-  for (const x of [280, 312, 344, 376]) {
-    dot(x, 44, 5, OUTLINE)
-    dot(x, 44, 3.8, '#C9A273')
-  }
-  fill(440, 18, 28, 34, OUTLINE)
-  fill(441, 19, 26, 32, '#E9EEF2')
-  fill(441, 33, 26, 1, '#B9C3CC')
-  // A round rug under the big table
-  dot(368, 92, 34, '#DDE6E0')
-  dot(368, 92, 31, '#E8EFEA')
-  g.strokeStyle = '#C9D6CD'
-  g.lineWidth = 1
-  g.beginPath()
-  g.arc(368, 92, 26, 0, Math.PI * 2)
-  g.stroke()
-  dot(368, 92, 20, OUTLINE)
-  dot(368, 92, 18.5, '#C9A273')
-  dot(368, 92, 15, '#D9B88A')
-  dot(368, 92, 6, '#F7F7F5', OUTLINE)
-  dot(366, 90, 2, '#E07A4F')
-  dot(370, 91, 2, '#D6A23C')
-  dot(368, 94, 2, '#56A86B')
-  for (const [x, y] of [[368, 64], [396, 92], [368, 120]]) {
-    dot(x, y, 7, OUTLINE)
-    dot(x, y, 5.5, '#465566')
-  }
-  // A small bistro table for two in the corner
-  for (const y of [74, 108]) {
-    dot(276, y, 5.5, OUTLINE)
-    dot(276, y, 4.2, '#C9A273')
-  }
-  dot(276, 91, 9, OUTLINE)
-  dot(276, 91, 7.8, '#F7F7F5')
-  dot(273, 89, 2, '#FFFFFF', '#B9C3CC')
-  dot(279, 93, 1.6, '#7A4B2A')
-  // A snack machine under the fridge
-  fill(436, 64, 32, 30, OUTLINE)
-  fill(437, 65, 30, 28, '#3E7CC9')
-  fill(439, 67, 19, 22, '#D7E9FA')
-  ;['#E5484D', '#D6A23C', '#2E9E8F', '#E07A4F', '#8A6FD6', '#56A86B'].forEach((c, i) => fill(441 + (i % 3) * 6, 69 + Math.floor(i / 3) * 10, 4, 6, c))
-  fill(460, 69, 5, 3, '#2B2F36')
-  fill(460, 76, 5, 10, '#2F5F9C')
-
-  // Team room. A soft rug under each desk, each its own colour.
-  const rugs = [['#BCD0C4', '#AFC4B7'], ['#CFC6DC', '#C2B8D1'], ['#DDCDB7', '#D1BFA6'], ['#BFD0DD', '#B0C3D2'], ['#DCC7CB', '#D0B7BC'], ['#CBD5B5', '#BDC9A5']]
-  for (let seat = 0; seat < SEATS; seat++) {
-    const { cx, dy } = seatAt(seat)
-    const [base, edge] = rugs[seat]
-    g.fillStyle = edge
-    g.beginPath()
-    g.roundRect(cx - 52, dy - 26, 104, 64, 6)
-    g.fill()
-    g.fillStyle = base
-    g.beginPath()
-    g.roundRect(cx - 49, dy - 23, 98, 58, 4)
-    g.fill()
-  }
-
-  // A bookshelf along the left wall
-  fill(8, 178, 14, 76, OUTLINE)
-  fill(9, 179, 12, 74, '#8B5E3C')
-  ;['#D45D7A', '#3E7CC9', '#D6A23C', '#2E9E8F', '#8A6FD6', '#E07A4F', '#56A86B', '#D45D7A', '#3E7CC9', '#D6A23C'].forEach((c, i) => fill(10, 181 + i * 7, 10, 5, c))
-
-  // The printer, and a plant beside it
-  fill(14, 356, 30, 18, OUTLINE)
-  fill(15, 357, 28, 16, '#D3D8DD')
-  fill(19, 360, 20, 3, '#2B2F36')
-  fill(21, 365, 16, 6, '#F6F7F8')
-
-  // The lounge corner: a rug, a sofa against the wall, a coffee table, a lamp
-  g.fillStyle = '#E6D3B3'
-  g.beginPath()
-  g.roundRect(138, 346, 84, 31, 4)
-  g.fill()
-  g.strokeStyle = '#D2BC97'
-  g.lineWidth = 1
-  g.strokeRect(141.5, 349.5, 77, 24)
-  fill(146, 361, 66, 16, OUTLINE)
-  fill(147, 368, 64, 8, '#4F7FA8')
-  fill(147, 362, 64, 7, '#3D6A92')
-  fill(147, 362, 6, 14, '#3D6A92')
-  fill(205, 362, 6, 14, '#3D6A92')
-  fill(155, 369, 22, 6, '#6C9BC4')
-  fill(181, 369, 22, 6, '#6C9BC4')
-  fill(163, 349, 32, 9, OUTLINE)
-  fill(164, 350, 30, 7, '#B98F5E')
-  fill(167, 351, 8, 4, '#F6F7F8')
-  dot(186, 353, 2.2, '#FFFFFF', '#B9C3CC')
-  dot(130, 366, 6, OUTLINE)
-  dot(130, 366, 4.8, '#F6E3A8')
-  dot(130, 366, 1.6, '#D6A23C')
-
-  // A ping-pong table, net across the middle
-  fill(290, 350, 52, 26, OUTLINE)
-  fill(291, 351, 50, 24, '#2E8B6E')
-  fill(291, 362.5, 50, 1, '#FFFFFF')
-  fill(315.5, 351, 1, 24, '#E9EEF2')
-  fill(315, 349, 2, 28, '#2B2F36')
-  dot(300, 356, 1.6, '#FFFFFF')
-  dot(286, 358, 3, '#E5484D', OUTLINE)
-  dot(346, 368, 3, '#3E7CC9', OUTLINE)
-
-  fill(452, 334, 16, 24, OUTLINE)
-  fill(453, 335, 14, 10, '#9CC4EC')
-  fill(453, 346, 14, 11, '#E9EEF2')
-  g.font = `700 8.5px ${FONT}`
-  g.fillStyle = '#5B6672'
-  g.textAlign = 'left'
-  g.fillText('Dine andre sessioner', 16, H - 12)
-
-  // Plants
-  for (const [x, y, big] of [[228, 36, true], [22, 116], [462, 120], [462, 150, true], [20, 150], [380, 368], [56, 368], [234, 366, true], [262, 120]]) {
-    const r = big ? 9 : 7
-    fill(x - 5, y, 10, 8, '#B5683E')
-    dot(x, y - 2, r, '#3E8A55', OUTLINE)
-    dot(x - r / 2, y - 4, r / 2, '#56A86B')
-    dot(x + r / 3, y - r, r / 3, '#6CC082')
-  }
+  g.fillText(clip(project || 'Kontoret', 26), mid, WORLD.y + 11.5)
 }
 
 // ── Clicking on someone ──────────────────────────────────────────────────
@@ -835,7 +1169,7 @@ const party = (p, spot, t) => {
 }
 
 // ── One frame ────────────────────────────────────────────────────────────
-let state = { sessions: [] }
+let state = { sessions: [], game: null }
 let focusKey = null
 try {
   focusKey = localStorage.getItem('agent-kontor:focus')
@@ -845,7 +1179,7 @@ let isChosen = focusKey !== null
 const focused = () => state.sessions.find(s => s.key === focusKey) ?? state.sessions[0] ?? null
 
 // Where each figure stood in the last frame, for clicks: { kind, id, x0, y0, x1, y1 }
-// in scene units, later entries drawn on top.
+// in world units, later entries drawn on top.
 let hits = []
 let selected = null // { kind: 'claude' | 'sub', id }
 
@@ -856,19 +1190,24 @@ const draw = () => {
   const frameHits = []
   const timeNow = timeOfDay()
   const hour = Math.floor(timeNow)
+  stepGlide()
   drawBuilding(s?.project ?? '', hour)
   ctx.setTransform(1, 0, 0, 1, 0, 0)
   ctx.imageSmoothingEnabled = false
   ctx.clearRect(0, 0, canvas.width, canvas.height)
   ctx.drawImage(background, 0, 0)
-  ctx.setTransform(S, 0, 0, S, 0, 0)
+  applyView(ctx)
 
   const main = s?.main ?? { state: 'idle', detail: 'Ingen session' }
-  const isOut = main.state === 'idle'
+  const kitchenSpot = coffeeSpot()
+  // On a break Claude goes to the kitchen; with no kitchen it stays put.
+  const isOut = main.state === 'idle' && !!kitchenSpot
   const subs = s?.subs ?? []
+  const walks = { ...WALKS, ...(s?.walks ?? {}) }
+  const list = desks()
 
   daylight(timeNow)
-  board(s?.stats)
+  board(s?.stats, state.game?.kroner)
   clock(new Date())
   // Screens in use, which glow in the dark
   const glowing = []
@@ -883,11 +1222,11 @@ const draw = () => {
     tag(MAIN.cx, MAIN.dy + 30, 'Claude', '#C8643B')
     frameHits.push({ kind: 'claude', id: 'claude', ...seatedBox(MAIN.cx, MAIN.dy) })
   } else {
-    frameHits.push({ kind: 'claude', id: 'claude', ...standingBox(KITCHEN_SEAT.x, KITCHEN_SEAT.y) })
-    standing(KITCHEN_SEAT.x, KITCHEN_SEAT.y, claudeLook, 'front', false, t, 7)
+    frameHits.push({ kind: 'claude', id: 'claude', ...standingBox(kitchenSpot.x, kitchenSpot.y) })
+    standing(kitchenSpot.x, kitchenSpot.y, claudeLook, 'front', false, t, 7)
     // The mug, and its steam
-    const mx = KITCHEN_SEAT.x + 15
-    const my = KITCHEN_SEAT.y - 22
+    const mx = kitchenSpot.x + 15
+    const my = kitchenSpot.y - 22
     rect(mx + 8, my + 2, 3, 5, OUTLINE)
     rect(mx + 8.5, my + 3, 1.5, 3, '#FFFFFF')
     rect(mx, my, 9, 10, OUTLINE)
@@ -896,35 +1235,45 @@ const draw = () => {
     ctx.globalAlpha = 0.7
     for (let i = 0; i < 2; i++) rect(mx + 2 + i * 3, my - 3 - ((t / 40 + i * 10) % 12), 1.5, 3, '#C9D2DA')
     ctx.globalAlpha = 1
-    tag(KITCHEN_SEAT.x, KITCHEN_SEAT.y + 3, 'Claude', '#C8643B')
+    tag(kitchenSpot.x, kitchenSpot.y + 3, 'Claude', '#C8643B')
     // The coffee machine on the counter, just used
+    const kitchen = firstRoom('kitchen')
+    const machine = at(kitchen, typeOf(kitchen).machine)
     ctx.globalAlpha = 0.55
     for (let i = 0; i < 3; i++) {
       const rise = (t / 50 + i * 7) % 18
-      rect(270 + i * 2.5 + Math.sin((t / 300) + i) * 1.2, 20 - rise * 0.4 + 14 - rise, 1.5, 3, '#E9EEF2')
+      rect(machine.x + i * 2.5 + Math.sin(t / 300 + i) * 1.2, machine.y + 14 - rise * 1.4, 1.5, 3, '#E9EEF2')
     }
     ctx.globalAlpha = 1
   }
 
-  // The team room
-  const walkers = []
-  for (let seat = 0; seat < SEATS; seat++) {
-    const { cx, dy } = seatAt(seat)
-    const sub = subs.find(x => x.seat === seat && poseOf(x, now)?.seated)
+  // The desks, and who sits at them
+  const seatedAt = seat => subs.find(x => x.seat === seat && poseOf(x, now, walks)?.seated)
+  list.forEach(({ cx, dy }, seat) => {
+    if (!isInView(cx - 60, dy - 60, 120, 120)) return
+    const sub = seatedAt(seat)
     chair(cx, dy)
     if (sub) sitting(cx, dy + 4, lookFor(sub.id), sub.activity.state === 'waiting', t, hashOf(sub.id))
     desk(cx, dy, 84, sub ? sub.activity.state : null, t)
-    if (sub) deskThingsFor(sub.id, cx, dy)
-    if (sub) glowing.push([cx + 24, dy + 8])
     if (sub) {
+      deskThingsFor(sub.id, cx, dy)
+      glowing.push([cx + 24, dy + 8])
       hands(cx, dy, lookFor(sub.id), sub.activity.state !== 'waiting', t + seat * 37)
       tag(cx, dy + 30, sub.name, '#4A5868')
       frameHits.push({ kind: 'sub', id: sub.id, ...seatedBox(cx, dy) })
     }
-  }
+  })
+  // Everyone on their feet: walking, handing over, or waiting by the door
+  // for a desk.
+  const walkers = []
   for (const sub of subs) {
-    const pose = poseOf(sub, now)
-    if (pose && !pose.seated) walkers.push({ sub, pose })
+    const pose = poseOf(sub, now, walks)
+    if (!pose) continue
+    if (!pose.seated) walkers.push({ sub, pose })
+    else if (sub.seat >= list.length) {
+      const { spot } = placeOf(sub.seat)
+      walkers.push({ sub, pose: { x: spot.x, y: spot.y, facing: 'front', isWalking: false, isWaiting: true } })
+    }
   }
   walkers.sort((a, b) => a.pose.y - b.pose.y)
   for (const { sub, pose } of walkers) {
@@ -934,13 +1283,18 @@ const draw = () => {
   }
 
   // The project room: the other sessions
-  const others = state.sessions.filter(x => x !== s).slice(0, 4)
-  others.forEach((o, i) => {
-    const cx = 72 + i * 112
-    const dy = 440
+  const projectRoom = firstRoom('project')
+  const seats = projectRoom ? typeOf(projectRoom).seats.map(p => at(projectRoom, p)) : []
+  const others = state.sessions.filter(x => x !== s).slice(0, seats.length)
+  seats.forEach(({ cx, dy }, i) => {
+    const o = others[i]
+    chair(cx, dy)
+    if (!o) {
+      desk(cx, dy, 80, null, t)
+      return
+    }
     const look = { ...claudeLook, shirt: shirts[hashOf(o.key) % shirts.length][0], shirtShade: shirts[hashOf(o.key) % shirts.length][1] }
     const away = o.main.state === 'idle'
-    chair(cx, dy)
     if (!away) sitting(cx, dy + 4, look, o.main.state === 'waiting', t, hashOf(o.key))
     desk(cx, dy, 80, away ? null : o.main.state, t)
     if (!away) hands(cx, dy, look, o.main.state !== 'waiting', t + i * 51)
@@ -948,10 +1302,6 @@ const draw = () => {
     if (o.subs?.length) tag(cx + 30, dy + 44, `+${o.subs.length}`, '#4A5868')
     frameHits.push({ kind: 'session', id: o.key, x0: cx - 42, y0: dy - 40, x1: cx + 42, y1: dy + 44 })
   })
-  for (let i = others.length; i < 4; i++) {
-    chair(72 + i * 112, 440)
-    desk(72 + i * 112, 440, 80, null, t)
-  }
 
   evening(timeNow, glowing)
 
@@ -959,22 +1309,25 @@ const draw = () => {
   const thanking = walkers.find(w => w.pose.handover)
   if (isOut) {
     const lines = ['Kaffepause', s?.stats?.linesAdded ? `${s.stats.linesAdded} linjer i dag` : 'Klar når du er', 'Godt arbejde, team', 'Hvad nu?']
-    bubble(KITCHEN_SEAT.x, KITCHEN_SEAT.y - 52, lines[Math.floor(t / 3000) % lines.length], false, t)
+    bubble(kitchenSpot.x, kitchenSpot.y - 52, lines[Math.floor(t / 3000) % lines.length], false, t)
   } else if (thanking) {
     bubble(MAIN.cx, MAIN.dy - 34, thanking.sub.outcome === 'failed' ? `Øv, ${thanking.sub.name}` : `Tak, ${thanking.sub.name}!`, false, t)
   } else {
     say(MAIN.cx, MAIN.dy - 34, main, t)
   }
-  for (let seat = 0; seat < SEATS; seat++) {
-    const sub = subs.find(x => x.seat === seat && poseOf(x, now)?.seated)
-    if (sub) say(seatAt(seat).cx, seatAt(seat).dy - 34, sub.activity, t + seat * 230)
-  }
+  list.forEach(({ cx, dy }, seat) => {
+    const sub = seatedAt(seat)
+    if (sub) say(cx, dy - 34, sub.activity, t + seat * 230)
+  })
   for (const { sub, pose } of walkers) {
     if (pose.handover) bubble(pose.x, pose.y - 52, sub.outcome === 'failed' ? `Gik i stå: ${sub.task}` : `Afleverer: ${sub.task}`, sub.outcome === 'failed', t)
+    else if (pose.isWaiting) say(pose.x, pose.y - 52, sub.activity, t + sub.seat * 190)
   }
-  others.forEach((o, i) => {
-    if (o.main.state === 'idle') tag(72 + i * 112, 414, 'Holder pause', '#8A94A0')
-    else say(72 + i * 112, 406, o.main, t + i * 170)
+  seats.forEach(({ cx, dy }, i) => {
+    const o = others[i]
+    if (!o) return
+    if (o.main.state === 'idle') tag(cx, dy - 26, 'Holder pause', '#8A94A0')
+    else say(cx, dy - 34, o.main, t + i * 170)
   })
   // The one whose card is open, ringed.
   const ring = selected && frameHits.find(h => h.kind === selected.kind && h.id === selected.id)
@@ -985,16 +1338,149 @@ const draw = () => {
   }
   hits = frameHits
 
-  const waitingAtDoor = subs.filter(x => x.seat < 0).length
-  if (waitingAtDoor) tag(DOOR.x - 40, 230, `+${waitingAtDoor} venter ved døren`, '#C8643B')
-
   if (s?.party) {
-    const who = subs.find(x => x.id === s.party.who && x.seat >= 0)
-    party({ ...s.party, at: performance.now() - (now - s.party.at) }, who ? seatAt(who.seat) : MAIN, t)
+    const who = subs.find(x => x.id === s.party.who)
+    const spot = who && placeOf(who.seat).isDesk ? placeOf(who.seat) : MAIN
+    party({ ...s.party, at: performance.now() - (now - s.party.at) }, spot, t)
   }
 
+  drawMinimap()
   requestAnimationFrame(draw)
 }
+
+// ── Moving the camera ────────────────────────────────────────────────────
+// Drag to move, scroll or pinch to zoom, double-click for everything. The
+// minimap shows where the view is once it is zoomed in, and takes you
+// anywhere with a click.
+const minimap = document.getElementById('minimap')
+const fitAllButton = document.getElementById('fit-all')
+const mini = minimap.getContext('2d')
+
+const drawMinimap = () => {
+  const isZoomed = view.zoom > 1.01 || glideTo?.zoom > 1.01
+  minimap.hidden = !isZoomed
+  fitAllButton.hidden = !isZoomed
+  if (!isZoomed) return
+  const dpr = window.devicePixelRatio || 1
+  // A quarter of the picture's width, at most 132 pixels
+  const width = Math.round(Math.min(132, canvas.offsetWidth * 0.26))
+  const height = Math.round((width * H) / W)
+  if (minimap.width !== width * dpr) {
+    minimap.width = width * dpr
+    minimap.height = height * dpr
+    minimap.style.width = `${width}px`
+    minimap.style.height = `${height}px`
+  }
+  // In the picture's own corners, wherever it sits in its space
+  minimap.style.left = `${canvas.offsetLeft + canvas.offsetWidth - width - 10}px`
+  minimap.style.top = `${canvas.offsetTop + canvas.offsetHeight - height - 10}px`
+  fitAllButton.style.left = `${canvas.offsetLeft + canvas.offsetWidth - fitAllButton.offsetWidth - 10}px`
+  fitAllButton.style.top = `${canvas.offsetTop + 10}px`
+  const k = (width * dpr) / W
+  mini.setTransform(k, 0, 0, k, -WORLD.x * k, -WORLD.y * k)
+  mini.fillStyle = '#2A323B'
+  mini.fillRect(WORLD.x, WORLD.y, W, H)
+  const colours = { corner: '#DCC194', kitchen: '#F3F5F6', team: '#CBD9C7', project: '#D6DCE6' }
+  for (const room of PLAN.rooms) {
+    mini.fillStyle = colours[room.type] ?? '#C9CED3'
+    mini.fillRect(room.x, room.y, typeOf(room).w, typeOf(room).h)
+  }
+  mini.lineWidth = 3 / k
+  mini.strokeStyle = '#2F86D6'
+  mini.strokeRect(view.x, view.y, W / view.zoom, H / view.zoom)
+}
+
+const worldAt = e => {
+  const box = canvas.getBoundingClientRect()
+  return { x: view.x + ((e.clientX - box.left) / box.width) * (W / view.zoom), y: view.y + ((e.clientY - box.top) / box.height) * (H / view.zoom) }
+}
+
+const zoomAt = (e, zoom) => {
+  const box = canvas.getBoundingClientRect()
+  const p = worldAt(e)
+  const fx = (e.clientX - box.left) / box.width
+  const fy = (e.clientY - box.top) / box.height
+  glideTo = null
+  Object.assign(view, clampView({ x: p.x - (fx * W) / zoom, y: p.y - (fy * H) / zoom, zoom }))
+}
+
+canvas.addEventListener(
+  'wheel',
+  e => {
+    e.preventDefault()
+    zoomAt(e, view.zoom * Math.exp(-e.deltaY * 0.0015))
+  },
+  { passive: false },
+)
+
+// Pointers down on the picture: one drags, two pinch.
+const pointers = new Map()
+let drag = null
+let pinch = null
+let hasDragged = false
+canvas.addEventListener('pointerdown', e => {
+  pointers.set(e.pointerId, e)
+  canvas.setPointerCapture(e.pointerId)
+  hasDragged = false
+  if (pointers.size === 1) drag = { x: e.clientX, y: e.clientY, view: { ...view } }
+  if (pointers.size === 2) {
+    const [a, b] = [...pointers.values()]
+    pinch = { distance: Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY), zoom: view.zoom }
+    drag = null
+  }
+})
+canvas.addEventListener('pointermove', e => {
+  if (!pointers.has(e.pointerId)) {
+    canvas.style.cursor = hitAt(e) ? 'pointer' : view.zoom > 1.01 ? 'grab' : 'default'
+    return
+  }
+  pointers.set(e.pointerId, e)
+  if (pinch && pointers.size === 2) {
+    const [a, b] = [...pointers.values()]
+    const middle = { clientX: (a.clientX + b.clientX) / 2, clientY: (a.clientY + b.clientY) / 2 }
+    zoomAt(middle, (pinch.zoom * Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY)) / pinch.distance)
+    hasDragged = true
+    return
+  }
+  if (!drag) return
+  const dx = e.clientX - drag.x
+  const dy = e.clientY - drag.y
+  if (!hasDragged && Math.hypot(dx, dy) < 4) return
+  hasDragged = true
+  canvas.style.cursor = 'grabbing'
+  const box = canvas.getBoundingClientRect()
+  glideTo = null
+  Object.assign(
+    view,
+    clampView({ x: drag.view.x - (dx / box.width) * (W / view.zoom), y: drag.view.y - (dy / box.height) * (H / view.zoom), zoom: view.zoom }),
+  )
+})
+const release = e => {
+  pointers.delete(e.pointerId)
+  if (pointers.size < 2) pinch = null
+  if (pointers.size === 0) drag = null
+}
+canvas.addEventListener('pointerup', release)
+canvas.addEventListener('pointercancel', release)
+canvas.addEventListener('dblclick', () => glide({ x: WORLD.x, y: WORLD.y, zoom: 1 }))
+fitAllButton.addEventListener('click', () => glide({ x: WORLD.x, y: WORLD.y, zoom: 1 }))
+minimap.addEventListener('click', e => {
+  const box = minimap.getBoundingClientRect()
+  const x = WORLD.x + ((e.clientX - box.left) / box.width) * W
+  const y = WORLD.y + ((e.clientY - box.top) / box.height) * H
+  glide(centredOn(x, y, view.zoom))
+})
+
+// Up close to whoever waits for you: the alert under the picture takes you there.
+const lookAtWaiting = () => {
+  const s = focused()
+  if (!s) return
+  if (s.main.state === 'waiting') return glide(centredOn(MAIN.cx, MAIN.dy - 10, 2.5))
+  const sub = (s.subs ?? []).find(x => x.activity.state === 'waiting')
+  const h = sub && hits.find(x => x.kind === 'sub' && x.id === sub.id)
+  if (h) glide(centredOn((h.x0 + h.x1) / 2, (h.y0 + h.y1) / 2, 2.5))
+}
+
 document.documentElement.style.setProperty('--office', String(W / H))
 fit()
 new ResizeObserver(fit).observe(stage)
@@ -1007,6 +1493,8 @@ const tabs = document.getElementById('tabs')
 const people = document.getElementById('people')
 const alertBox = document.getElementById('alert')
 const statusLine = document.getElementById('status')
+const saldo = document.getElementById('saldo')
+alertBox.addEventListener('click', lookAtWaiting)
 
 const el = (tagName, props = {}, children = []) => {
   const node = Object.assign(document.createElement(tagName), props)
@@ -1017,6 +1505,8 @@ const dot = state => el('span', { className: 'dot', style: `background:${stateCo
 
 const renderPage = () => {
   const s = focused()
+  saldo.hidden = typeof state.game?.kroner !== 'number'
+  if (!saldo.hidden) saldo.textContent = kr(state.game.kroner)
   tabs.replaceChildren(
     ...state.sessions.map(x =>
       el('button', { className: 'tab', type: 'button', onclick: () => choose(x.key), ariaPressed: String(x === s) }, [dot(x.main.state), x.project || 'Session']),
@@ -1047,12 +1537,8 @@ const renderPage = () => {
 // ── The details card ─────────────────────────────────────────────────────
 const card = document.getElementById('card')
 
-const sceneAt = e => {
-  const box = canvas.getBoundingClientRect()
-  return { x: ((e.clientX - box.left) / box.width) * W, y: ((e.clientY - box.top) / box.height) * H }
-}
 const hitAt = e => {
-  const { x, y } = sceneAt(e)
+  const { x, y } = worldAt(e)
   for (let i = hits.length - 1; i >= 0; i--) {
     const h = hits[i]
     if (x >= h.x0 && x <= h.x1 && y >= h.y0 && y <= h.y1) return h
@@ -1137,24 +1623,27 @@ const placeCard = () => {
   if (!h || card.hidden) return
   const box = canvas.getBoundingClientRect()
   const stageBox = stage.getBoundingClientRect()
-  const scale = box.width / W
+  // World units to canvas pixels, through the camera
+  const scale = box.width / (W / view.zoom)
   const left = box.left - stageBox.left
   const top = box.top - stageBox.top
+  const sx = v => (v - view.x) * scale
+  const sy = v => (v - view.y) * scale
   const cardWidth = card.offsetWidth
   const cardHeight = card.offsetHeight
-  const right = left + h.x1 * scale + 8
-  const leftSide = left + h.x0 * scale - cardWidth - 8
+  const right = left + sx(h.x1) + 8
+  const leftSide = left + sx(h.x0) - cardWidth - 8
   let x
   let y
   if (right + cardWidth <= left + box.width || leftSide >= left) {
     x = right + cardWidth <= left + box.width ? right : leftSide
-    y = top + h.y0 * scale
+    y = top + sy(h.y0)
   } else {
     // No room beside it (a narrow window): under the figure, over it if
     // there is room there, or else on under the picture, but never over it.
-    x = left + ((h.x0 + h.x1) / 2) * scale - cardWidth / 2
-    const below = top + h.y1 * scale + 6
-    const above = top + h.y0 * scale - cardHeight - 6
+    x = left + sx((h.x0 + h.x1) / 2) - cardWidth / 2
+    const below = top + sy(h.y1) + 6
+    const above = top + sy(h.y0) - cardHeight - 6
     y = below + cardHeight <= top + box.height || above < top ? below : above
     card.style.transform = `translate(${Math.round(Math.max(left + 4, Math.min(x, left + box.width - cardWidth - 4)))}px, ${Math.round(y)}px)`
     return
@@ -1170,6 +1659,11 @@ const select = next => {
 }
 
 canvas.addEventListener('click', e => {
+  // The end of a drag is no click.
+  if (hasDragged) {
+    hasDragged = false
+    return
+  }
   const h = hitAt(e)
   if (h?.kind === 'session') {
     select(null)
@@ -1177,9 +1671,6 @@ canvas.addEventListener('click', e => {
   } else {
     select(h && !(selected && selected.kind === h.kind && selected.id === h.id) ? { kind: h.kind, id: h.id } : null)
   }
-})
-canvas.addEventListener('mousemove', e => {
-  canvas.style.cursor = hitAt(e) ? 'pointer' : 'default'
 })
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') select(null)

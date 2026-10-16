@@ -21,6 +21,7 @@ Status: ✅ lavet · 🟡 delvist · ⬜ ikke lavet · ➖ ikke længere relevan
 | 0.7.7 | Hyggeligere kontor: tæpper, reol, sofahjørne og bordtennis i teamrummet, bistrobord og snackautomat i køkkenet, lænestol hos Claude, egne ting på hver hjælpers skrivebord |
 | 0.7.8 | Lys og dybde: skygger under figurerne, sollys fra vinduerne efter tidspunktet, mørke aftener med lamper og lysende skærme |
 | 0.7.9 | Mere levende figurer: lidt større, blinker, ånder, og en tænkeboble med … i stedet for "Tænker" |
+| 0.8.0 | Spillets fase 0: grundplanen som data, ruter med A\*, kamera med træk, zoom og minikort, gåture med fast varighed, kroner tjent ved arbejdet og vist på siden |
 
 ## 🔧 Fejl og ting der driller
 
@@ -74,7 +75,7 @@ Status: ✅ lavet · 🟡 delvist · ⬜ ikke lavet · ➖ ikke længere relevan
 | 31 | **Fuldskærm og "tv-tilstand"** til en ekstra skærm: større figurer, ingen liste. | S | ⬜ |
 | 32 | **Dagsstatistik på siden:** linjer, pris og antal hjælpere i dag og i ugen, gemt af serveren. | M | ⬜ |
 | 33 | **Flere kontorer:** ét rum pr. projekt, man kan gå mellem, i stedet for faner. | L | ⬜ |
-| 35 | **Et større kontor:** flere skriveborde, flere rum, mødelokale. Siden skalerer selv; grundplanen (`W`, `H`, pladser og ruter) skal ændres ens i `public/app.js` og `hooks/register.tsx`, som timer gåturene. | M | ⬜ |
+| 35 | **Et større kontor:** fundamentet er klar: rum er data, ruter findes med A\*, og kameraet kan zoome og flytte. Mangler selve de nye rum (spillets fase 2 og 5). | M | 🟡 |
 | 39 | **Liv i teamrummet og køkkenet:** tæpper under skrivebordene, reol, sofahjørne med lampe, bordtennisbord, bistrobord, snackautomat, damp fra kaffemaskinen i pausen. | M | ✅ |
 | 40 | **Egne ting på skrivebordet:** hver hjælper har altid de samme to ting (kop, plante, papirer, badeand, høretelefoner, billede eller snack). | S | ✅ |
 | 41 | **Lys og dybde:** skygger under figurer og stole, sollys fra vinduerne der følger solen, aftenmørke med lamper, loftslys og lysende skærme. Se en anden tid med `?tid=21:30` i adressen. | M | ✅ |
@@ -86,7 +87,8 @@ Status: ✅ lavet · 🟡 delvist · ⬜ ikke lavet · ➖ ikke længere relevan
 
 | # | Hvad | Str. | Status |
 |---|---|---|---|
-| 44 | **Tjen kroner, køb kontoret:** pladser, rum, pynt, gulvsiddere der brokker sig, trivsel, og et kontor der kan blive markant større. Hele planen står i [SPIL.md](SPIL.md). | L+ | ⬜ |
+| 44 | **Tjen kroner, køb kontoret:** pladser, rum, pynt, gulvsiddere der brokker sig, trivsel, og et kontor der kan blive markant større. Hele planen står i [SPIL.md](SPIL.md). | L+ | 🟡 |
+| 45 | **Drama og banter:** hjælperne driller, konkurrerer og brokker sig i små replikskifter, når de står i kantinen, ud fra dagens rigtige hændelser. Se SPIL.md, fase 3. | M | ⬜ |
 
 ## 🧹 Oprydning
 

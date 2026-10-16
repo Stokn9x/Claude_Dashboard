@@ -5,6 +5,8 @@ Et pixel-kontor set ovenfra, i din browser. Tryk på **🏢 Åbn kontor** over c
 - **Seks skriveborde i teamrummet.** Hver hjælper får et navn og sit eget udseende, og flere end seks venter ved døren.
 - **Talebobler med det, de laver lige nu:** "Læser api.ts", "Skriver README.md", "Kører npm test". Skærmen på skrivebordet viser det også: kode, terminal, en side tekst eller en browser.
 - **Venter på dig:** figuren rækker hånden op, boblen blinker rødt, og en stribe under kontoret siger hvad den venter på. Det sker kun, når en godkendelsesdialog faktisk vises for dig, ikke når Auto-tilstanden selv afgør det.
+- **Kamera:** træk for at flytte rundt, rul eller knib for at zoome, og dobbeltklik eller tryk **Vis hele** for hele kontoret. Når du har zoomet ind, viser et lille kort i hjørnet, hvor du er. Klik på den røde "venter på dig"-linje under kontoret for at hoppe hen til den, der venter.
+- **Kroner:** arbejdet tjener kroner, der vises øverst på siden og på Claudes tavle. Linjer, afleverede opgaver, grønne tests, commits og pull requests tæller. Snart kan de bruges på kontoret, se [SPIL.md](SPIL.md).
 - **Lys efter tidspunktet:** sollys falder ind ad vinduerne om dagen, og om aftenen bliver der mørkt, så lamperne og skærmene lyser. Vil du se aftenen om dagen, så skriv `?tid=21:30` efter adressen.
 - **Pause:** Claude går ud i køkkenet med en kop kaffe, der damper, og småsnakker.
 - **Fejringer:** konfetti når testene er grønne (`npm test`, `pytest`, `jest`, `vitest`, `cargo test` …), en regnsky når de fejler, og balloner ved `git commit` og `gh pr create`.

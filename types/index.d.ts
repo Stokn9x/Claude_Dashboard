@@ -2,6 +2,8 @@ export type AgentState = 'working' | 'reading' | 'editing' | 'running' | 'browsi
 
 export type Activity = { state: AgentState; detail: string }
 
+export type Earned = { added: number; removed: number; delivered: number; tests: number; commits: number; prs: number }
+
 // One step someone took, for the details card: "10:42 Læser api.ts".
 export type Step = { at: number; detail: string }
 
@@ -63,6 +65,11 @@ export type Office = {
   // Claude's own count of tool calls and latest steps, for its details card.
   tools: number
   recent: Step[]
+  // What this session has earned, as running counts; the server turns them
+  // into kroner. The rules (a cap per edit, a pause between test runs) are
+  // applied here, where each event is seen.
+  earned: Earned
+  lastTestAt: number
 }
 
 declare module 'claude-code' {

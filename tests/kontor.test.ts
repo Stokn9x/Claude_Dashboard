@@ -362,25 +362,54 @@ test('once the office is open, a server that stopped is started again', async ($
   expect(starts).toBe(2)
 })
 
-test('a seventh helper waits by the door and takes the first desk that comes free', async ($, on) => {
+test('every helper gets a place number, without a limit, and a freed number is used again', async ($, on) => {
   const clock = backgroundHelper(on, $)
   const file = statusFile(on)
   on('classic.SubagentStop', () => ({}) as never)
-  on('agent.list', () => ({ value: ['1', '2', '3', '4', '5', '6', '7'].map(n => agentEntry(`sub-b${n}`, 'running')) }) as never)
+  on('agent.list', () => ({ value: ['1', '2', '3', '4', '5', '6', '7', '8'].map(n => agentEntry(`sub-b${n}`, 'running')) }) as never)
   await $.session.start(start())
 
   for (const n of ['1', '2', '3', '4', '5', '6', '7']) {
     await $.tool.call({ tool: 'Agent', prompt: 'p', description: 'Læs README', tool_use_id: `b${n}`, run_in_background: true } as never)
   }
-  await clock.advance(9000)
-  const seventh = () => file.last()?.subs.find(s => s.name && JSON.stringify(s).includes('sub-b7'))
-  expect(seventh()?.seat).toBe(-1)
+  await clock.advance(600)
+  const seatOf = (id: string) => file.last()?.subs.find(s => JSON.stringify(s).includes(id))?.seat
+  // The page decides which numbers get a desk and which sit on the floor.
+  expect(seatOf('sub-b7')).toBe(6)
 
-  // The second helper is done: once it is out of the door, its desk is free.
+  // The second helper is done; once it is out of the door, its number is free.
   await $.classic.SubagentStop({ agent_id: 'sub-b2', agent_type: 'Explore', stop_hook_active: false, agent_transcript_path: '' } as never)
-  await clock.advance(20_000)
-  expect(seventh()?.seat).toBe(1)
-  expect(file.last()?.subs.some(s => JSON.stringify(s).includes('sub-b2'))).toBe(false)
+  await clock.advance(11_000)
+  expect(seatOf('sub-b2')).toBeUndefined()
+  await $.tool.call({ tool: 'Agent', prompt: 'p', description: 'Læs README', tool_use_id: 'b8', run_in_background: true } as never)
+  await clock.advance(600)
+  expect(seatOf('sub-b8')).toBe(1)
+})
+
+test('earnings are counted by the rules: a cap per edit, tests at most every ten minutes', async ($, on) => {
+  const clock = engine(on, async e => {
+    if (e.tool === 'Agent') {
+      await $.agent.spawn({ tool_use_id: e.tool_use_id, prompt: 'p', description: 'Kortlæg API’et', subagentType: 'Explore', parentModel: 'm', background: false } as never)
+    }
+  })
+  const file = statusFile(on)
+  await $.session.start(start())
+  const earned = () => (JSON.parse(JSON.stringify(file.last())) as { earned: Record<string, number> }).earned
+
+  // +2 -1 from the engine's Edit result
+  await $.tool.call({ tool: 'Edit', file_path: 'C:/x/a.ts', old_string: 'a', new_string: 'b', tool_use_id: 'e1' } as never)
+  await $.tool.call({ tool: 'Bash', command: 'npm test', tool_use_id: 't1' } as never)
+  await $.tool.call({ tool: 'Bash', command: 'npm test', tool_use_id: 't2' } as never)
+  await $.tool.call({ tool: 'Bash', command: 'git commit -m x', tool_use_id: 'c1' } as never)
+  await $.tool.call({ tool: 'Agent', prompt: 'p', description: 'Kortlæg API’et', tool_use_id: 'a1' } as never)
+  await clock.advance(600)
+  expect(earned()).toEqual({ added: 2, removed: 1, delivered: 1, tests: 1, commits: 1, prs: 0 })
+
+  // Ten minutes on, green tests count again.
+  await clock.advance(10 * 60_000)
+  await $.tool.call({ tool: 'Bash', command: 'npm test', tool_use_id: 't3' } as never)
+  await clock.advance(600)
+  expect(earned().tests).toBe(2)
 })
 
 test('each helper keeps its own count of tools, lines and latest steps for its card', async ($, on) => {

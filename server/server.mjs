@@ -14,7 +14,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-const VERSION = '0.7.9'
+const VERSION = '0.8.0'
 const HOST = '127.0.0.1'
 const PORT = Number(process.env.AGENT_KONTOR_PORT || 4747)
 const HERE = path.dirname(fileURLToPath(import.meta.url))
@@ -36,6 +36,88 @@ if (process.argv.includes('--detach')) {
   process.stdout.write(JSON.stringify({ started: child.pid }) + '\n')
   process.exit(0)
 }
+
+// ── The game: kroner earned by the work, spent on the office ────────────
+//
+// The server is the one writer of spil.json, so sessions running side by
+// side never overwrite each other's money. Each session's status file
+// carries running counts of what it has earned (the mod applies the rules:
+// a cap per edit, a pause between test runs); the server credits what has
+// grown since it last looked, session by session. See SPIL.md.
+
+const GAME = path.join(os.homedir(), '.claude', 'agent-kontor', 'spil.json')
+const RATES = { added: 1, removed: 0.5, delivered: 25, tests: 50, commits: 30, prs: 100 }
+// What a new office starts with: Claude's corner and a small team room with
+// two desks. The rest is earned (phase 1 and on).
+const START = { desks: 2, rooms: ['claude', 'team'] }
+// A session's credited counts are kept this long after it was last seen.
+const CREDIT_KEEP_MS = 7 * 24 * 60 * 60_000
+
+const newGame = () => ({ v: 1, kroner: 0, owned: { ...START, rooms: [...START.rooms] }, credited: {}, startedAt: Date.now() })
+
+const loadGame = () => {
+  try {
+    const saved = JSON.parse(fs.readFileSync(GAME, 'utf8'))
+    return { ...newGame(), ...saved, owned: { ...START, ...(saved.owned ?? {}) }, credited: saved.credited ?? {} }
+  } catch {
+    return newGame()
+  }
+}
+
+let game = loadGame()
+let isGameChanged = false
+
+// Written whole to a side file first, then moved into place: a crash
+// half-way never leaves a broken spil.json.
+const saveGame = () => {
+  if (!isGameChanged) return
+  try {
+    fs.mkdirSync(path.dirname(GAME), { recursive: true })
+    fs.writeFileSync(`${GAME}.tmp`, JSON.stringify(game, null, 2))
+    fs.renameSync(`${GAME}.tmp`, GAME)
+    isGameChanged = false
+  } catch {
+    // Kept in memory; the next tick tries again.
+  }
+}
+
+const credit = (status, now) => {
+  const earned = status.earned
+  if (!status.key || !earned || typeof earned !== 'object') return
+  const before = game.credited[status.key]?.earned ?? {}
+  let kroner = 0
+  for (const [k, rate] of Object.entries(RATES)) {
+    const count = Number(earned[k]) || 0
+    const was = Number(before[k]) || 0
+    // A count that went down was started over: all of it is new.
+    kroner += (count >= was ? count - was : count) * rate
+  }
+  const isNewCount = Object.keys(RATES).some(k => (Number(earned[k]) || 0) !== (Number(before[k]) || 0))
+  if (!isNewCount) {
+    // Still around: kept from being pruned, noted once a day.
+    const seen = game.credited[status.key]
+    if (seen && now - (seen.at ?? 0) > 24 * 60 * 60_000) {
+      seen.at = now
+      isGameChanged = true
+    }
+    return
+  }
+  game.kroner += kroner
+  game.credited[status.key] = { earned: { ...earned }, at: now }
+  isGameChanged = true
+}
+
+const pruneCredited = now => {
+  for (const [key, entry] of Object.entries(game.credited)) {
+    if (now - (entry.at ?? 0) > CREDIT_KEEP_MS) {
+      delete game.credited[key]
+      isGameChanged = true
+    }
+  }
+}
+
+// What the page sees of the game.
+const gameView = () => ({ kroner: Math.floor(game.kroner), owned: game.owned })
 
 // ── The sessions, as their files say ────────────────────────────────────
 
@@ -69,6 +151,7 @@ const readSessions = () => {
       // Half-written: what the last read said, until the next tick reads it whole.
       status = previous.get(name) ?? null
     }
+    if (status) credit(status, now)
     if (status && (status.ended || now - (status.updatedAt ?? 0) > FORGET_MS)) forget(name)
     if (!status || status.ended || !status.main || now - (status.updatedAt ?? 0) > STALE_MS) continue
     sessions.push(status)
@@ -77,10 +160,12 @@ const readSessions = () => {
 }
 
 // updatedAt moves with every heartbeat; only what the page draws counts as news.
-const shapeOf = sessions => JSON.stringify(sessions.map(({ updatedAt, ...rest }) => rest))
+const shapeOf = sessions => JSON.stringify([sessions.map(({ updatedAt, ...rest }) => rest), gameView()])
+const stateOf = sessions => JSON.stringify({ sessions, game: gameView() })
 
 let sessionsNow = readSessions()
-let current = JSON.stringify({ sessions: sessionsNow })
+saveGame()
+let current = stateOf(sessionsNow)
 let currentShape = shapeOf(sessionsNow)
 let lastBusyAt = Date.now()
 const listeners = new Set()
@@ -98,8 +183,10 @@ const send = (res, text) => {
 
 const publish = () => {
   sessionsNow = readSessions()
+  pruneCredited(Date.now())
+  saveGame()
   if (sessionsNow.length > 0) lastBusyAt = Date.now()
-  current = JSON.stringify({ sessions: sessionsNow })
+  current = stateOf(sessionsNow)
   const shape = shapeOf(sessionsNow)
   if (shape === currentShape) return
   currentShape = shape

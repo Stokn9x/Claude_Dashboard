@@ -1,6 +1,6 @@
 # Spillet i Agent-kontor
 
-Status: **plan, intet bygget endnu.** Beslutningerne står under [Besluttet](#besluttet).
+Status: **fase 0 er lavet (0.8.0).** Beslutningerne står under [Besluttet](#besluttet).
 
 ## Idéen
 
@@ -51,6 +51,17 @@ Priserne er et første bud og skal justeres, når vi ser, hvor hurtigt pengene k
 - **Byggeri:** efter køb står der stillads i ca. 10 sekunder, og så kommer rummet frem med konfetti.
 - **Gulvsiddere:** en hjælper uden skrivebord sidder på gulvet langs væggen med en laptop i skødet. Den siger ting som "Av min ryg", "Har vi ikke en stol?" og "Jeg vil også have et skrivebord". Den arbejder lige så godt som de andre; det er kun stemningen, der lider.
 - **Butik:** en ny fane ved siden af listen på siden: "Hvem laver hvad" og "Butik". Butikken viser saldo, hvad man har råd til, og hvad der kommer næste gang.
+
+## Drama og banter (fase 3)
+
+Hjælperne skal have lidt personlighed. Når to eller flere står i kantinen, ved kaffemaskinen eller ved bordtennisbordet, snakker de sammen i små replikskifter:
+
+- **Drillerier:** "Var det dig, der brugte 400 linjer på en README?" / "Den var nødvendig!"
+- **Små konkurrencer:** hvem der har afleveret flest opgaver i dag, hvem der fik rødt i testene
+- **Brok og sladder:** gulvsiddere, der brokker sig over en kollega med to skærme; nogen der har spist den sidste kage
+- **Reaktioner på det, der sker:** en hjælper, der gik i stå, bliver trøstet eller drillet; grønne tests giver high-five
+
+Replikkerne vælges ud fra rigtige hændelser (opgaver, tests, linjer, hvem der sidder på gulvet), så de passer til dagen. Hver hjælper får et lille temperament ud fra sit navn (fx kæk, tør, positiv, dramatisk), så de lyder forskelligt. Ingen sproglig model: replikkerne er skabeloner, så det koster intet og aldrig siger noget mærkeligt.
 
 ## Trivsel (fase 3)
 
@@ -112,10 +123,10 @@ Det betyder, at **fase 0 er større**, end den ellers ville være. Til gengæld 
 
 | Fase | Indhold | Størrelse |
 |---|---|---|
-| **0. Fundament** | Gitter og grundplan som data, kamera med træk og zoom, ruter med A\*, gåture med fast varighed, tællere i statusfilen, `spil.json` på serveren, saldo på siden | L+ |
+| **0. Fundament** | Gitter og grundplan som data, kamera med træk og zoom, ruter med A\*, gåture med fast varighed, tællere i statusfilen, `spil.json` på serveren, saldo på siden | L+ ✅ |
 | **1. Pladser** | Køb skriveborde, gulvsiddere med laptop og brok, butik-fanen | M |
 | **2. Rum** | Ledige grunde, køb rum, byggeri med stillads, køkken/toilet/sofa/bordtennis/mødelokale | L |
-| **3. Liv** | Rummene bliver brugt: kaffe, toiletbesøg, bordtennis, møder; trivsel | L |
+| **3. Liv** | Rummene bliver brugt: kaffe, toiletbesøg, bordtennis, møder; trivsel; **drama og banter** mellem hjælperne, når de står i kantinen | L |
 | **4. Mere** | Pynt-butik, opgraderinger (bedre stole, større skærme), præstationer ("1.000 linjer på en dag"), statistik | M |
 | **5. Vækst** | Mere grund, teamrum 3 og videre, nye etager med elevator, hjælpere fordelt på flere rum | L |
 

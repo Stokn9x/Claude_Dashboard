@@ -27,6 +27,7 @@
     .tab[aria-pressed="true"] { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
     .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex: none; }
     .status { color: var(--soft); font-size: 12px; }
+    .saldo { font-weight: 700; font-variant-numeric: tabular-nums; padding: 3px 10px; border-radius: 999px; background: var(--chip); border: 1px solid var(--line); }
     .status.lost { color: var(--alert); }
 
     /* The office takes all the room the window has; the list sits beside it
@@ -56,6 +57,11 @@
       box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25); font-size: 13px; pointer-events: auto; z-index: 2;
     }
     .card[hidden] { display: none; }
+    canvas#office { touch-action: none; }
+    /* Over the picture's corners once it is zoomed in */
+    .fit-all { position: absolute; z-index: 1; border: 1px solid var(--line); background: var(--chip); color: var(--ink); border-radius: 8px; padding: 4px 10px; font: inherit; font-size: 12px; cursor: pointer; }
+    .minimap { position: absolute; z-index: 1; border-radius: 6px; border: 1px solid var(--line); cursor: pointer; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25); }
+    .fit-all[hidden], .minimap[hidden] { display: none; }
     .card-head { display: flex; align-items: center; gap: 8px; font-size: 14px; }
     .card-close { margin-left: auto; border: 0; background: none; color: var(--soft); font-size: 18px; line-height: 1; cursor: pointer; padding: 0 2px; }
     .card-task { color: var(--soft); margin-top: 2px; }
@@ -66,7 +72,7 @@
     .card-steps { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 2px; }
     .card-steps time { color: var(--soft); font-variant-numeric: tabular-nums; margin-right: 8px; }
 
-    .alert { border: 1px solid var(--alert); color: var(--alert); border-radius: 10px; padding: 8px 12px; }
+    .alert { border: 1px solid var(--alert); color: var(--alert); border-radius: 10px; padding: 8px 12px; cursor: pointer; }
     .alert:empty { display: none; }
     ul.people { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
     @media (max-width: 720px) { ul.people { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); } }
@@ -82,12 +88,15 @@
   <header>
     <h1>Agent-kontor</h1>
     <nav class="tabs" id="tabs" aria-label="Sessioner"></nav>
+    <span class="saldo" id="saldo" title="Tjent ved arbejdet i alle dine sessioner" hidden></span>
     <span class="status" id="status">Forbinder…</span>
   </header>
   <main>
     <div class="stage" id="stage">
       <canvas id="office" aria-label="Kontoret set ovenfra. Klik på en figur for at se, hvad den laver."></canvas>
       <div class="card" id="card" role="dialog" aria-label="Detaljer" hidden></div>
+      <button class="fit-all" id="fit-all" type="button" hidden>Vis hele</button>
+      <canvas class="minimap" id="minimap" aria-label="Oversigt over kontoret" hidden></canvas>
     </div>
     <aside>
       <div class="alert" id="alert" role="status"></div>
