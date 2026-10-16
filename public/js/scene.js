@@ -28,6 +28,12 @@ const NAME = '#4A5868'
 // A helper's name plate in the colour of the model it runs on
 const MODEL_COLOUR = { Opus: '#7D55C7', Sonnet: '#3D74B8', Haiku: '#23857A', Fable: '#B8792A' }
 const nameColour = sub => MODEL_COLOUR[modelFamily(sub.model)] ?? NAME
+// The name on the plate; whoever leads the month so far (three tasks at
+// least) wears a star.
+const nameOf = sub => {
+  const leader = store.state.game?.stats?.staff?.ranking?.[0]
+  return leader && leader.tasks >= 3 && leader.name === sub.name ? `⭐ ${sub.name}` : sub.name
+}
 const CLAUDE = '#C8643B'
 
 const seatedBox = (cx, dy) => ({ x0: cx - 22, y0: dy - 34, x1: cx + 22, y1: dy + 42 })
@@ -283,7 +289,7 @@ const drawDesks = ({ list, seatedAt, glowing, hits, t }) => {
     // What its kind works with: a magnifying glass, a roll of plans
     if (sub.type === 'Explore') magnifier(cx + 33, dy + 15)
     else if (sub.type === 'Plan') blueprint(cx + 30, dy + 14)
-    tag(cx, dy + 30, sub.name, nameColour(sub))
+    tag(cx, dy + 30, nameOf(sub), nameColour(sub))
     hits.push({ kind: 'sub', id: sub.id, ...seatedBox(cx, dy) })
   })
 }
@@ -293,7 +299,7 @@ const drawFloorSitters = ({ floorSitters, glowing, hits, t }) => {
   for (const { sub, spot } of floorSitters) {
     onTheFloor(spot.x, spot.y, lookFor(sub.id), t, hashOf(sub.id))
     glowing.push([spot.x, spot.y - 10])
-    tag(spot.x, spot.y + 3, sub.name, nameColour(sub))
+    tag(spot.x, spot.y + 3, nameOf(sub), nameColour(sub))
     hits.push({ kind: 'sub', id: sub.id, x0: spot.x - 20, y0: spot.y - 44, x1: spot.x + 20, y1: spot.y + 14 })
   }
 }
@@ -322,7 +328,7 @@ const drawWalkers = ({ walkers, players, hits, t }) => {
     } else standing(pose.x, pose.y, look, pose.facing, pose.isWalking, t, hashOf(sub.id))
     if (kind === 'coffee') mug(pose.x + 9, pose.y - 22)
     if (kind === 'pingpong') circle(pose.x + (pose.facing === 'right' ? 10 : -10), pose.y - 18, 3.2, '#E5484D', OUTLINE)
-    tag(pose.x, pose.y + 3, sub.name, nameColour(sub))
+    tag(pose.x, pose.y + 3, nameOf(sub), nameColour(sub))
     if (!pose.isHomeward) hits.push({ kind: 'sub', id: sub.id, ...standingBox(pose.x, pose.y) })
   }
   // The ping-pong ball, while both players are at the table
@@ -373,7 +379,8 @@ const drawSpeech = frame => {
   }
   list.forEach(({ cx, dy }, seat) => {
     const sub = seatedAt(seat)
-    if (sub) say(cx, dy - 34, sub.activity, t + seat * 230)
+    // The name in the bubble: the row behind covers the plate under the desk
+    if (sub) say(cx, dy - 34, sub.activity, t + seat * 230, nameOf(sub))
   })
   for (const { sub, pose } of walkers) {
     if (pose.handover) bubble(pose.x, pose.y - 52, sub.outcome === 'failed' ? `Gik i stå: ${sub.task}` : `Afleverer: ${sub.task}`, sub.outcome === 'failed', t)

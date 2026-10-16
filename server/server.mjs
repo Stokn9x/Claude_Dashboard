@@ -15,7 +15,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-const VERSION = '0.24.0'
+const VERSION = '0.25.0'
 const HOST = '127.0.0.1'
 const PORT = Number(process.env.AGENT_KONTOR_PORT || 4747)
 const HERE = path.dirname(fileURLToPath(import.meta.url))
@@ -398,9 +398,41 @@ const noteTasks = (status, now) => {
     const tasks = (game.days[day].tasks ??= [])
     const id = `${status.key}/${sub.id}/${at}`
     if (tasks.length >= TASKS_PER_DAY || tasks.some(t => t.id === id)) continue
-    tasks.push({ id, at, name: String(sub.name ?? '').slice(0, 30), task: String(sub.task ?? '').slice(0, 100), project: String(status.project ?? '').slice(0, 60), ...(sub.outcome === 'failed' ? { failed: true } : {}) })
+    const name = String(sub.name ?? '').slice(0, 30)
+    tasks.push({ id, at, name, task: String(sub.task ?? '').slice(0, 100), project: String(status.project ?? '').slice(0, 60), ...(sub.outcome === 'failed' ? { failed: true } : {}) })
+    noteStaff(day.slice(0, 7), name, sub)
     isGameChanged = true
   }
+}
+
+// ── Employee of the month ───────────────────────────────────────────────
+// The helpers' names come back session after session, so each name keeps
+// its own tally for the month: tasks handed over, tasks it got stuck on,
+// and the lines it wrote. The most tasks (then the most lines) leads the
+// month; last month's leader is its employee of the month. Thirteen months
+// are kept.
+const STAFF_MONTHS_KEPT = 13
+const noteStaff = (month, name, sub) => {
+  if (!name) return
+  game.staff ??= {}
+  const tally = ((game.staff[month] ??= {})[name] ??= { tasks: 0, stuck: 0, lines: 0 })
+  if (sub.outcome === 'failed') tally.stuck += 1
+  else tally.tasks += 1
+  tally.lines += Math.max(0, Number(sub.linesAdded) || 0) + Math.max(0, Number(sub.linesRemoved) || 0)
+  for (const old of Object.keys(game.staff).sort().slice(0, -STAFF_MONTHS_KEPT)) delete game.staff[old]
+}
+const rankingOf = month =>
+  Object.entries(game.staff?.[month] ?? {})
+    .map(([name, t]) => ({ name, ...t }))
+    .sort((a, b) => b.tasks - a.tasks || b.lines - a.lines || a.name.localeCompare(b.name))
+const monthBefore = month => {
+  const [y, m] = month.split('-').map(Number)
+  return m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, '0')}`
+}
+const staffView = now => {
+  const month = dayOf(now).slice(0, 7)
+  const last = monthBefore(month)
+  return { month, ranking: rankingOf(month).slice(0, 5), lastMonth: last, winner: rankingOf(last)[0] ?? null }
 }
 
 // A session not seen for a week is retired to a short list of its counts
@@ -555,6 +587,7 @@ const statsView = () => {
   return {
     days,
     today: { ...days[days.length - 1], tasks },
+    staff: staffView(now),
     best: { added: bestDay('added') },
     totals: { added: total('added'), removed: total('removed'), delivered: total('delivered'), tests: total('tests'), commits: total('commits'), prs: total('prs'), kroner: Math.floor(total('kroner')), bonus: total('bonus') },
     daysActive: daysActive(),

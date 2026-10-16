@@ -28,6 +28,7 @@ Status: ✅ lavet · 🟡 delvist · ⬜ ikke lavet · ⏸️ parkeret · ➖ ik
 | 0.11.1 | Fejlrettelser: ingen går gennem væggene (døre forbinder rummene i rutegitteret, og der er fri vej ud af Claudes kontor), nyt toilet med døren ud til et frit område, ingen fliser i væggene; langsommere indtjening og højere priser, så kontoret bygges over uger |
 | 0.12.0 | En lækrere side rundt om kontoret: topbjælke med ikon, trivsel, saldo og forbindelsesprik; kort med pixel-portræt og statuspille i listen; venteboks med "Gå til"; butik med ikoner og fremdrift; kun mørkt tema |
 | 0.13.0 | Spillets fase 4: pynt og opgraderinger i butikken, 17 præstationer med belønning og notifikation, statistik i den nye fane Fremskridt |
+| 0.25.0 | Månedens medarbejder: hjælpernes navne går igen, så serveren fører en tavle pr. navn og måned (opgaver, dem der gik i stå, linjer). Fremskridt viser sidste måneds medarbejder med pokal og månedens stilling med medaljer, og den, der fører måneden, har en ⭐ på navneskiltet. Ved skrivebordene står hjælperens navn nu i taleboblen, fordi rækken bagved dækker navneskiltet |
 | 0.24.0 | Sæson og vejr, uden at noget forlader computeren: vejret skifter hver tredje time ud fra uret (klart, overskyet, regn og om vinteren sne, oftest regn om efteråret) og glider ind og ud. Regn falder i streger og løber på ruderne, sne driver ned og bliver liggende en tid på græsset, grundene, hækken og væggene, og søen fryser til. Løvtræerne er grønne om sommeren, blomstrer om foråret, bliver orange og gule om efteråret og står nøgne om vinteren. I december står der et juletræ i receptionen, og der hænger lyskæder i gangen. Se et andet vejr med `?vejr=regn` (eller `sne`, `skyet`, `klart`) og en anden måned med `?maaned=12` |
 | 0.23.1 | Småting: en hjælper med fri på plænen går hjem ad stien uden først at gå op til hoveddøren; skriveborde, der ikke er købt, står ikke længere i vejen for en gåtur; ekstra pladser ved bænken og på plænen står aldrig i træerne; ni hjælpere kan aflevere side om side; depotet mod nord har rækkens tykke ydervæg; Claude vander planten lidt højere oppe, så navnet ikke ligger oven i skiltet ved døren |
 | 0.23.0 | Tv-tilstand (📺 eller T): fuld skærm uden panel, log og kort, og kameraet følger den, der venter på dig, en hjælper på vej ind eller med et resultat, og ellers dem, der arbejder, på skift; flytter man selv kameraet, venter det lidt. Hjælpernes type og model kan ses: Explore har et forstørrelsesglas på skrivebordet, Plan en tegningsrulle, navneskiltet har modellens farve (Opus lilla, Sonnet blå, Haiku grøn, Fable gylden), og kortet siger fx "Udforsker på Haiku" |
@@ -157,7 +158,7 @@ Fundet ved en gennemgang af koden og det, vi har set undervejs. **P1** er fejl, 
 | 63 | **Sæson og vejr:** jul i december, regn på ruderne, sne om vinteren. Lavet i 0.24.0 (rest af punkt 22). | M | ✅ |
 | 64 | **Kontorhund eller -kat** (punkt 23), evt. købt i butikken. Lavet i 0.21.0: en rød kontorkat i butikken. | M | ✅ |
 | 65 | **Indret selv:** flyt pynt og inventar rundt med træk og slip (punkt 25). | L | ⬜ |
-| 66 | **Månedens medarbejder:** hjælpernes navne går igen, så de kan få deres egen statistik og en pokal. | M | ⬜ |
+| 66 | **Månedens medarbejder:** hjælpernes navne går igen, så de kan få deres egen statistik og en pokal. Lavet i 0.25.0. | M | ✅ |
 | 67 | **Tv-tilstand** til en ekstra skærm: fuld skærm, ingen panel, kameraet følger det, der sker (punkt 31). Lavet i 0.23.0: 📺 eller T. | S | ✅ |
 
 | 69 | **Aktivitetslog:** en lille liste nederst over det seneste, der er sket (ny opgave, aflevering, grønne tests), med tid og hvem. Lavet i 0.15.0. | S | ✅ |
@@ -171,7 +172,7 @@ Fundet ved en gennemgang af koden og det, vi har set undervejs. **P1** er fejl, 
 ### Forslag til rækkefølge
 
 1. **63 sæson og vejr** og **64 kontorkatten**, lavet i 0.24.0 og 0.21.0.
-2. **66 månedens medarbejder** (67 tv-tilstand kom i 0.23.0).
+2. **66 månedens medarbejder** og **67 tv-tilstand**, lavet i 0.25.0 og 0.23.0.
 3. **65 indret selv**: flyt pynt og inventar med træk og slip.
 
 ## 🧪 Testgennemgang 16.10.2026 (0.19.0)

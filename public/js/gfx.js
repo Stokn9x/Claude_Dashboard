@@ -142,7 +142,9 @@ const thought = (cx, bottom, t) => {
 
 // What someone says: a thought cloud while they are only thinking, the
 // words otherwise, red while they wait for you.
-export const say = (cx, bottom, activity, t) => {
+// `who`, when given, leads the words: at the desks, where the row behind
+// covers the name plates.
+export const say = (cx, bottom, activity, t, who = null) => {
   if (activity.detail === 'Tænker' && activity.state !== 'waiting') legibly(cx, bottom, 8.5, 12, (cx, bottom) => thought(cx, bottom, t))
-  else bubble(cx, bottom, activity.detail, activity.state === 'waiting', t)
+  else bubble(cx, bottom, who ? `${who} · ${activity.detail}` : activity.detail, activity.state === 'waiting', t, who ? 30 + who.length + 3 : 30)
 }

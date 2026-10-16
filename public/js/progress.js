@@ -2,6 +2,7 @@
 import { store } from './store.js'
 import { el, number } from './util.js'
 import { summaryText } from './summary.js'
+import { lookFor, portraitOf } from './figures.js'
 
 const panel = document.getElementById('progress')
 const toasts = document.getElementById('toasts')
@@ -53,6 +54,29 @@ panel.addEventListener('click', async e => {
   setTimeout(() => (button.textContent = '📋 Kopiér'), 2000)
 })
 
+// Employee of the month: last month's, with a cup, and this month's race so
+// far. The helpers' names come back from session to session (the server
+// keeps a tally per name).
+const monthName = month => new Date(`${month}-15T12:00:00`).toLocaleDateString('da-DK', { month: 'long' })
+const face = name => el('img', { className: 'face', src: portraitOf(`staff:${name}`, lookFor(`staff:${name}`)), alt: '' })
+const tally = r => `${number(r.tasks)} ${r.tasks === 1 ? 'opgave' : 'opgaver'} · ${number(r.lines)} linjer${r.stuck ? ` · ${number(r.stuck)} gik i stå` : ''}`
+const MEDALS = ['🥇', '🥈', '🥉']
+const staffSection = staff => {
+  if (!staff || (!staff.winner && !staff.ranking.length)) return []
+  return [
+    el('h3', {}, ['Månedens medarbejder']),
+    ...(staff.winner
+      ? [el('div', { className: 'winner' }, [el('span', { className: 'cup', ariaHidden: 'true' }, ['🏆']), face(staff.winner.name), el('div', {}, [el('strong', {}, [staff.winner.name]), el('span', {}, [`${monthName(staff.lastMonth)}: ${tally(staff.winner)}`])])])]
+      : []),
+    ...(staff.ranking.length
+      ? [
+          el('p', { className: 'hint' }, [`Indtil videre i ${monthName(staff.month)}:`]),
+          el('ol', { className: 'ranking' }, staff.ranking.map((r, i) => el('li', {}, [el('span', { className: 'place' }, [MEDALS[i] ?? `${i + 1}.`]), face(r.name), el('strong', {}, [r.name]), el('span', { className: 'hint' }, [tally(r)])]))),
+        ]
+      : []),
+  ]
+}
+
 const tile = (value, text) => el('div', { className: 'tile' }, [el('strong', {}, [value]), el('span', {}, [text])])
 const weekday = day => new Date(`${day}T12:00:00`).toLocaleDateString('da-DK', { weekday: 'narrow' })
 
@@ -102,6 +126,7 @@ export const renderProgress = () => {
       g.streak?.isToday ? `Dagens bonus er tjent: +${number(g.streak.bonus)} kr. I morgen giver den første linje +${number(g.streak.next)} kr.` : `Den første linje i dag giver en bonus på +${number(g.streak?.next ?? 25)} kr.`,
     ]),
     ...todayList(today),
+    ...staffSection(g.stats.staff),
     el('h3', {}, ['De sidste 14 dage']),
     bars(days),
     el('p', { className: 'hint' }, [`Bedste dag: ${number(best.added)} linjer · ${daysActive} ${daysActive === 1 ? 'dag' : 'dage'} med arbejde`]),

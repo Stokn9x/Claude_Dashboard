@@ -377,3 +377,26 @@ test("the day's tasks are noted once each, for the summary", async () => {
     await stop(child)
   }
 })
+
+test('each name keeps a tally for the month, and the most tasks lead it', async () => {
+  const home = newHome()
+  const lastMonth = (() => {
+    const d = new Date()
+    const m = d.getMonth() === 0 ? `${d.getFullYear() - 1}-12` : `${d.getFullYear()}-${String(d.getMonth()).padStart(2, '0')}`
+    return m
+  })()
+  fs.writeFileSync(gameFile(home), JSON.stringify({ v: 1, plan: 2, kroner: 0, owned: { desks: 0, rooms: ['claude', 'team'] }, credited: {}, staff: { [lastMonth]: { Viggo: { tasks: 9, stuck: 0, lines: 400 }, Alma: { tasks: 3, stuck: 1, lines: 50 } } } }))
+  const child = await start(home)
+  const file = path.join(home, '.claude', 'agent-kontor', 'sessions', 'sm.json')
+  const since = Date.now() - 1000
+  const sub = (id, name, extra = {}) => ({ id, name, task: 't', phase: 'delivering', since, seat: 0, linesAdded: 10, ...extra })
+  try {
+    fs.writeFileSync(file, JSON.stringify({ v: 2, key: 'sm', project: 'p', updatedAt: Date.now(), main: { state: 'idle', detail: 'x' }, subs: [sub('a', 'Ida'), sub('b', 'Ida'), sub('c', 'Emil', { outcome: 'failed' }), sub('d', 'Emil')], earned: { added: 0, removed: 0, delivered: 0, tests: 0, commits: 0, prs: 0 } }))
+    await sleep(900)
+    const { staff } = JSON.parse((await get('/api/state')).body).game.stats
+    assert.deepEqual(staff.ranking.map(r => [r.name, r.tasks, r.stuck]), [['Ida', 2, 0], ['Emil', 1, 1]])
+    assert.equal(staff.winner.name, 'Viggo')
+  } finally {
+    await stop(child)
+  }
+})

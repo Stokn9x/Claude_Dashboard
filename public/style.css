@@ -169,6 +169,14 @@ body.tv header:hover { opacity: 1; }
 .tasks .task-what em { font-style: normal; color: var(--faint); }
 .tasks .task-mark { color: var(--good); font-weight: 700; }
 .tasks .is-stuck .task-mark { color: var(--warn); }
+.winner { display: grid; grid-template-columns: auto auto 1fr; gap: 10px; align-items: center; padding: 10px 12px; border-radius: 12px; background: color-mix(in srgb, var(--warn) 14%, var(--surface-2)); border: 1px solid color-mix(in srgb, var(--warn) 40%, transparent); }
+.winner .cup { font-size: 22px; }
+.winner div { display: grid; gap: 2px; font-size: 12px; color: var(--soft); }
+.winner strong { color: var(--ink); font-size: 14px; }
+.face { width: 30px; height: 30px; image-rendering: pixelated; border-radius: 8px; background: var(--surface); }
+.ranking { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.ranking li { display: grid; grid-template-columns: 24px 30px auto 1fr; gap: 8px; align-items: center; padding: 4px 10px; border-radius: 10px; background: var(--surface-2); font-size: 13px; }
+.ranking .hint { text-align: right; font-size: 11px; }
 .totals { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 4px 12px; font-size: 13px; }
 .totals strong { margin-right: 6px; font-variant-numeric: tabular-nums; }
 .achievements { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
