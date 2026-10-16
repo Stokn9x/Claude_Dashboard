@@ -199,8 +199,8 @@ export const clock = date => {
 }
 
 // A green watering can in Claude's hand, tipped at the plant, with drops
-// falling from the spout.
-export const wateringCan = (x, y, t) => {
+// falling `fall` units from the spout.
+export const wateringCan = (x, y, t, fall = 14) => {
   rounded(x - 4, y - 4, 9, 7, 2, '#4F9A5B', OUTLINE, 1)
   ctx.strokeStyle = OUTLINE
   ctx.lineWidth = 1.6
@@ -219,7 +219,7 @@ export const wateringCan = (x, y, t) => {
   for (let i = 0; i < 3; i++) {
     const k = ((t / 600 + i / 3) % 1)
     ctx.globalAlpha = 1 - k
-    rect(x + 10 + k * 5, y - 4 + k * 14, 1.2, 2, '#7DC3F0')
+    rect(x + 10 + k * 5, y - 4 + k * fall, 1.2, 2, '#7DC3F0')
   }
   ctx.globalAlpha = 1
 }

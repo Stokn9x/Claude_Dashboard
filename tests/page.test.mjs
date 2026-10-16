@@ -491,7 +491,7 @@ test("the cat's places can all be reached from each other, and Claude's pause sp
     const places = cat.catPlaces()
     const pairs = places.flatMap(a => places.filter(b => b !== a).map(b => [`cat ${a.name} to ${b.name}`, a, b]))
     const { spot: watering } = cat.claudePause(0) // any slot: the spots are fixed
-    pairs.push(['Claude to the plants', plan.MAIN_SPOT, plan.at(plan.firstRoom('corner'), { x: 376, y: 230 })])
+    pairs.push(['Claude to the plants', plan.MAIN_SPOT, plan.at(plan.firstRoom('corner'), { x: 376, y: 212 })])
     pairs.push(['Claude to the cat', plan.MAIN_SPOT, plan.at(plan.firstRoom('corner'), { x: 240, y: 224 })])
     assert.ok(watering)
     assert.deepEqual(routes.checkRoutes(pairs).problems, [], rooms.join(','))
@@ -539,4 +539,49 @@ test("the day's summary counts the work and lists the tasks in order", async () 
   assert.match(text, /3 commits, grønne tests 1 gang/)
   assert.ok(text.indexOf('10.42 Freja (a): Kortlæg API’et') < text.indexOf('14.05 Ida (b): Find fejlen (gik i stå)'), text)
   assert.doesNotMatch(summaryText({ added: 0, removed: 0, tasks: [] }), /Opgaver/)
+})
+
+// ── Small things from the test review (89) ───────────────────────────────
+
+test('a desk not bought yet is no obstacle; a bought one is walked round', () => {
+  owning(['claude', 'team'], 0)
+  const { cx, dy } = deskSlots()[0]
+  const across = () => {
+    const points = routes.route({ x: cx - 70, y: dy + 12 }, { x: cx + 70, y: dy + 12 })
+    return points.slice(1).reduce((d, p, i) => d + Math.hypot(p.x - points[i].x, p.y - points[i].y), 0)
+  }
+  const overTheRug = across()
+  assert.ok(overTheRug < 150, `about straight over the rug: ${Math.round(overTheRug)}`)
+  owning(['claude', 'team'], 1)
+  assert.ok(across() > overTheRug + 20, 'round the desk once it stands')
+})
+
+test('nobody waits or idles among the trees, however many there are', () => {
+  everything()
+  const near = p => scenery.TREES.find(t => Math.hypot(t.x - p.x, t.y - p.y) < t.r * 0.8)
+  for (let seat = 0; seat < 90; seat++) {
+    const { spot, isOutside } = placeOf(seat)
+    if (isOutside) assert.equal(near(spot), undefined, `seat ${seat} at ${spot.x},${spot.y}`)
+  }
+  owning(['claude', 'team'], 0)
+  const many = Array.from({ length: 60 }, (_, i) => helper(`h${i}`, { phase: 'idle' }))
+  for (const { spot } of idle.idlePlan(many, 0).values()) assert.equal(near(spot), undefined, `lawn ${spot.x},${spot.y}`)
+})
+
+test('off work on the lawn, a helper goes home by the path, not up to the front door', () => {
+  owning(['claude', 'team'], 2)
+  const lawn = GROUNDS.hangout[2]
+  const sub = helper('h1', { phase: 'leaving', from: 'idle', since: 0 })
+  const door = plan.entrance()
+  for (let t = 0; t <= routes.WALKS.leave; t += 250) {
+    const p = routes.poseOf(sub, t, routes.WALKS, lawn)
+    if (p) assert.ok(p.y > door.y + 20, `at ${Math.round(p.x)},${Math.round(p.y)}`)
+  }
+  assert.deepEqual(routes.homewardRoute('h1', lawn)[0], routes.pathJoin(lawn))
+})
+
+test('nine helpers can hand over side by side', () => {
+  everything()
+  const spots = new Set(Array.from({ length: 9 }, (_, seat) => JSON.stringify(plan.handoffFor(seat))))
+  assert.equal(spots.size, 9)
 })

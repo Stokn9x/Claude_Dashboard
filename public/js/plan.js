@@ -24,6 +24,8 @@ const DESK_ROWS = [46, 122, 198]
 const TEAM_COLUMNS = [65, -65, -195]
 const teamDesks = top => TEAM_COLUMNS.flatMap((cx, i) => DESK_ROWS.map(dy => ({ cx, dy: top + dy, step: i + 1 })))
 // A desk and the chair behind it, as blocks to walk round
+// A desk and its chair, in the way of a walk: only the desks bought are
+// (deskBlocksNow, used by routes.js); a desk not bought yet is a rug.
 const deskBlocks = list => list.flatMap(({ cx, dy }) => [[cx - 42, dy - 1, 84, 30], [cx - 21, dy - 18, 42, 22]])
 
 export const ROOM_TYPES = {
@@ -37,7 +39,7 @@ export const ROOM_TYPES = {
     windows: [184, 356],
     claude: { cx: 297, dy: 96 },
     // Where a helper stands to hand over its result, right of Claude's desk
-    handoff: seat => ({ x: 374 + (seat % 3) * 13, y: 100 + (Math.floor(seat / 3) % 2) * 14 }),
+    handoff: seat => ({ x: 374 + (seat % 3) * 13, y: 100 + (Math.floor(seat / 3) % 3) * 14 }),
     board: { x: 354, y: 22, w: 44, h: 30 },
     plants: [[196, 236], [400, 236, true]],
     lights: [[240, 192, 44, 0.4], [297, 60, 70, 0.16, 'ceiling'], [297, 196, 70, 0.16, 'ceiling']],
@@ -56,7 +58,7 @@ export const ROOM_TYPES = {
     desks: teamDesks(0),
     plants: [[12, 14], [158, 22, true]],
     lights: TEAM_COLUMNS.flatMap(cx => [[cx, 84, 66, 0.16, 'ceiling'], [cx, 160, 66, 0.16, 'ceiling']]),
-    blocks: [...deskBlocks(teamDesks(0)), [-258, 70, 14, 76], [-100, 2, 70, 14], [-36, 228, 16, 20]],
+    blocks: [[-258, 70, 14, 76], [-100, 2, 70, 14], [-36, 228, 16, 20]],
   },
   // The first team room, in the south row under the second
   team: {
@@ -67,7 +69,7 @@ export const ROOM_TYPES = {
     desks: teamDesks(314),
     plants: [[12, 552], [-118, 552, true]],
     lights: TEAM_COLUMNS.flatMap(cx => [[cx, 398, 66, 0.16, 'ceiling'], [cx, 474, 66, 0.16, 'ceiling']]),
-    blocks: [...deskBlocks(teamDesks(314)), [-258, 380, 14, 76], [138, 540, 30, 18], [-36, 316, 16, 22]],
+    blocks: [[-258, 380, 14, 76], [138, 540, 30, 18], [-36, 316, 16, 22]],
   },
   // The main corridor: every room has its door on it, and it is wide
   // enough for two lanes. Helpers keep right.
@@ -122,7 +124,7 @@ export const ROOM_TYPES = {
     lights: [[580, 380], [580, 480]].map(([x, y]) => [x, y, 66, 0.16, 'ceiling']),
     // The aquarium along the top wall, right of the door: x, y, width, height
     aquarium: [560, 318, 64, 14],
-    blocks: [...deskBlocks([[520, 390], [640, 390], [520, 490], [640, 490]].map(([cx, dy]) => ({ cx, dy }))), [560, 318, 64, 14]],
+    blocks: [[560, 318, 64, 14]],
   },
   // The lounge, east of the meeting room: where helpers off work go to play
   // and unwind. Step 1 has the TV, the sofa and room for a ping-pong table,
@@ -209,7 +211,8 @@ export const PLAN = {
     { id: 'claude', type: 'corner', x: 182, y: 0 },
     { id: 'meeting', type: 'meeting', x: 424, y: 0, buy: 'meeting' },
     { id: 'lounge', type: 'lounge', x: 736, y: 0, buy: 'lounge', grows: [{ buy: 'lounge-2', w: 350 }, { buy: 'lounge-3', w: 510 }] },
-    { id: 'lounge-depot', type: 'depot', x: 948, y: 0, w: 138, h: 250, until: 'lounge-2' },
+    // In the north row, so with the row's thick outer wall
+    { id: 'lounge-depot', type: 'depot', x: 948, y: 0, w: 138, h: 250, until: 'lounge-2', topWall: 16 },
     { id: 'team', type: 'team', x: 0, y: SOUTH, grows: [{ buy: 'team1-2', x: -130, w: 300 }, { buy: 'team1-3', x: -260, w: 430 }] },
     { id: 'reception', type: 'reception', x: 182, y: SOUTH },
     { id: 'quiet', type: 'quiet', x: 424, y: SOUTH },
@@ -302,7 +305,9 @@ export const at = (room, p) => {
   const { dx, dy } = shiftOf(room)
   return 'cx' in p ? { ...p, cx: p.cx + dx, dy: p.dy + dy } : { ...p, x: p.x + dx, y: p.y + dy }
 }
-const frameAround = (room, r) => ({ x: r.x - 6, y: r.y - (typeOf(room).topWall ?? 6), w: r.w + 12, h: r.h + (typeOf(room).topWall ?? 6) + 6 })
+// The outer wall along the top: thick in the north row, 6 elsewhere.
+export const topWallOf = room => room.topWall ?? typeOf(room).topWall ?? 6
+const frameAround = (room, r) => ({ x: r.x - 6, y: r.y - topWallOf(room), w: r.w + 12, h: r.h + topWallOf(room) + 6 })
 export const frameOf = room => frameAround(room, rectOf(room))
 export const fullFrameOf = room => frameAround(room, fullRectOf(room))
 
@@ -377,6 +382,7 @@ export const deskSlots = () =>
   })
 export const ownedDesks = () => Math.min(deskSlots().length, store.state.game?.owned?.desks ?? deskSlots().length)
 export const desks = () => deskSlots().slice(0, ownedDesks())
+export const deskBlocksNow = () => deskBlocks(desks())
 
 // The spots along the reception's walls, for helpers beyond the last desk
 // the rooms have room for.
@@ -423,8 +429,10 @@ export const placeOf = seat => {
   const bench = GROUNDS.benchSpots
   const k = n - walls.length
   if (k < bench.length) return { isDesk: false, isOutside: true, spot: bench[k] }
-  // More than even the bench holds: standing about on the grass beside it.
-  const m = k - bench.length
+  // More than even the bench holds: standing about on the grass beside it,
+  // in three rows that stay clear of the trees (scenery.js); beyond those
+  // they stand closer.
+  const m = (k - bench.length) % 12
   return { isDesk: false, isOutside: true, spot: { x: GROUNDS.bench.x - 70 - (m % 4) * 18, y: GROUNDS.bench.y - 10 + Math.floor(m / 4) * 22 } }
 }
 

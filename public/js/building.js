@@ -6,7 +6,7 @@
 import { store } from './store.js'
 import { FONT, canvas, readable } from './gfx.js'
 import { clip } from './util.js'
-import { MAIN, PLAN, ROOM_NAMES, WORLD, doormat, frameOf, isBuilt, isOpenDoor, lotOf, nextStepOf, rectOf, roomById, shiftOf, topWindowsOf, typeOf } from './plan.js'
+import { MAIN, PLAN, ROOM_NAMES, WORLD, topWallOf, doormat, frameOf, isBuilt, isOpenDoor, lotOf, nextStepOf, rectOf, roomById, shiftOf, topWindowsOf, typeOf } from './plan.js'
 import { applyView, onResize, visibleRect, visibleRooms, view } from './camera.js'
 import { isNightAt, sideWindows, skyAt } from './light.js'
 import { drawGrounds } from './outdoors.js'
@@ -142,7 +142,7 @@ export const drawBuilding = (project, hour) => {
     if (!isBuilt(room)) continue
     const f = frameOf(room)
     fill(f.x, f.y, f.w, f.h, WALL)
-    if (typeOf(room).topWall) {
+    if (topWallOf(room) > 6) {
       fill(f.x, f.y, f.w, 6, WALL_TOP)
       for (const wx of topWindowsOf(room)) {
         fill(wx, f.y + 1, 56, 5, sky)

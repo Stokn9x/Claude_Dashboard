@@ -63,8 +63,9 @@ export const idlePlan = (idleSubs, now, taken = new Set()) => {
   }
   const lawn = spotsFor('garden')
   ;[...picks.garden, ...overflow].forEach((sub, index) => {
-    // More than the lawn's spots: a little further out, still in pairs.
-    const ring = Math.floor(index / lawn.length)
+    // More than the lawn's spots: a little further out, still in pairs, at
+    // most two rings out, where no tree grows (scenery.js).
+    const ring = Math.floor(index / lawn.length) % 3
     const base = lawn[index % lawn.length]
     plan.set(sub.id, { kind: 'garden', spot: { ...base, x: base.x + ring * 70, y: base.y + ring * 12 }, index, slot })
   })

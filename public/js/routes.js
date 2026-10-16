@@ -10,7 +10,7 @@
 // door and the path. Routes are kept until the floor plan changes.
 import { store, owns } from './store.js'
 import { hashOf, isIn } from './util.js'
-import { GROUNDS, PLAN, WORLD, MAIN_SPOT, entrance, frameOf, walkway, at, deskSlots, firstRoom, handoffFor, hasNow, isBuilt, isDepot, isOpenDoor, laneOf, placeOf, rectOf, shiftOf, spotsIn, typeOf } from './plan.js'
+import { GROUNDS, PLAN, WORLD, MAIN_SPOT, entrance, frameOf, walkway, at, deskBlocksNow, deskSlots, firstRoom, handoffFor, hasNow, isBuilt, isDepot, isOpenDoor, laneOf, placeOf, rectOf, shiftOf, spotsIn, typeOf } from './plan.js'
 
 const STEP = 6
 const TURN = 0.6
@@ -42,7 +42,7 @@ const buildGrid = () => {
   const blocks = walkable().flatMap(room => {
     const { dx, dy } = shiftOf(room)
     return (typeOf(room).blocks ?? []).filter(([x, y, w, h, needs]) => owns(needs) && hasNow(room, [x + w / 2, y + h / 2])).map(([x, y, w, h]) => [x + dx - 3, y + dy - 3, w + 6, h + 6])
-  })
+  }).concat(deskBlocksNow().map(([x, y, w, h]) => [x - 3, y - 3, w + 6, h + 6]))
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
       const x = WORLD.x + c * STEP + STEP / 2
@@ -54,7 +54,7 @@ const buildGrid = () => {
 }
 
 const ensureGrid = () => {
-  const key = (store.state.game?.owned?.rooms ?? ['*']).join(',')
+  const key = `${(store.state.game?.owned?.rooms ?? ['*']).join(',')}|${store.state.game?.owned?.desks ?? '*'}`
   if (key === gridKey) return
   grid = buildGrid()
   gridKey = key
@@ -388,7 +388,15 @@ export const poseOf = (sub, now, walks = WALKS, origin = null) => {
     return e2 < walks.leave ? walkEndingAt(leaveRoute(sub.seat), e2, walks.leave, 'left') : null
   }
   if (e >= walks.leave) return null
+  if (sub.from === 'idle' && origin && isOutdoors(origin)) return walkEndingAt([origin, pathJoin(origin)], e, walks.leave)
   return walkEndingAt(sub.from === 'idle' && origin ? route(origin, entrance()) : leaveRoute(sub.seat), e, walks.leave)
+}
+
+// Where someone outside (on the lawn) joins the path on the way home: beside
+// them, below the step down from the front door.
+export const pathJoin = origin => {
+  const corner = walkway()[1]
+  return { x: corner.x, y: Math.max(corner.y, Math.min(GROUNDS.pavement.y - 4, origin.y)) }
 }
 
 // ── Late news ────────────────────────────────────────────────────────────
@@ -426,17 +434,20 @@ export const HOMEWARD_MS = 9000
 export const outAt = (sub, walks = WALKS) =>
   sub.phase === 'leaving' ? sub.since + walks.leave : sub.phase === 'delivering' ? sub.since + walks.deliver + walks.handover + walks.leave : null
 
-export const homewardRoute = id => {
+// From the front door, or for one who left from the lawn, from where it
+// joined the path.
+export const homewardRoute = (id, origin = null) => {
   const [door, corner, street] = walkway()
   const side = hashOf(id) % 2 === 0 ? 1 : -1
-  return [door, corner, street, { x: street.x + side * 560, y: street.y }]
+  const start = origin && isOutdoors(origin) ? [pathJoin(origin)] : [door, corner]
+  return [...start, street, { x: street.x + side * 560, y: street.y }]
 }
 
 // Where a helper on its way home is, or null before it is out or once it
 // is out of sight.
-export const homewardPose = (id, out, now) => {
+export const homewardPose = (id, out, now, origin = null) => {
   const k = (now - out) / HOMEWARD_MS
-  return k < 0 || k >= 1 ? null : walkAt(homewardRoute(id), k)
+  return k < 0 || k >= 1 ? null : walkAt(homewardRoute(id, origin), k)
 }
 
 // For checking the floor plan after a change: every route a helper or

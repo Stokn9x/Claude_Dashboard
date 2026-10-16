@@ -28,6 +28,7 @@ Status: ✅ lavet · 🟡 delvist · ⬜ ikke lavet · ⏸️ parkeret · ➖ ik
 | 0.11.1 | Fejlrettelser: ingen går gennem væggene (døre forbinder rummene i rutegitteret, og der er fri vej ud af Claudes kontor), nyt toilet med døren ud til et frit område, ingen fliser i væggene; langsommere indtjening og højere priser, så kontoret bygges over uger |
 | 0.12.0 | En lækrere side rundt om kontoret: topbjælke med ikon, trivsel, saldo og forbindelsesprik; kort med pixel-portræt og statuspille i listen; venteboks med "Gå til"; butik med ikoner og fremdrift; kun mørkt tema |
 | 0.13.0 | Spillets fase 4: pynt og opgraderinger i butikken, 17 præstationer med belønning og notifikation, statistik i den nye fane Fremskridt |
+| 0.23.1 | Småting: en hjælper med fri på plænen går hjem ad stien uden først at gå op til hoveddøren; skriveborde, der ikke er købt, står ikke længere i vejen for en gåtur; ekstra pladser ved bænken og på plænen står aldrig i træerne; ni hjælpere kan aflevere side om side; depotet mod nord har rækkens tykke ydervæg; Claude vander planten lidt højere oppe, så navnet ikke ligger oven i skiltet ved døren |
 | 0.23.0 | Tv-tilstand (📺 eller T): fuld skærm uden panel, log og kort, og kameraet følger den, der venter på dig, en hjælper på vej ind eller med et resultat, og ellers dem, der arbejder, på skift; flytter man selv kameraet, venter det lidt. Hjælpernes type og model kan ses: Explore har et forstørrelsesglas på skrivebordet, Plan en tegningsrulle, navneskiltet har modellens farve (Opus lilla, Sonnet blå, Haiku grøn, Fable gylden), og kortet siger fx "Udforsker på Haiku" |
 | 0.22.0 | Dagens opsummering: serveren husker hver opgave, hjælperne afleverer eller går i stå (en uge tilbage), og fanen Fremskridt viser dagens opgaver med tid, navn og projekt. **📋 Kopiér** giver dagen som tekst til et standup eller en note: linjer, opgaver, commits, pull requests, tests og hver opgave |
 | 0.21.0 | Liv i kontoret: en kontorkat i butikken (3.500 kr, +4 trivsel), der vandrer mellem lænestolen hos Claude, receptionen, sin madskål i køkkenet, loungens sofa og plænen; den sover krøllet sammen med et "z", spiser og siger "Miav". Claude holder pause på flere måder: kaffe i køkkenet, vander planterne på sit kontor eller kalder på katten og klapper den. Koden er delt op: mod'en i seks filer, og siden har fået `rooms.js`, `sales.js`, `party.js` og `cat.js`. Alle tekstfiler har LF-linjeskift |
@@ -201,7 +202,7 @@ En samlet gennemgang før nye ting: koden læst igennem (mod, server og side), a
 | 86 | **Skifter siden session, går den forrige sessions hjælpere hjem ud ad hoveddøren** i det nye kontor, og en hjælper, der kaldes tilbage, kan starte fra plænen. | S | ✅ |
 | 87 | **Claude hopper fra mødet eller køkkenet til skrivebordet**, når en hjælper kommer med et resultat, i stedet for at gå. | S | ✅ |
 | 88 | **Lange ærinder går for hurtigt**, fx fra teamrum 1 til toilettet: loftet på 8 sekunder er for kort til det store hus. | S | ✅ |
-| 89 | **Småting:** hjælpere på plænen går op til hoveddøren og ned igen, når de går hjem; skriveborde, der ikke er købt, spærrer stadig for gåture; listen over ruter vokser hele dagen; ekstra pladser på plænen og ved bænken kan stå i træerne; afleveringspladserne går igen for hver sjette hjælper; depotet mod nord mangler den tykke ydervæg. | S | ⬜ |
+| 89 | **Småting:** hjælpere på plænen går op til hoveddøren og ned igen, når de går hjem; skriveborde, der ikke er købt, spærrer stadig for gåture; listen over ruter vokser hele dagen; ekstra pladser på plænen og ved bænken kan stå i træerne; afleveringspladserne går igen for hver sjette hjælper; depotet mod nord mangler den tykke ydervæg. | S | ✅ |
 
 ### Serveren og mod'en
 
@@ -218,7 +219,7 @@ En samlet gennemgang før nye ting: koden læst igennem (mod, server og side), a
 1. **Bevægelserne:** 81-88, lavet i 0.19.1.
 2. **Pengene:** 75-80, så ingen tjener for meget eller for lidt. Lavet i 0.19.2.
 3. **Robusthed:** 90-93. Lavet i 0.20.1.
-4. **Småting:** 89 og 94 (94 lavet i 0.20.1).
+4. **Småting:** 89 og 94, lavet i 0.23.1 og 0.20.1.
 
 ## 🧹 Oprydning
 

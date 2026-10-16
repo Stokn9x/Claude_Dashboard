@@ -79,7 +79,7 @@ const walkOrBe = (from, to, into) => {
 export const PAUSE_SLOT_MS = 60_000
 // Beside the big plant in Claude's office, can in hand; and beside the
 // armchair, where the cat comes to be stroked.
-const WATERING = { x: 376, y: 230, facing: 'right' }
+const WATERING = { x: 376, y: 212, facing: 'right' }
 const STROKING = { x: 240, y: 224, facing: 'left' }
 
 // What Claude does on a pause right now: a coffee in the kitchen, the

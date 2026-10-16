@@ -250,7 +250,8 @@ const drawClaude = ({ main, where, rest, meetingPose, claudeWalk, kitchenSpot, g
   } else if (where === 'plants' || where === 'cat') {
     const { x, y, facing } = rest.spot
     standing(x, y, claudeLook, facing, false, t, 7)
-    if (where === 'plants') wateringCan(x + 12, y - 20, t)
+    // Down onto the big plant in the corner
+    if (where === 'plants') wateringCan(x + 12, y - 20, t, 36)
     tag(x, y + 3, 'Claude', CLAUDE)
     hits.push({ kind: 'claude', id: 'claude', ...standingBox(x, y) })
   } else {
@@ -515,13 +516,14 @@ export const draw = () => {
     .sort((a, b) => a.spot.y - b.spot.y)
   for (const sub of subs) {
     const out = outAt(sub, walks)
-    if (out !== null) homeward.set(`${s.key}|${sub.id}`, { sub, out, key: s.key })
+    // One leaving from the lawn goes home from there, by the path
+    if (out !== null) homeward.set(`${s.key}|${sub.id}`, { sub, out, key: s.key, origin: sub.phase === 'leaving' && sub.from === 'idle' ? lastIdle.get(sub.id) ?? null : null })
   }
   const goingHome = []
-  for (const [id, { sub, out, key }] of homeward) {
+  for (const [id, { sub, out, key, origin }] of homeward) {
     if (now > out + HOMEWARD_MS) homeward.delete(id)
     else if (key === s?.key && now >= out && !subs.some(x => x.id === sub.id && x.phase !== 'leaving' && x.phase !== 'delivering')) {
-      const pose = homewardPose(sub.id, out, now)
+      const pose = homewardPose(sub.id, out, now, origin)
       if (pose) goingHome.push({ sub, pose: { ...pose, isHomeward: true } })
     }
   }
