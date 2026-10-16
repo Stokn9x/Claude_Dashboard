@@ -462,6 +462,7 @@ export const ITEMS = {
   meeting: { name: 'Mødelokale', icon: '📊', about: 'Et mødelokale ved siden af Claude med et langt bord og en skærm på væggen.' },
   reception: { name: 'Reception', icon: '🛎️', about: 'Indretning af receptionen bag hoveddøren: skranke, sofa, logo og Bodil, der byder hjælperne velkommen og siger farvel.' },
   plants: { name: 'Planter overalt', icon: '🪴', about: 'Store planter i teamrummet, stillerummet og hos Claude.' },
+  cat: { name: 'Kontorkat', icon: '🐈', about: 'En rød kat, der sover i receptionen, spiser i køkkenet og sætter sig hos Claude. Claude klapper den i pauserne.' },
   rugs: { name: 'Tæpper', icon: '🧶', about: 'Bløde tæpper under skrivebordene i teamrummene og stillerummet.' },
   art: { name: 'Kunst på væggene', icon: '🖼️', about: 'Malerier på væggene i teamrummet og hos Claude.' },
   neon: { name: 'Neonskilt', icon: '💡', about: 'Et lyserødt "SHIP IT" i teamrummet, der lyser om aftenen.' },

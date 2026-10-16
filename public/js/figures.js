@@ -1,5 +1,5 @@
-// The people: their looks, drawn from their ids, and every pose they take.
-import { OUTLINE, ctx, rect, shadow } from './gfx.js'
+// The people, and the office cat: their looks, drawn from their ids, and every pose they take.
+import { OUTLINE, ctx, label, rect, rounded, shadow } from './gfx.js'
 import { hashOf, stir } from './util.js'
 
 // One sprite pixel, in world units
@@ -132,4 +132,113 @@ export const portraitOf = (key, look) => {
     portraits.set(key, c.toDataURL())
   }
   return portraits.get(key)
+}
+
+// ── The office cat ───────────────────────────────────────────────────────
+// A ginger cat at (x, y), its feet there: walking, sitting, asleep curled
+// up, or eating with its head down. Drawn in soft shapes, not sprite
+// pixels: it is small, and round reads better at that size.
+const FUR = '#E3893F'
+const STRIPE = '#B9642A'
+const BELLY = '#F7DDBA'
+const ear = (x, y, side) => {
+  ctx.beginPath()
+  ctx.moveTo(x - 2.4 * side, y)
+  ctx.lineTo(x - 1.2 * side, y - 4.2)
+  ctx.lineTo(x + 0.6 * side, y - 0.6)
+  ctx.closePath()
+  ctx.fillStyle = FUR
+  ctx.fill()
+  ctx.lineWidth = 0.9
+  ctx.strokeStyle = OUTLINE
+  ctx.stroke()
+}
+const tail = (from, to, bend, width = 2.4) => {
+  ctx.beginPath()
+  ctx.moveTo(from.x, from.y)
+  ctx.quadraticCurveTo(bend.x, bend.y, to.x, to.y)
+  ctx.lineCap = 'round'
+  ctx.lineWidth = width + 1.6
+  ctx.strokeStyle = OUTLINE
+  ctx.stroke()
+  ctx.lineWidth = width
+  ctx.strokeStyle = FUR
+  ctx.stroke()
+  ctx.lineCap = 'butt'
+}
+const blob = (x, y, rx, ry, fill) => {
+  ctx.beginPath()
+  ctx.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2)
+  ctx.fillStyle = fill
+  ctx.fill()
+  ctx.lineWidth = 1
+  ctx.strokeStyle = OUTLINE
+  ctx.stroke()
+}
+
+export const cat = (x, y, facing, kind, t) => {
+  const swish = Math.sin(t / 420)
+  shadow(x, y + 0.5, kind === 'sleep' ? 9 : 7.5, 2)
+  if (kind === 'sleep') {
+    // Curled up, nose to tail, breathing slowly; a z now and then
+    const rise = Math.sin(t / 900) * 0.4
+    tail({ x: x - 6, y: y - 2 }, { x: x + 6, y: y - 0.5 }, { x: x - 2, y: y + 3 })
+    blob(x, y - 4 - rise, 8.5, 5 + rise, FUR)
+    for (const dx of [-4, -1, 2]) rect(x + dx, y - 8.5 - rise, 1.2, 3, STRIPE)
+    blob(x + 5.5, y - 3.5, 3.8, 3.2, FUR)
+    ear(x + 4.5, y - 6, 1)
+    ear(x + 7.5, y - 5.5, -1)
+    rect(x + 4, y - 3.5, 1.6, 0.6, OUTLINE)
+    rect(x + 6.6, y - 3.5, 1.6, 0.6, OUTLINE)
+    const k = (t % 2400) / 2400
+    ctx.globalAlpha = 1 - k
+    label('z', x + 9 + k * 4, y - 9 - k * 8, 4 + k * 2, '#E9EEF2', 800)
+    ctx.globalAlpha = 1
+    return
+  }
+  ctx.save()
+  if (facing === 'left') {
+    ctx.translate(x * 2, 0)
+    ctx.scale(-1, 1)
+  }
+  if (kind === 'sit') {
+    // Sitting up, tail round the feet, the tip twitching
+    tail({ x: x - 3, y: y - 1 }, { x: x - 9, y: y - 6 + swish * 2 }, { x: x - 9, y: y + 1 })
+    blob(x, y - 6, 5.2, 6.5, FUR)
+    blob(x + 0.5, y - 4.5, 2.6, 3.6, BELLY)
+    rect(x - 4, y - 10, 1.2, 3, STRIPE)
+    rect(x - 2, y - 11.5, 1.2, 2.5, STRIPE)
+    blob(x + 1, y - 14.5, 4.6, 4, FUR)
+    ear(x - 1.4, y - 17.2, 1)
+    ear(x + 3.6, y - 17.2, -1)
+    const isBlinking = t % 3700 < 150
+    rect(x - 1, y - 15.4, 1.2, isBlinking ? 0.5 : 1.4, OUTLINE)
+    rect(x + 2.4, y - 15.4, 1.2, isBlinking ? 0.5 : 1.4, OUTLINE)
+    rect(x + 0.7, y - 13.6, 1.4, 1, '#E58A9A')
+    ctx.restore()
+    return
+  }
+  // Walking, or standing at the bowl with its head down to eat
+  const isEating = kind === 'eat'
+  const step = kind === 'walk' ? Math.floor(t / 140) % 2 : 0
+  // Four legs, two and two lifted in turn as it walks
+  for (const [dx, lift] of [[-5.5, step], [-3, 1 - step], [3, step], [5.5, 1 - step]]) rect(x + dx - 0.9, y - 4 - lift * 0.8, 1.8, 4, OUTLINE)
+  tail({ x: x - 7, y: y - 8 }, { x: x - 11, y: y - 16 + swish * 1.5 }, { x: x - 13, y: y - 9 })
+  rounded(x - 8, y - 11, 15, 7.5, 3.6, FUR, OUTLINE, 1)
+  rounded(x - 4, y - 6.4, 8, 2.2, 1.1, BELLY)
+  for (const dx of [-4.5, -1.5, 1.5]) rect(x + dx, y - 10.5, 1.2, 3.2, STRIPE)
+  const head = isEating ? { x: x + 8.5, y: y - 5 } : { x: x + 8, y: y - 12 }
+  blob(head.x, head.y, 4.2, 3.8, FUR)
+  ear(head.x - 1.6, head.y - 2.6, 1)
+  ear(head.x + 2.4, head.y - 2.4, -1)
+  rect(head.x + 1.2, head.y - 1, 1.2, isEating ? 0.5 : 1.3, OUTLINE)
+  rect(head.x + 3.3, head.y + 0.6, 1, 0.9, '#E58A9A')
+  ctx.restore()
+}
+
+// The cat's bowl, with food in it.
+export const bowl = (x, y) => {
+  shadow(x, y + 2, 5, 1.4)
+  blob(x, y, 4.6, 2.4, '#3E7CC9')
+  blob(x, y - 0.6, 3.2, 1.3, '#8B5E3C')
 }

@@ -15,7 +15,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-const VERSION = '0.20.1'
+const VERSION = '0.21.0'
 const HOST = '127.0.0.1'
 const PORT = Number(process.env.AGENT_KONTOR_PORT || 4747)
 const HERE = path.dirname(fileURLToPath(import.meta.url))
@@ -240,7 +240,7 @@ const WELLBEING = {
   lounge: 10, 'lounge-2': 6, 'lounge-3': 6,
   pingpong: 10, meeting: 5, reception: 5,
   'team1-2': 2, 'team1-3': 2, team2: 4, 'team2-2': 2, 'team2-3': 2,
-  plants: 3, rugs: 3, art: 3, neon: 2, espresso: 3, aquarium: 5, chairs: 6, screens: 5,
+  plants: 3, rugs: 3, cat: 4, art: 3, neon: 2, espresso: 3, aquarium: 5, chairs: 6, screens: 5,
   perFloorSitter: -8,
 }
 const LIFTS = Object.keys(WELLBEING).filter(item => item !== 'base' && item !== 'perFloorSitter')
@@ -430,7 +430,7 @@ const ROOM_PRICES = {
   pingpong: 6000, meeting: 12_000, reception: 7000,
 }
 // Decor and upgrades: bought once each, for the look and for wellbeing.
-const DECOR_PRICES = { plants: 600, rugs: 800, art: 900, neon: 1200, espresso: 1500, aquarium: 2500, chairs: 4000, screens: 5000 }
+const DECOR_PRICES = { plants: 600, rugs: 800, cat: 3500, art: 900, neon: 1200, espresso: 1500, aquarium: 2500, chairs: 4000, screens: 5000 }
 const THING_PRICES = { ...ROOM_PRICES, ...DECOR_PRICES }
 
 const priceOf = item => {

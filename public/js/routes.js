@@ -443,7 +443,8 @@ export const homewardPose = (id, out, now) => {
 // Claude can take, walked in small steps; any that crosses a wall or a
 // depot, or that could not be found and was drawn straight, is reported.
 // In the browser console: kontorCheckRoutes()
-export const checkRoutes = () => {
+// `extra` adds walks of its own: [name, from, to].
+export const checkRoutes = (extra = []) => {
   ensureGrid()
   const floors = walkable().map(room => box(rectOf(room)))
   const doors = PLAN.doors.filter(isOpenDoor).map(d => [d.x - 1, d.y - 1, d.w + 2, d.h + 2])
@@ -485,6 +486,10 @@ export const checkRoutes = () => {
       check(`${spot.x},${spot.y} to seat ${seat}`, route(spot, home))
       count += 2
     }
+  }
+  for (const [name, from, to] of extra) {
+    check(name, route(from, to))
+    count += 1
   }
   const meeting = firstRoom('meeting')
   if (meeting && isBuilt(meeting)) {

@@ -197,3 +197,29 @@ export const clock = date => {
   hand(minutes / 60, r * 0.8, 0.8, OUTLINE)
   hand(date.getSeconds() / 60, r * 0.85, 0.4, '#E5484D')
 }
+
+// A green watering can in Claude's hand, tipped at the plant, with drops
+// falling from the spout.
+export const wateringCan = (x, y, t) => {
+  rounded(x - 4, y - 4, 9, 7, 2, '#4F9A5B', OUTLINE, 1)
+  ctx.strokeStyle = OUTLINE
+  ctx.lineWidth = 1.6
+  ctx.beginPath()
+  ctx.moveTo(x + 4, y - 1)
+  ctx.lineTo(x + 10, y - 5)
+  ctx.stroke()
+  ctx.strokeStyle = '#4F9A5B'
+  ctx.lineWidth = 0.8
+  ctx.stroke()
+  ctx.beginPath()
+  ctx.arc(x - 1, y - 5, 3, Math.PI, 0)
+  ctx.strokeStyle = OUTLINE
+  ctx.lineWidth = 1
+  ctx.stroke()
+  for (let i = 0; i < 3; i++) {
+    const k = ((t / 600 + i / 3) % 1)
+    ctx.globalAlpha = 1 - k
+    rect(x + 10 + k * 5, y - 4 + k * 14, 1.2, 2, '#7DC3F0')
+  }
+  ctx.globalAlpha = 1
+}

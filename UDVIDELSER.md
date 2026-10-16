@@ -28,6 +28,7 @@ Status: ✅ lavet · 🟡 delvist · ⬜ ikke lavet · ⏸️ parkeret · ➖ ik
 | 0.11.1 | Fejlrettelser: ingen går gennem væggene (døre forbinder rummene i rutegitteret, og der er fri vej ud af Claudes kontor), nyt toilet med døren ud til et frit område, ingen fliser i væggene; langsommere indtjening og højere priser, så kontoret bygges over uger |
 | 0.12.0 | En lækrere side rundt om kontoret: topbjælke med ikon, trivsel, saldo og forbindelsesprik; kort med pixel-portræt og statuspille i listen; venteboks med "Gå til"; butik med ikoner og fremdrift; kun mørkt tema |
 | 0.13.0 | Spillets fase 4: pynt og opgraderinger i butikken, 17 præstationer med belønning og notifikation, statistik i den nye fane Fremskridt |
+| 0.21.0 | Liv i kontoret: en kontorkat i butikken (3.500 kr, +4 trivsel), der vandrer mellem lænestolen hos Claude, receptionen, sin madskål i køkkenet, loungens sofa og plænen; den sover krøllet sammen med et "z", spiser og siger "Miav". Claude holder pause på flere måder: kaffe i køkkenet, vander planterne på sit kontor eller kalder på katten og klapper den. Koden er delt op: mod'en i seks filer, og siden har fået `rooms.js`, `sales.js`, `party.js` og `cat.js`. Alle tekstfiler har LF-linjeskift |
 | 0.20.1 | Robusthed: et spil.json, der bare er låst et øjeblik (antivirus, OneDrive), prøves igen i nogle sekunder og skrives aldrig over med en ældre kopi; en ekstra server, der starter samtidig, rører ingen filer, før porten er dens; dagens kopi af spillet laves én gang om dagen og overskrives ikke ved en genstart; serveren gemmer, før den lukker; stribe og dage følger kalenderen, også når der skiftes til og fra sommertid; et gammelt lounge-id rettes ved hver start; kun et navn kan købes; og står der `cd …` først i en kommando, vises kommandoen efter den |
 | 0.20.0 | Kontoret kan læses ved normal zoom: navne, talebobler og prisskilte er altid mindst 11-12 pixel høje, ned til hele kontoret i billedet, og skrumper først med kontoret, når man zoomer længere ud. Byggegrundene har fået et skilt med ikon, navn, pris og enten "Klik for at bygge" eller hvor meget der mangler, med en bjælke, og grunden er pælet ud med reb. Hvert rum har et skilt med ikon og navn på gangen ved sin dør. Gangen har fået stenfliser langs væggene, et langt tæppe under begge vognbaner, loftslamper og planter. Tæpperne under skrivebordene købes nu i butikken (Tæpper, 800 kr, +3 trivsel), ligesom planterne. Køkkenets ur hænger på bagvæggen |
 | 0.19.2 | Pengene tælles rigtigt: en statusfil, der læses for sent, betaler ikke igen; en session, der genoptages efter mere end en uge, betales ikke forfra; en subagent sendt i baggrunden (Ctrl+B) og agenter, som motorens liste ikke kender (fx workflow-agenter), afleveres én gang, når de er færdige; et testord i en commit-besked gør den ikke til en testkørsel, og `npm test && git commit` tæller begge dele; delvise commits og `--amend` tæller ikke linjer dobbelt, og `git -C`, `Set-Location` og en `cd` midt i kommandoen læser det rigtige repo. Desuden: kontoret går ikke længere i stå og viser kun græs, hvis et enkelt billede fejler (fx åbnet i et vindue uden størrelse), og fanerne øverst står i fast rækkefølge i stedet for at bytte plads |
@@ -145,12 +146,12 @@ Fundet ved en gennemgang af koden og det, vi har set undervejs. **P1** er fejl, 
 | # | Hvad | Str. | Status |
 |---|---|---|---|
 | 59 | **Personlighed i dialogen:** hver hjælper får et temperament ud fra navnet (kæk, tør, dramatisk, positiv), så replikkerne lyder forskelligt (rest fra fase 3). Lavet i 0.16.0, og temperamentet står på hjælperens kort. | S | ✅ |
-| 60 | **Claude laver noget i pauserne:** vander planter, går en tur, spiller bordtennis med en hjælper (rest af punkt 19). | M | ⬜ |
+| 60 | **Claude laver noget i pauserne:** lavet i 0.21.0: kaffe, vander planterne eller klapper katten. Mangler: vander planter, går en tur, spiller bordtennis med en hjælper (rest af punkt 19). | M | 🟡 |
 | 61 | **Fase 5, vækst i ét plan:** teamrum 2 (seks skriveborde mere), en lounge og en reception. Lavet i 0.18.0. | L | ✅ |
 | 73 | **Et anneks til de andre sessioner:** en bygning på grunden, hvor dine andre sessioner sidder, så man kan klikke sig over til dem. Parkeret efter dit ønske. | M | ⏸️ |
 | 62 | **Daglig bonus og stribe:** en lille bonus for første arbejde på dagen og for dage i træk. Lavet i 0.16.0: 25 kr plus 10 kr pr. dag i træk, højst en uge; vises i Fremskridt og i loggen. | S | ✅ |
 | 63 | **Sæson og vejr:** jul i december, regn på ruderne, sne om vinteren (rest af punkt 22). | M | ⬜ |
-| 64 | **Kontorhund eller -kat** (punkt 23), evt. købt i butikken. | M | ⬜ |
+| 64 | **Kontorhund eller -kat** (punkt 23), evt. købt i butikken. Lavet i 0.21.0: en rød kontorkat i butikken. | M | ✅ |
 | 65 | **Indret selv:** flyt pynt og inventar rundt med træk og slip (punkt 25). | L | ⬜ |
 | 66 | **Månedens medarbejder:** hjælpernes navne går igen, så de kan få deres egen statistik og en pokal. | M | ⬜ |
 | 67 | **Tv-tilstand** til en ekstra skærm: fuld skærm, ingen panel, kameraet følger det, der sker (punkt 31). | S | ⬜ |
@@ -165,7 +166,7 @@ Fundet ved en gennemgang af koden og det, vi har set undervejs. **P1** er fejl, 
 
 ### Forslag til rækkefølge
 
-1. **63 sæson og vejr** og **64 kontorhund eller -kat**.
+1. **63 sæson og vejr** (64 kontorkatten kom i 0.21.0).
 2. **66 månedens medarbejder** og **67 tv-tilstand**.
 3. **65 indret selv**: flyt pynt og inventar med træk og slip.
 

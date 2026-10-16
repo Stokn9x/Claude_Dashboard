@@ -9,8 +9,9 @@ import { hashOf } from './util.js'
 import { MAIN, MAIN_SPOT, ROOM_TYPES, at, coffeeSpot, desks, firstRoom, isBuilt, placeOf, shiftOf, typeOf } from './plan.js'
 import { HOMEWARD_MS, WALKS, homewardPose, outAt, poseOf, route, walkAt, walkMs } from './routes.js'
 import { STAY, banterFor, breakNow, errandPose, meetingNow } from './breaks.js'
-import { claudeLook, hands, lookFor, onTheFloor, sitting, sittingBack, standing } from './figures.js'
-import { board, chair, clock, desk, deskThingsFor, mug, steam } from './furniture.js'
+import { bowl, cat, claudeLook, hands, lookFor, onTheFloor, sitting, sittingBack, standing } from './figures.js'
+import { board, chair, clock, desk, deskThingsFor, mug, steam, wateringCan } from './furniture.js'
+import { PAUSE_SLOT_MS, bowlOf, catNow, catPlaces, claudePause } from './cat.js'
 import { daylight, evening, timeOfDay } from './light.js'
 import { chatFor, grumbleAt } from './voices.js'
 import { IDLE_WALK_MS, idlePlan } from './idle.js'
@@ -222,7 +223,7 @@ const errandsNow = (subs, now, meeting, pause) => {
 
 // Claude: at the desk, on the way to or at the meeting, in the kitchen with
 // a mug on a break, or walking between them.
-const drawClaude = ({ main, where, meetingPose, claudeWalk, kitchenSpot, glowing, hits, t }) => {
+const drawClaude = ({ main, where, rest, meetingPose, claudeWalk, kitchenSpot, glowing, hits, t }) => {
   const isAtDesk = where === 'desk'
   chair(MAIN.cx, MAIN.dy)
   if (isAtDesk) sitting(MAIN.cx, MAIN.dy + 4, claudeLook, main.state === 'waiting', t, 7)
@@ -243,6 +244,12 @@ const drawClaude = ({ main, where, meetingPose, claudeWalk, kitchenSpot, glowing
     else standing(p.x, p.y, claudeLook, p.facing, p.isWalking, t, 7)
     tag(p.x, p.y + 3, 'Claude', CLAUDE)
     hits.push({ kind: 'claude', id: 'claude', ...standingBox(p.x, p.y) })
+  } else if (where === 'plants' || where === 'cat') {
+    const { x, y, facing } = rest.spot
+    standing(x, y, claudeLook, facing, false, t, 7)
+    if (where === 'plants') wateringCan(x + 12, y - 20, t)
+    tag(x, y + 3, 'Claude', CLAUDE)
+    hits.push({ kind: 'claude', id: 'claude', ...standingBox(x, y) })
   } else {
     const { x, y } = kitchenSpot
     standing(x, y, claudeLook, 'front', false, t, 7)
@@ -322,11 +329,34 @@ const drawWalkers = ({ walkers, players, hits, t }) => {
   }
 }
 
+// The cat and, in the kitchen, its bowl; now and then a word from it.
+const drawCat = ({ catPose, t }) => {
+  if (!catPose) return
+  const kitchen = catPlaces().find(p => p.name === 'kitchen')
+  if (kitchen) {
+    const b = bowlOf(kitchen)
+    bowl(b.x, b.y)
+  }
+  cat(catPose.x, catPose.y, catPose.facing, catPose.kind, t)
+  if (catPose.kind === 'sit' && catPose.there > 2000 && t % 14_000 < 1600) bubble(catPose.x, catPose.y - 22, 'Miav', false, t, 10)
+}
+
 // What everyone says, on top of everything.
 const drawSpeech = frame => {
-  const { s, main, where, meeting, meetingPose, pause, kitchenSpot, list, seatedAt, subs, walkers, players, floorSitters, t } = frame
+  const { s, main, where, rest, catPose, meeting, meetingPose, pause, kitchenSpot, list, seatedAt, subs, walkers, players, floorSitters, t } = frame
   const thanking = walkers.find(w => w.pose.handover)
-  if (where === 'kitchen') {
+  if (where === 'plants' || where === 'cat') {
+    const isCatHere = catPose && !catPose.isWalking && catPose.place.name === 'corner'
+    const lines = where === 'plants' ? ['Lidt vand til jer', 'Så, så', 'I vokser jo'] : isCatHere ? ['Hvem er en god kat?', 'Hej, mis', 'Du spinder jo'] : ['Mis mis!']
+    if (t % 9000 < 6000) bubble(rest.spot.x, rest.spot.y - 52, lines[Math.floor(t / 9000) % lines.length], false, t)
+    // Stroked, the cat purrs: a heart rises
+    if (isCatHere && where === 'cat') {
+      const k = (t % 1800) / 1800
+      ctx.globalAlpha = 1 - k
+      label('♥', catPose.x + 2, catPose.y - 22 - k * 10, 7, '#E5484D')
+      ctx.globalAlpha = 1
+    }
+  } else if (where === 'kitchen') {
     const lines = ['Kaffepause', s?.stats?.linesAdded ? `${s.stats.linesAdded} linjer i dag` : 'Klar når du er', 'Godt arbejde, team', 'Hvad nu?']
     bubble(kitchenSpot.x, kitchenSpot.y - 52, lines[Math.floor(t / 3000) % lines.length], false, t)
   } else if (thanking) {
@@ -437,10 +467,15 @@ export const draw = () => {
   const pause = breakNow(subs, now, walks, meeting, settledHere)
   const onErrand = errandsNow(subs, now, meeting, pause)
   const meetingPose = meeting?.withClaude && !isReceiving ? errandPose(MAIN_SPOT, { kind: 'meeting', start: meeting.start, stay: STAY.meeting, dest: meeting.head }, now) : null
-  // On a break Claude goes to the kitchen; with no kitchen it stays put.
-  const claudeWhere = meetingPose ? 'meeting' : main.state === 'idle' && kitchenSpot && !isReceiving ? 'kitchen' : 'desk'
-  const claudeWalk = unjumped(`${s?.key}|claude`, claudeWhere === 'meeting' ? meetingPose : claudeWhere === 'kitchen' ? kitchenSpot : MAIN_SPOT, now)
+  // On a pause Claude takes a coffee, waters its plants or strokes the cat
+  // (cat.js), and the cat, called, comes to the armchair.
+  const rest = meetingPose || main.state !== 'idle' || isReceiving ? null : claudePause(now)
+  const claudeWhere = meetingPose ? 'meeting' : rest ? rest.kind : 'desk'
+  const claudeWalk = unjumped(`${s?.key}|claude`, claudeWhere === 'meeting' ? meetingPose : rest ? rest.spot : MAIN_SPOT, now)
   const where = claudeWalk ? 'walking' : claudeWhere
+  const catTarget = rest?.kind === 'cat' ? catNow(now, 'corner', rest.slot * PAUSE_SLOT_MS) : catNow(now)
+  const catWalk = catTarget && unjumped('cat', catTarget, now)
+  const catPose = catTarget && (catWalk ? { ...catTarget, ...catWalk, kind: 'walk' } : catTarget)
 
   // Off work, a helper keeps clear of the spots a break or the meeting uses.
   const taken = new Set([...(pause?.errands.values() ?? [])].map(e => `${e.dest.x},${e.dest.y}`).concat([...(meeting?.seats.values() ?? [])].map(p => `${p.x},${p.y}`)))
@@ -491,7 +526,7 @@ export const draw = () => {
     .sort((a, b) => a.pose.y - b.pose.y)
   const players = walkers.filter(w => w.pose.isThere && w.pose.errand.kind === 'pingpong')
   const sales = forSaleNow(list)
-  const frame = { s, main, where, meeting, meetingPose, claudeWalk, pause, kitchenSpot, list, seatedAt, subs, walkers, players, floorSitters, glowing, hits, t }
+  const frame = { s, main, where, rest, catPose, meeting, meetingPose, claudeWalk, pause, kitchenSpot, list, seatedAt, subs, walkers, players, floorSitters, glowing, hits, t }
 
   const headlights = drawLife(now, t, visibleRect())
   daylight(timeNow)
@@ -505,6 +540,7 @@ export const draw = () => {
   drawDesks(frame)
   drawSaleOutlines(sales, hits)
   drawFloorSitters(frame)
+  drawCat(frame)
   drawWalkers(frame)
   evening(timeNow, glowing, headlights)
   drawSaleSigns(sales, hits, t)

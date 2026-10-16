@@ -16,10 +16,11 @@ const { eventsBetween } = await import(js('activity'))
 const idle = await import(js('idle'))
 const voices = await import(js('voices'))
 const util = await import(js('util'))
+const cat = await import(js('cat'))
 
 const { PLAN, WORLD, GROUNDS, CHAINS, typeOf, frameOf, fullFrameOf, rectOf, deskSlots, desks, placeOf } = plan
 const STEPS = Object.values(CHAINS).flat()
-const ALL_ROOMS = ['claude', 'team', ...STEPS, 'pingpong', 'meeting', 'plants', 'rugs', 'art', 'neon', 'espresso', 'aquarium', 'chairs', 'screens', 'reception']
+const ALL_ROOMS = ['claude', 'team', ...STEPS, 'pingpong', 'meeting', 'plants', 'rugs', 'cat', 'art', 'neon', 'espresso', 'aquarium', 'chairs', 'screens', 'reception']
 const owning = (rooms, deskCount) => {
   store.state = { sessions: [], game: { owned: { rooms, desks: deskCount }, kroner: 0, next: {} } }
 }
@@ -480,4 +481,45 @@ test('everything the server sells has a name, an icon and a text in the shop', a
   }
   // And every room that can be bought is one of them.
   for (const room of PLAN.rooms.filter(r => r.buy)) assert.ok(plan.ITEMS[room.buy], room.id)
+})
+
+// ── The cat and Claude's pause ───────────────────────────────────────────
+
+test("the cat's places can all be reached from each other, and Claude's pause spots too", () => {
+  for (const rooms of LAYOUTS) {
+    owning(rooms, 10)
+    const places = cat.catPlaces()
+    const pairs = places.flatMap(a => places.filter(b => b !== a).map(b => [`cat ${a.name} to ${b.name}`, a, b]))
+    const { spot: watering } = cat.claudePause(0) // any slot: the spots are fixed
+    pairs.push(['Claude to the plants', plan.MAIN_SPOT, plan.at(plan.firstRoom('corner'), { x: 376, y: 230 })])
+    pairs.push(['Claude to the cat', plan.MAIN_SPOT, plan.at(plan.firstRoom('corner'), { x: 240, y: 224 })])
+    assert.ok(watering)
+    assert.deepEqual(routes.checkRoutes(pairs).problems, [], rooms.join(','))
+  }
+})
+
+test('the cat walks from place to place, settles in time, and is there only once bought', () => {
+  owning(['claude', 'team', 'kitchen', 'lounge'], 0)
+  assert.equal(cat.catNow(0), null)
+  owning(['claude', 'team', 'kitchen', 'lounge', 'cat'], 0)
+  const at = slot => cat.catNow(slot * cat.CAT_SLOT_MS + cat.CAT_SLOT_MS - 1)
+  const visited = new Set()
+  for (let slot = 1; slot < 60; slot++) {
+    const now = at(slot)
+    assert.equal(now.isWalking, false, 'there by the end of its slot')
+    visited.add(now.place.name)
+  }
+  assert.equal(visited.size, cat.catPlaces().length, 'every place in time')
+  // Half a second into a slot with a new place, it is on its way.
+  const moving = Array.from({ length: 59 }, (_, i) => i + 1).find(slot => at(slot).place.name !== at(slot - 1).place.name)
+  assert.equal(cat.catNow(moving * cat.CAT_SLOT_MS + 500).isWalking, true)
+  assert.deepEqual(cat.catNow(12_345), cat.catNow(12_345), 'the same for every viewer')
+})
+
+test("Claude's pause: coffee only with a kitchen, the cat only once bought", () => {
+  const kinds = () => new Set(Array.from({ length: 200 }, (_, i) => cat.claudePause(i * cat.PAUSE_SLOT_MS).kind))
+  owning(['claude', 'team'], 0)
+  assert.deepEqual([...kinds()], ['plants'])
+  owning(['claude', 'team', 'kitchen', 'cat'], 0)
+  assert.deepEqual([...kinds()].sort(), ['cat', 'kitchen', 'plants'])
 })

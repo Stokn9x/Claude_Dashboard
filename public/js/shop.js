@@ -22,7 +22,7 @@ export const onBought = fn => {
 // A row is one thing, or a room that grows: then it offers the next step.
 const GROUPS = [
   ['Pladser og rum', ['desk', CHAINS.team, CHAINS.kitchen, CHAINS.lounge, CHAINS.toilet, 'meeting', 'reception', 'pingpong']],
-  ['Pynt og opgraderinger', ['plants', 'rugs', 'art', 'neon', 'espresso', 'aquarium', 'chairs', 'screens']],
+  ['Pynt og opgraderinger', ['plants', 'rugs', 'cat', 'art', 'neon', 'espresso', 'aquarium', 'chairs', 'screens']],
 ]
 // A chain's step now: the first not bought, or its last once all are.
 const stepNow = (steps, g) => steps.find(item => !g.owned.rooms.includes(item)) ?? steps[steps.length - 1]
