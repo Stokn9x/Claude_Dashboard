@@ -52,7 +52,7 @@ const ROOM_TYPES = {
     // Where a helper without a desk sits on the floor with its laptop
     floor: [[70, 372], [100, 372], [252, 372], [276, 372], [364, 372], [394, 372], [424, 372], [34, 278], [62, 278], [90, 278]].map(([x, y]) => ({ x, y })),
     plants: [[462, 150, true], [20, 150], [380, 368], [56, 368], [234, 366, true]],
-    lights: [[130, 366, 54, 0.42, 'lamp', 'lounge'], ...[[166, 200], [314, 200], [166, 300], [314, 300]].map(([x, y]) => [x, y, 66, 0.16, 'ceiling'])],
+    lights: [[130, 366, 54, 0.42, 'lamp', 'lounge'], [240, 147, 46, 0.4, 'neon', 'neon'], ...[[166, 200], [314, 200], [166, 300], [314, 300]].map(([x, y]) => [x, y, 66, 0.16, 'ceiling'])],
     bulbs: [[130, 366, 'lounge']],
     // Furniture bought for the room, and where its sign stands until then
     items: { lounge: { x: 180, y: 362 }, pingpong: { x: 316, y: 362 } },
@@ -97,7 +97,8 @@ const ROOM_TYPES = {
     desks: [0, 1, 2, 3].map(i => ({ cx: 72 + i * 112, dy: 440 })),
     plants: [[460, 400, true], [18, 400]],
     lights: [[128, 440], [240, 440], [352, 440]].map(([x, y]) => [x, y, 66, 0.16, 'ceiling']),
-    blocks: [0, 1, 2, 3].flatMap(i => [[30 + i * 112, 439, 84, 30], [51 + i * 112, 422, 42, 22]]),
+    // The desks and chairs, and the aquarium's place by the wall
+    blocks: [...[0, 1, 2, 3].flatMap(i => [[30 + i * 112, 439, 84, 30], [51 + i * 112, 422, 42, 22]]), [330, 388, 64, 14]],
   },
 }
 
@@ -135,6 +136,13 @@ const ITEMS = {
   lounge: { name: 'Sofahjørne', about: 'En sofa, et sofabord og en lampe i teamrummet.' },
   pingpong: { name: 'Bordtennisbord', about: 'Et bordtennisbord i teamrummet.' },
   meeting: { name: 'Mødelokale', about: 'Et mødelokale med et langt bord og en skærm på væggen.' },
+  plants: { name: 'Planter overalt', about: 'Store planter i teamrummet og stillerummet.' },
+  art: { name: 'Kunst på væggene', about: 'Malerier på væggene i teamrummet og hos Claude.' },
+  neon: { name: 'Neonskilt', about: 'Et lyserødt "SHIP IT" over teamrummet, der lyser om aftenen.' },
+  espresso: { name: 'Espressomaskine', about: 'En rigtig espressomaskine i køkkenet. Den damper hele dagen.' },
+  aquarium: { name: 'Akvarium', about: 'Et akvarium med fisk i stillerummet.' },
+  chairs: { name: 'Ergonomiske stole', about: 'Bedre stole til alle skriveborde. Ryggen siger tak.' },
+  screens: { name: 'Store skærme', about: 'Brede skærme på alle skriveborde.' },
 }
 // Whether something is bought; everything counts as bought until the
 // server has said what is.
@@ -821,6 +829,16 @@ const forSaleSign = (cx, dy, price, canAfford, t) => {
 
 const chair = (cx, dy) => {
   shadow(cx + 2, dy + 4, 22, 5, 0.14)
+  if (owns('chairs')) {
+    // Ergonomic: a high back with a headrest, and armrests
+    rounded(cx - 22, dy - 20, 44, 24, 6, OUTLINE)
+    rounded(cx - 20, dy - 18, 40, 20, 5, '#2E7D74')
+    rounded(cx - 14, dy - 22, 28, 6, 3, OUTLINE)
+    rounded(cx - 12, dy - 21, 24, 4, 2, '#3AA597')
+    rect(cx - 22, dy - 4, 4, 8, OUTLINE)
+    rect(cx + 18, dy - 4, 4, 8, OUTLINE)
+    return
+  }
   rounded(cx - 21, dy - 18, 42, 22, 5, OUTLINE)
   rounded(cx - 19, dy - 16, 38, 18, 4, '#465566')
   rounded(cx - 17, dy - 14, 34, 3, 1.5, '#5A6B7E')
@@ -844,11 +862,14 @@ const screenArt = (x, y, state, t) => {
   }
 }
 
-const monitor = (x, dy, state, t) => {
-  rect(x - 1, dy + 1, 22, 16, OUTLINE)
-  rect(x, dy + 2, 20, 13, state ? screens[state] : '#141A22')
-  if (state) screenArt(x + 2, dy + 4, state, t)
-  rect(x + 8, dy + 17, 4, 3, OUTLINE)
+const monitor = (x, dy, state, t, isWide = false) => {
+  const w = isWide ? 30 : 20
+  const left = isWide ? x - 10 : x
+  rect(left - 1, dy + 1, w + 2, 16, OUTLINE)
+  rect(left, dy + 2, w, 13, state ? screens[state] : '#141A22')
+  if (state) screenArt(left + 2, dy + 4, state, t)
+  if (state && isWide) screenArt(left + 16, dy + 4, state, t + 333)
+  rect(left + w / 2 - 2, dy + 17, 4, 3, OUTLINE)
 }
 
 const desk = (cx, dy, w, state, t, monitors = 1) => {
@@ -860,7 +881,7 @@ const desk = (cx, dy, w, state, t, monitors = 1) => {
   rect(left, dy, w, 22, '#E4C79C')
   rect(left, dy, w, 2, '#F1DBB8')
   rect(left, dy + 22, w, 6, '#B98F5E')
-  monitor(cx + w / 2 - 28, dy, state, t)
+  monitor(cx + w / 2 - 28, dy, state, t, monitors === 1 && owns('screens'))
   if (monitors > 1) monitor(cx - w / 2 + 8, dy, state, t)
   rounded(cx - 12, dy + 12, 24, 7, 1, '#D3D8DD', OUTLINE, 1)
   rect(cx - 9, dy + 14, 18, 1, '#AEB6BF')
@@ -1132,7 +1153,7 @@ const evening = (h, screens) => {
   for (const room of visibleRooms().filter(isBuilt)) {
     const { dx, dy } = shiftOf(room)
     for (const [x, y, r, alpha, kind, needs] of typeOf(room).lights ?? []) {
-      if (owns(needs)) glow(x + dx, y + dy, r, kind === 'ceiling' ? '255, 228, 180' : '255, 196, 120', alpha)
+      if (owns(needs)) glow(x + dx, y + dy, r, kind === 'ceiling' ? '255, 228, 180' : kind === 'neon' ? '255, 95, 162' : '255, 196, 120', alpha)
     }
   }
   for (const [x, y] of screens) glow(x, y, 26, '130, 180, 255', 0.3)
@@ -1152,7 +1173,7 @@ let backgroundKey = ''
 
 // Each room type's own floor and furniture, in its home coordinates.
 const roomDrawers = {
-  corner: (g, fill, dot) => {
+  corner: (g, fill, dot, has) => {
     // Oak planks
     fill(6, 16, 240, 116, '#DCC194')
     for (let i = 0; i < 11; i++) {
@@ -1183,6 +1204,7 @@ const roomDrawers = {
     dot(70, 31, 7, OUTLINE)
     dot(70, 31, 5.8, '#B98F5E')
     dot(70, 31, 3.2, '#F6E3A8', '#C9A55A')
+    if (has('art')) painting(g, fill, 140, 18, 34, 14, ['#3E7CC9', '#8A6FD6', '#F6F7F8'])
     // The whiteboard; board() writes the day's numbers on it
     const b = ROOM_TYPES.corner.board
     fill(b.x - 1, b.y - 1, b.w + 2, b.h + 2, OUTLINE)
@@ -1192,7 +1214,7 @@ const roomDrawers = {
     fill(b.x + 13, b.y + b.h - 1.5, 5, 1.5, '#3E7CC9')
   },
 
-  kitchen: (g, fill, dot) => {
+  kitchen: (g, fill, dot, has) => {
     // Tiles
     fill(252, 16, 222, 116, '#F3F5F6')
     for (let c = 0; c < 19; c++) for (let r = 0; r < 10; r++) if ((c + r) % 2 === 0) fill(252 + c * 12, 16 + r * 12, 12, 12, '#E4E8EB')
@@ -1200,8 +1222,19 @@ const roomDrawers = {
     fill(256, 18, 150, 16, OUTLINE)
     fill(257, 19, 148, 14, '#F7F7F5')
     fill(257, 31, 148, 2, '#C9CED3')
-    fill(266, 20, 14, 12, '#2B2F36')
-    dot(273, 26, 2, '#E07A4F')
+    if (has('espresso')) {
+      // A chrome espresso machine with two cups
+      fill(262, 19, 22, 13, OUTLINE)
+      fill(263, 20, 20, 11, '#C9CED3')
+      fill(265, 21, 16, 3, '#E9EEF2')
+      fill(266, 26, 3, 3, '#2B2F36')
+      fill(277, 26, 3, 3, '#2B2F36')
+      dot(286, 28, 2, '#FFFFFF', OUTLINE)
+      dot(291, 28, 2, '#FFFFFF', OUTLINE)
+    } else {
+      fill(266, 20, 14, 12, '#2B2F36')
+      dot(273, 26, 2, '#E07A4F')
+    }
     fill(300, 21, 22, 9, '#B9C3CC')
     fill(330, 21, 20, 10, '#9CB4C6')
     fill(336, 23, 8, 5, '#D7E9FA')
@@ -1313,6 +1346,27 @@ const roomDrawers = {
     dot(286, 358, 3, '#E5484D', OUTLINE)
     dot(346, 368, 3, '#3E7CC9', OUTLINE)
     }
+    // Art on the top wall, and a neon sign between the paintings
+    if (has('art')) {
+      painting(g, fill, 52, 141, 30, 14, ['#7FB069', '#A9D8F5', '#F6E3A8'])
+      painting(g, fill, 398, 141, 30, 14, ['#D45D7A', '#E07A4F', '#F6D77A'])
+    }
+    if (has('neon')) {
+      g.fillStyle = '#2B1F33'
+      g.beginPath()
+      g.roundRect(210, 140, 60, 13, 3)
+      g.fill()
+      g.font = `800 8px ${FONT}`
+      g.textAlign = 'center'
+      g.shadowColor = '#FF5FA2'
+      g.shadowBlur = 6
+      g.fillStyle = '#FF8CC2'
+      g.fillText('SHIP IT', 240, 150)
+      g.shadowBlur = 0
+    }
+    if (has('plants')) {
+      for (const [x, y] of [[112, 156], [368, 156]]) bigPlant(g, fill, x, y)
+    }
     // The water cooler
     fill(452, 334, 16, 24, OUTLINE)
     fill(453, 335, 14, 10, '#9CC4EC')
@@ -1377,7 +1431,7 @@ const roomDrawers = {
     }
   },
 
-  quiet: g => {
+  quiet: (g, fill, dot, has) => {
     // A soft blue carpet, a rug under each desk, a sign on the floor
     g.fillStyle = '#D6DCE6'
     g.fillRect(6, 384, 468, 118)
@@ -1399,6 +1453,14 @@ const roomDrawers = {
     g.fillStyle = '#5B6672'
     g.textAlign = 'left'
     g.fillText('Stillerum', 16, 496)
+    // The aquarium along the top wall; its fish swim in the frame
+    if (has('aquarium')) {
+      fill(...AQUARIUM.slice(0, 2).map((v, i) => v - 1), AQUARIUM[2] + 2, AQUARIUM[3] + 2, OUTLINE)
+      fill(...AQUARIUM, '#3E8FC9')
+      fill(AQUARIUM[0], AQUARIUM[1], AQUARIUM[2], 2, '#9CD3F5')
+      for (let i = 0; i < 5; i++) fill(AQUARIUM[0] + 4 + i * 11, AQUARIUM[1] + AQUARIUM[3] - 3, 3, 3, i % 2 ? '#56A86B' : '#D9B88A')
+    }
+    if (has('plants')) for (const [x, y] of [[124, 398], [302, 398]]) bigPlant(g, fill, x, y)
   },
 }
 
@@ -1458,6 +1520,32 @@ const drawLot = (g, fill, room) => {
   g.setLineDash([])
   for (const [x, y] of [[room.x + 4, room.y + 4], [room.x + t.w - 4, room.y + 4], [room.x + 4, room.y + t.h - 4], [room.x + t.w - 4, room.y + t.h - 4]]) fill(x - 1.5, y - 1.5, 3, 3, '#8B5E3C')
 }
+
+// A framed painting on a wall: sky, hills and a sun, in three colours.
+const painting = (g, fill, x, y, w, h, [land, sky, sun]) => {
+  fill(x - 1, y - 1, w + 2, h + 2, '#6E4B32')
+  fill(x, y, w, h, sky)
+  fill(x, y + h * 0.55, w, h * 0.45, land)
+  g.fillStyle = sun
+  g.beginPath()
+  g.arc(x + w * 0.72, y + h * 0.35, h * 0.18, 0, Math.PI * 2)
+  g.fill()
+}
+
+// A big potted plant, for the decor
+const bigPlant = (g, fill, x, y) => {
+  fill(x - 6, y, 12, 9, '#9C5A34')
+  for (const [dx, dy, r, c] of [[0, -4, 10, '#3E8A55'], [-5, -7, 6, '#56A86B'], [5, -9, 5, '#6CC082'], [-2, -12, 4, '#6CC082']]) {
+    g.fillStyle = c
+    g.beginPath()
+    g.arc(x + dx, y + dy, r, 0, Math.PI * 2)
+    g.fill()
+  }
+}
+
+// Where the aquarium stands in the quiet room: x, y, width, height
+// right of the door from the team room, so the doorway stays free
+const AQUARIUM = [330, 388, 64, 14]
 
 // The walls, floors and furniture: everything that does not move, drawn
 // again only when the light or the view changes. Rooms out of view are
@@ -1720,6 +1808,30 @@ const draw = () => {
 
   daylight(timeNow)
   board(s?.stats, state.game?.kroner)
+  // Fish in the aquarium
+  const quietRoom = firstRoom('quiet')
+  if (owns('aquarium') && quietRoom) {
+    const [ax, ay, aw, ah] = AQUARIUM.map((v, i) => v + (i === 0 ? shiftOf(quietRoom).dx : i === 1 ? shiftOf(quietRoom).dy : 0))
+    for (let i = 0; i < 4; i++) {
+      const k = ((t / (2600 + i * 700) + i * 0.27) % 2 + 2) % 2
+      const goingRight = k < 1
+      const fx = ax + 4 + (aw - 12) * (goingRight ? k : 2 - k)
+      const fy = ay + 4 + ((i * 3) % (ah - 7)) + Math.sin(t / 400 + i) * 1
+      rect(fx, fy, 5, 3, ['#F2994A', '#F2C94C', '#EB5757', '#F6F7F8'][i])
+      rect(goingRight ? fx - 2 : fx + 5, fy + 0.5, 2, 2, ['#F2994A', '#F2C94C', '#EB5757', '#F6F7F8'][i])
+    }
+  }
+  // An espresso machine is always going
+  const kitchenRoom = firstRoom('kitchen')
+  if (owns('espresso') && kitchenRoom && isBuilt(kitchenRoom)) {
+    const m = at(kitchenRoom, typeOf(kitchenRoom).machine)
+    ctx.globalAlpha = 0.5
+    for (let i = 0; i < 3; i++) {
+      const rise = (t / 60 + i * 6) % 16
+      rect(m.x + 2 + i * 3 + Math.sin(t / 280 + i) * 1.2, m.y - rise * 0.9, 1.5, 3, '#E9EEF2')
+    }
+    ctx.globalAlpha = 1
+  }
   clock(new Date())
   // Screens in use, which glow in the dark
   const glowing = []
@@ -2158,6 +2270,8 @@ let alertKey = ''
 
 const renderPage = () => {
   renderShop()
+  renderProgress()
+  announce()
   const s = focused()
   const g = state.game
   saldo.hidden = typeof g?.kroner !== 'number'
@@ -2416,6 +2530,7 @@ const showPanel = name => {
   for (const button of panelButtons) button.ariaPressed = String(button.dataset.panel === name)
   people.hidden = name !== 'people'
   shop.hidden = name !== 'shop'
+  document.getElementById('progress').hidden = name !== 'progress'
   try {
     localStorage.setItem('agent-kontor:panel', name)
   } catch {}
@@ -2445,8 +2560,12 @@ const RATE_TEXT = { added: 'linje tilføjet', removed: 'linje fjernet', delivere
 // second, and a button rebuilt under the pointer would swallow the click.
 let shopParts = null
 
-const SHOP_ORDER = ['desk', 'kitchen', 'toilet', 'lounge', 'pingpong', 'meeting']
-const ICONS = { desk: '🪑', kitchen: '☕', toilet: '🚻', lounge: '🛋️', pingpong: '🏓', meeting: '📊' }
+const SHOP_GROUPS = [
+  ['Pladser og rum', ['desk', 'kitchen', 'toilet', 'lounge', 'pingpong', 'meeting']],
+  ['Pynt og opgraderinger', ['plants', 'art', 'neon', 'espresso', 'aquarium', 'chairs', 'screens']],
+]
+const SHOP_ORDER = SHOP_GROUPS.flatMap(([, items]) => items)
+const ICONS = { desk: '🪑', kitchen: '☕', toilet: '🚻', lounge: '🛋️', pingpong: '🏓', meeting: '📊', plants: '🪴', art: '🖼️', neon: '💡', espresso: '☕', aquarium: '🐠', chairs: '💺', screens: '🖥️' }
 const moodFace = score => (score < 35 ? '😟' : score < 60 ? '🙂' : '😄')
 
 const buildShop = g => {
@@ -2484,7 +2603,10 @@ const buildShop = g => {
       moodNote,
       moodParts,
     ]),
-    el('ul', { className: 'items' }, rows.map(r => r.li)),
+    ...SHOP_GROUPS.flatMap(([title, items]) => [
+      el('h3', {}, [title]),
+      el('ul', { className: 'items' }, rows.filter(r => items.includes(r.item)).map(r => r.li)),
+    ]),
     el('h3', {}, ['Sådan tjener du kroner']),
     el('ul', { className: 'rates' }, rates),
   )
@@ -2542,9 +2664,89 @@ const renderShop = () => {
 }
 
 try {
-  showPanel(localStorage.getItem('agent-kontor:panel') === 'shop' ? 'shop' : 'people')
+  const saved = localStorage.getItem('agent-kontor:panel')
+  showPanel(['shop', 'progress'].includes(saved) ? saved : 'people')
 } catch {
   showPanel('people')
+}
+
+// ── Progress: statistics and achievements ────────────────────────────────
+const progressPanel = document.getElementById('progress')
+let progressKey = ''
+
+const renderProgress = () => {
+  const g = state.game
+  const key = JSON.stringify([g?.stats, g?.achievements?.map(a => [a.id, a.value, a.at])])
+  if (key === progressKey) return
+  progressKey = key
+  if (!g?.stats) {
+    progressPanel.replaceChildren(el('p', { className: 'empty' }, ['Statistikken kommer, når kontoret er forbundet.']))
+    return
+  }
+  const { today, days, best, totals, daysActive } = g.stats
+  const number = n => Math.floor(n).toLocaleString('da-DK')
+  const tile = (value, label) => el('div', { className: 'tile' }, [el('strong', {}, [value]), el('span', {}, [label])])
+  const top = Math.max(1, ...days.map(d => d.added))
+  const weekday = day => new Date(`${day}T12:00:00`).toLocaleDateString('da-DK', { weekday: 'narrow' })
+  const bars = el(
+    'div',
+    { className: 'bars', role: 'img', ariaLabel: 'Linjer de sidste 14 dage' },
+    days.map((d, i) =>
+      el('div', { className: `bar${i === days.length - 1 ? ' is-today' : ''}`, title: `${d.day}: ${number(d.added)} linjer, ${number(d.kroner)} kr` }, [
+        el('span', { style: `height:${Math.max(2, (100 * d.added) / top)}%` }, []),
+        el('small', {}, [weekday(d.day)]),
+      ]),
+    ),
+  )
+  const achievements = [...g.achievements].sort((a, b) => (b.at ? 1 : 0) - (a.at ? 1 : 0) || b.value / b.target - a.value / a.target)
+  const unlocked = achievements.filter(a => a.at).length
+  progressPanel.replaceChildren(
+    el('div', { className: 'tiles' }, [tile(number(today.added), 'linjer i dag'), tile(number(today.delivered), 'opgaver i dag'), tile(`${number(today.kroner)} kr`, 'tjent i dag')]),
+    el('h3', {}, ['De sidste 14 dage']),
+    bars,
+    el('p', { className: 'hint' }, [`Bedste dag: ${number(best.added)} linjer · ${daysActive} ${daysActive === 1 ? 'dag' : 'dage'} med arbejde`]),
+    el('h3', {}, ['I alt']),
+    el('ul', { className: 'totals' }, [
+      [number(totals.added), 'linjer skrevet'],
+      [number(totals.delivered), 'opgaver afleveret'],
+      [number(totals.tests), 'grønne testkørsler'],
+      [number(totals.commits), 'commits'],
+      [number(totals.prs), 'pull requests'],
+      [`${number(totals.kroner)} kr`, 'tjent'],
+    ].map(([v, l]) => el('li', {}, [el('strong', {}, [v]), l]))),
+    el('h3', {}, [`Præstationer · ${unlocked} af ${achievements.length}`]),
+    el('ul', { className: 'achievements' }, achievements.map(a =>
+      el('li', { className: `achievement${a.at ? ' is-done' : ''}` }, [
+        el('span', { className: 'medal', ariaHidden: 'true' }, [a.at ? '🏅' : '🔒']),
+        el('div', { className: 'item-head' }, [el('strong', {}, [a.name]), el('span', { className: 'item-count' }, [`+${number(a.reward)} kr`])]),
+        el('p', { className: 'hint' }, [a.at ? `${a.about} · ${new Date(a.at).toLocaleDateString('da-DK')}` : a.about]),
+        ...(a.at ? [] : [el('span', { className: 'progress' }, [el('span', { style: `width:${(100 * a.value) / a.target}%` }, [])]), el('p', { className: 'hint' }, [`${number(a.value)} af ${number(a.target)}`])]),
+      ]),
+    )),
+  )
+}
+
+// A notice in the corner when an achievement is unlocked. Those already
+// unlocked when the page opens are not announced.
+const toasts = document.getElementById('toasts')
+let announced = null
+const announce = () => {
+  const done = (state.game?.achievements ?? []).filter(a => a.at)
+  if (announced === null) {
+    if (state.game) announced = new Set(done.map(a => a.id))
+    return
+  }
+  for (const a of done) {
+    if (announced.has(a.id)) continue
+    announced.add(a.id)
+    const toast = el('div', { className: 'toast', role: 'status' }, [
+      el('span', { className: 'medal' }, ['🏅']),
+      el('div', {}, [el('strong', {}, [`Præstation: ${a.name}`]), el('span', {}, [`${a.about} · +${a.reward} kr`])]),
+    ])
+    toasts.append(toast)
+    setTimeout(() => toast.classList.add('is-leaving'), 6000)
+    setTimeout(() => toast.remove(), 6600)
+  }
 }
 
 const choose = key => {

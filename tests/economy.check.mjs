@@ -21,6 +21,11 @@ const sleep = ms => new Promise(r => setTimeout(r, ms))
 const start = () => spawn(process.execPath, [server], { env: { ...process.env, USERPROFILE: home, HOME: home, AGENT_KONTOR_PORT: PORT }, stdio: 'ignore' })
 const state = async () => (await fetch(`http://127.0.0.1:${PORT}/api/state`)).json()
 const game = async () => (await state()).game
+// The saldo without the rewards for achievements, which come on top
+const earnedKr = async () => {
+  const g = await game()
+  return g.kroner - g.achievements.filter(a => a.at).reduce((sum, a) => sum + a.reward, 0)
+}
 const write = (key, earned, extra = {}) =>
   fs.writeFileSync(path.join(dir, `${key}.json`), JSON.stringify({ v: 2, key, project: 'p', updatedAt: Date.now(), main: { state: 'idle', detail: 'x' }, subs: [], earned, ...extra }))
 let failures = 0
@@ -49,26 +54,26 @@ let total = 0
 write('sA', { ...zero, added: 400, removed: 100, delivered: 2 })
 total += worth(rates, { added: 400, removed: 100, delivered: 2 }) * bare
 await sleep(900)
-near('the first counts are credited', (await game()).kroner, total)
+near('the first counts are credited', await earnedKr(), total)
 
 write('sA', { ...zero, added: 600, removed: 100, delivered: 2, tests: 1 })
 total += worth(rates, { added: 200, tests: 1 }) * bare
 await sleep(900)
-near('only the growth is credited', (await game()).kroner, total)
+near('only the growth is credited', await earnedKr(), total)
 
 child.kill()
 await sleep(300)
 child = start()
 await sleep(900)
-near('a restart credits nothing twice', (await game()).kroner, total)
+near('a restart credits nothing twice', await earnedKr(), total)
 
 // The session ends with a last commit in its final file, which then goes.
 fs.writeFileSync(path.join(dir, 'sA.json'), JSON.stringify({ key: 'sA', ended: true, earned: { ...zero, added: 600, removed: 100, delivered: 2, tests: 1, commits: 1 }, updatedAt: 0 }))
 total += worth(rates, { commits: 1 }) * bare
 await sleep(900)
-near('the ending file is credited', (await game()).kroner, total)
+near('the ending file is credited', await earnedKr(), total)
 check('and then removed', fs.existsSync(path.join(dir, 'sA.json')), false)
-near('spil.json has the kroner', JSON.parse(fs.readFileSync(path.join(home, '.claude', 'agent-kontor', 'spil.json'), 'utf8')).kroner, total)
+near('spil.json has the kroner', JSON.parse(fs.readFileSync(path.join(home, '.claude', 'agent-kontor', 'spil.json'), 'utf8')).kroner, total + (await game()).kroner - (await earnedKr()))
 
 // Buying: only from the page (Origin and token), and only what you can afford.
 const buy = (headers, item = 'desk') =>
@@ -82,22 +87,22 @@ const deskPrice = (await game()).next.desk
 check('a desk you cannot afford is refused', (await buy(page)).status, 409)
 
 // Earn enough for the desk, with lines from a second session.
-let linesB = Math.ceil((deskPrice - total) / (rates.added * bare)) + 40
+let linesB = Math.ceil((deskPrice - (await game()).kroner) / (rates.added * bare)) + 40
 write('sB', { ...zero, added: linesB })
 total += linesB * rates.added * bare
 await sleep(900)
-near('earned enough', (await game()).kroner, total)
+near('earned enough', await earnedKr(), total)
 check('buying the desk works', (await buy(page)).status, 200)
 total -= deskPrice
 const afterDesk = await game()
 check('three desks now', afterDesk.owned.desks, 3)
-near('and the price is paid', afterDesk.kroner, total)
+near('and the price is paid', await earnedKr(), total)
 check('the next desk costs more', afterDesk.next.desk > deskPrice, true)
 
 // Rooms: bought once, and only with the money for them.
 const kitchenPrice = afterDesk.next.kitchen
 check('the kitchen cannot be afforded yet', (await buy(page, 'kitchen')).status, 409)
-const more = Math.ceil((kitchenPrice - total) / (rates.added * bare)) + 40
+const more = Math.ceil((kitchenPrice - (await game()).kroner) / (rates.added * bare)) + 40
 linesB += more
 write('sB', { ...zero, added: linesB })
 total += more * rates.added * bare
@@ -122,6 +127,20 @@ const before = crowded.kroner
 write('sB', { ...zero, added: linesB + 400 }, { subs: helpers(6) })
 await sleep(900)
 near('400 lines earn less at that wellbeing', (await game()).kroner - before, 400 * rates.added * 0.92)
+
+// Statistics and achievements
+const stats = (await game()).stats
+check('today counts every line credited', stats.today.added, linesB + 400 + 600)
+check('fourteen days of history', stats.days.length, 14)
+const achieved = Object.fromEntries((await game()).achievements.map(a => [a.id, a.at !== null]))
+check('first line achieved', achieved['lines-1'], true)
+check('1.000 lines achieved', achieved['lines-1k'], true)
+check('first desk achieved', achieved['desk-3'], true)
+check('kitchen achieved', achieved['kitchen'], true)
+check('100.000 lines not yet', achieved['lines-100k'], false)
+// Decor is for sale, and lifts wellbeing
+const g0 = await game()
+check('plants are for sale', typeof g0.next.plants, 'number')
 
 child.kill()
 fs.rmSync(home, { recursive: true, force: true })

@@ -1,6 +1,6 @@
 # Spillet i Agent-kontor
 
-Status: **fase 0 til 3 er lavet (0.8.0 til 0.11.0).** Beslutningerne står under [Besluttet](#besluttet).
+Status: **fase 0 til 4 er lavet (0.8.0 til 0.13.0).** Beslutningerne står under [Besluttet](#besluttet).
 
 ## Idéen
 
@@ -43,6 +43,13 @@ En travl time (ca. 2.000 linjer, ti opgaver, et par tests og commits) giver omkr
 | Sofahjørne | 4.000 kr | Hygge i teamrummet |
 | Bordtennisbord | 6.000 kr | To spiller i pauserne |
 | Mødelokale | 12.000 kr | Claude holder møde hvert 10. minut |
+| Planter overalt | 600 kr | +3 trivsel |
+| Kunst på væggene | 900 kr | +3 trivsel |
+| Neonskilt | 1.200 kr | +2 trivsel; lyser om aftenen |
+| Espressomaskine | 1.500 kr | +3 trivsel; damper hele dagen |
+| Akvarium | 2.500 kr | +5 trivsel; fisk i stillerummet |
+| Ergonomiske stole | 4.000 kr | +6 trivsel |
+| Store skærme | 5.000 kr | +5 trivsel |
 
 Alt i alt koster kontoret ca. 56.000 kr, svarende til 70-80 travle timer. Det første skrivebord kommer efter godt en time, køkkenet efter 5-6 timer.
 
@@ -128,7 +135,7 @@ Det betyder, at **fase 0 er større**, end den ellers ville være. Til gengæld 
 | **1. Pladser** | Køb skriveborde, gulvsiddere med laptop og brok, butik-fanen | M ✅ |
 | **2. Rum** | Ledige grunde, køb rum, byggeri med stillads, køkken/toilet/sofa/bordtennis/mødelokale | L ✅ |
 | **3. Liv** | Rummene bliver brugt: kaffe, toiletbesøg, bordtennis, møder; trivsel; **drama og banter** mellem hjælperne, når de står i kantinen | L ✅ |
-| **4. Mere** | Pynt-butik, opgraderinger (bedre stole, større skærme), præstationer ("1.000 linjer på en dag"), statistik | M |
+| **4. Mere** | Pynt (planter, kunst, neonskilt, espressomaskine, akvarium), opgraderinger (ergonomiske stole, store skærme), 17 præstationer med belønning og notifikation, statistik for i dag, 14 dage, bedste dag og i alt | M ✅ |
 | **5. Vækst** | Mere grund, flere arbejdsrum, nye etager med elevator, hjælpere fordelt på flere rum; **en ny bygning eller stor udvidelse, hvor man kan se sine andre sessioner** (indtil da skifter man mellem dem med fanerne øverst) | L |
 
 Hver fase kan bruges for sig og skal være færdig og testet, før den næste starter.

@@ -27,6 +27,7 @@ Status: ✅ lavet · 🟡 delvist · ⬜ ikke lavet · ➖ ikke længere relevan
 | 0.11.0 | Spillets fase 3: kaffepauser, toiletbesøg, bordtennis og møder hos Claude; drama og banter i køkkenet ud fra dagens rigtige tal; trivsel der ganger indtjeningen; projektrummet er blevet et stillerum med fire skriveborde mere; CLAUDE.md |
 | 0.11.1 | Fejlrettelser: ingen går gennem væggene (døre forbinder rummene i rutegitteret, og der er fri vej ud af Claudes kontor), nyt toilet med døren ud til et frit område, ingen fliser i væggene; langsommere indtjening og højere priser, så kontoret bygges over uger |
 | 0.12.0 | En lækrere side rundt om kontoret: topbjælke med ikon, trivsel, saldo og forbindelsesprik; kort med pixel-portræt og statuspille i listen; venteboks med "Gå til"; butik med ikoner og fremdrift; kun mørkt tema |
+| 0.13.0 | Spillets fase 4: pynt og opgraderinger i butikken, 17 præstationer med belønning og notifikation, statistik i den nye fane Fremskridt |
 
 ## 🔧 Fejl og ting der driller
 

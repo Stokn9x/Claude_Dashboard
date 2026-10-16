@@ -151,6 +151,36 @@
     .plus { color: var(--good); font-weight: 600; }
     .minus { color: var(--alert); font-weight: 600; }
     .rates li { display: grid; grid-template-columns: 64px 1fr; font-size: 13px; }
+
+    /* ── Progress ───────────────────────────────────────────────────────── */
+    .progress-panel { display: grid; gap: 10px; }
+    .progress-panel h3 { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--faint); margin: 6px 2px 0; }
+    .tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+    .tile { padding: 10px; border-radius: 12px; background: var(--surface-2); display: grid; gap: 2px; }
+    .tile strong { font-size: 18px; font-variant-numeric: tabular-nums; }
+    .tile span { font-size: 11px; color: var(--soft); }
+    .bars { display: grid; grid-template-columns: repeat(14, 1fr); gap: 3px; height: 92px; align-items: end; padding: 8px; border-radius: 12px; background: var(--surface-2); }
+    .bar { display: grid; grid-template-rows: 1fr auto; height: 100%; align-items: end; justify-items: center; gap: 2px; }
+    .bar span { width: 100%; border-radius: 3px 3px 1px 1px; background: color-mix(in srgb, var(--accent) 55%, transparent); }
+    .bar.is-today span { background: var(--accent); }
+    .bar small { font-size: 9px; color: var(--faint); }
+    .totals { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 4px 12px; font-size: 13px; }
+    .totals strong { margin-right: 6px; font-variant-numeric: tabular-nums; }
+    .achievements { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+    .achievement { padding: 8px 10px; border-radius: 12px; background: var(--surface-2); display: grid; grid-template-columns: 28px 1fr; gap: 2px 8px; align-items: start; }
+    .achievement > :not(.medal) { grid-column: 2; }
+    .achievement .medal { grid-row: 1 / span 4; font-size: 18px; line-height: 28px; text-align: center; }
+    .achievement:not(.is-done) { opacity: 0.8; }
+    .achievement:not(.is-done) .medal { filter: grayscale(1); opacity: 0.6; }
+
+    /* Notices in the corner */
+    .toasts { position: fixed; right: 20px; bottom: 20px; display: grid; gap: 8px; z-index: 10; }
+    .toast { display: flex; gap: 10px; align-items: center; padding: 10px 14px; border-radius: 12px; background: var(--surface); border: 1px solid color-mix(in srgb, var(--warn) 50%, var(--line)); box-shadow: var(--shadow); animation: toast-in 0.3s ease-out; transition: opacity 0.5s, transform 0.5s; }
+    .toast .medal { font-size: 22px; }
+    .toast div { display: grid; }
+    .toast span { color: var(--soft); font-size: 12px; }
+    .toast.is-leaving { opacity: 0; transform: translateY(8px); }
+    @keyframes toast-in { from { opacity: 0; transform: translateY(12px); } }
     .rate { font-weight: 600; font-variant-numeric: tabular-nums; }
   </style>
 </head>
@@ -181,12 +211,15 @@
         <div class="panels" role="tablist">
           <button type="button" data-panel="people" aria-pressed="true">Hvem laver hvad</button>
           <button type="button" data-panel="shop" aria-pressed="false">Butik</button>
+          <button type="button" data-panel="progress" aria-pressed="false">Fremskridt</button>
         </div>
         <ul class="people" id="people"></ul>
         <section class="shop" id="shop" hidden></section>
+        <section class="progress-panel" id="progress" hidden></section>
       </div>
     </aside>
   </main>
+  <div class="toasts" id="toasts" aria-live="polite"></div>
   <script src="/app.js"></script>
 </body>
 </html>

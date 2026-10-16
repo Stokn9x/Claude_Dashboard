@@ -15,7 +15,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-const VERSION = '0.12.0'
+const VERSION = '0.13.0'
 const HOST = '127.0.0.1'
 const PORT = Number(process.env.AGENT_KONTOR_PORT || 4747)
 const HERE = path.dirname(fileURLToPath(import.meta.url))
@@ -89,13 +89,19 @@ const saveGame = () => {
 // How the office feels, 0 to 100: a bare office is so-so, every room and
 // piece of furniture makes it better, every helper on the floor worse. It
 // multiplies what the work earns by 0.8 to 1.2.
-const WELLBEING = { base: 40, kitchen: 15, toilet: 10, lounge: 10, pingpong: 10, meeting: 5, perFloorSitter: -8 }
+const WELLBEING = {
+  base: 40,
+  kitchen: 15, toilet: 10, lounge: 10, pingpong: 10, meeting: 5,
+  plants: 3, art: 3, neon: 2, espresso: 3, aquarium: 5, chairs: 6, screens: 5,
+  perFloorSitter: -8,
+}
+const LIFTS = ['kitchen', 'toilet', 'lounge', 'pingpong', 'meeting', 'plants', 'art', 'neon', 'espresso', 'aquarium', 'chairs', 'screens']
 // Helpers on the floor right now: the most any session has beyond the desks.
 let floorNow = 0
 
 const wellbeing = () => {
   const parts = [{ what: 'Grundniveau', points: WELLBEING.base }]
-  for (const item of ['kitchen', 'toilet', 'lounge', 'pingpong', 'meeting']) {
+  for (const item of LIFTS) {
     if (game.owned.rooms.includes(item)) parts.push({ what: item, points: WELLBEING[item] })
   }
   if (floorNow > 0) parts.push({ what: 'floor', count: floorNow, points: floorNow * WELLBEING.perFloorSitter })
@@ -127,9 +133,38 @@ const credit = (status, now) => {
     }
     return
   }
-  game.kroner += kroner * wellbeing().multiplier
+  const gained = kroner * wellbeing().multiplier
+  game.kroner += gained
+  // The same growth, counted for statistics: in all, and for today.
+  const day = dayOf(now)
+  game.totals ??= {}
+  game.days ??= {}
+  game.days[day] ??= {}
+  for (const k of Object.keys(RATES)) {
+    const count = Number(earned[k]) || 0
+    const was = Number(before[k]) || 0
+    const grew = count >= was ? count - was : count
+    game.totals[k] = (game.totals[k] ?? 0) + grew
+    game.days[day][k] = (game.days[day][k] ?? 0) + grew
+  }
+  game.totals.kroner = (game.totals.kroner ?? 0) + gained
+  game.days[day].kroner = (game.days[day].kroner ?? 0) + gained
   game.credited[status.key] = { earned: { ...earned }, at: now }
   isGameChanged = true
+}
+
+// The local date, as YYYY-MM-DD, for the day's statistics.
+const dayOf = at => {
+  const d = new Date(at)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+const DAYS_KEPT = 60
+const pruneDays = () => {
+  const days = Object.keys(game.days ?? {}).sort()
+  for (const day of days.slice(0, Math.max(0, days.length - DAYS_KEPT))) {
+    delete game.days[day]
+    isGameChanged = true
+  }
 }
 
 const pruneCredited = now => {
@@ -149,10 +184,13 @@ const DESK_PRICES = [0, 0, 800, 1200, 1800, 2500, 3500, 4500, 6000, 8000]
 const MAX_DESKS = DESK_PRICES.length
 // Rooms, and furniture for the team room, bought once each.
 const ROOM_PRICES = { kitchen: 3000, toilet: 2500, lounge: 4000, pingpong: 6000, meeting: 12000 }
+// Decor and upgrades: bought once each, for the look and for wellbeing.
+const DECOR_PRICES = { plants: 600, art: 900, neon: 1200, espresso: 1500, aquarium: 2500, chairs: 4000, screens: 5000 }
+const THING_PRICES = { ...ROOM_PRICES, ...DECOR_PRICES }
 
 const priceOf = item => {
   if (item === 'desk') return game.owned.desks < MAX_DESKS ? DESK_PRICES[game.owned.desks] : null
-  if (item in ROOM_PRICES) return game.owned.rooms.includes(item) ? null : ROOM_PRICES[item]
+  if (item in THING_PRICES) return game.owned.rooms.includes(item) ? null : THING_PRICES[item]
   return null
 }
 
@@ -165,8 +203,48 @@ const buy = item => {
   else game.owned.rooms = [...game.owned.rooms, item]
   game.log = [...(game.log ?? []), { at: Date.now(), item, price }].slice(-50)
   isGameChanged = true
+  checkAchievements(Date.now())
   saveGame()
   return { status: 200 }
+}
+
+// ── Achievements ────────────────────────────────────────────────────────
+// Milestones over all sessions and days. Each is unlocked once, with a
+// small reward in kroner (not multiplied by wellbeing), and the page shows
+// a notice when it happens.
+const total = k => game.totals?.[k] ?? 0
+const daysActive = () => Object.values(game.days ?? {}).filter(d => (d.added ?? 0) + (d.delivered ?? 0) + (d.commits ?? 0) > 0).length
+const bestDay = k => Math.max(0, ...Object.values(game.days ?? {}).map(d => d[k] ?? 0))
+const ALL_ROOMS = Object.keys(ROOM_PRICES)
+
+const ACHIEVEMENTS = [
+  { id: 'lines-1', name: 'Første linje', about: 'Skriv den første linje', reward: 10, value: () => total('added'), target: 1 },
+  { id: 'lines-1k', name: '1.000 linjer', about: 'Skriv 1.000 linjer i alt', reward: 100, value: () => total('added'), target: 1000 },
+  { id: 'lines-10k', name: '10.000 linjer', about: 'Skriv 10.000 linjer i alt', reward: 500, value: () => total('added'), target: 10_000 },
+  { id: 'lines-100k', name: '100.000 linjer', about: 'Skriv 100.000 linjer i alt', reward: 2000, value: () => total('added'), target: 100_000 },
+  { id: 'day-1k', name: 'En god dag', about: 'Skriv 1.000 linjer på én dag', reward: 300, value: () => bestDay('added'), target: 1000 },
+  { id: 'tasks-10', name: 'Holdspiller', about: 'Få 10 opgaver afleveret af hjælpere', reward: 100, value: () => total('delivered'), target: 10 },
+  { id: 'tasks-100', name: 'Teamleder', about: 'Få 100 opgaver afleveret af hjælpere', reward: 500, value: () => total('delivered'), target: 100 },
+  { id: 'tests-10', name: 'Grøn bølge', about: 'Kør grønne tests 10 gange', reward: 150, value: () => total('tests'), target: 10 },
+  { id: 'commits-10', name: 'Committed', about: 'Lav 10 commits', reward: 150, value: () => total('commits'), target: 10 },
+  { id: 'prs-5', name: 'Ship it', about: 'Åbn 5 pull requests', reward: 300, value: () => total('prs'), target: 5 },
+  { id: 'desk-3', name: 'Indflytning', about: 'Køb det første skrivebord', reward: 50, value: () => game.owned.desks, target: 3 },
+  { id: 'desk-10', name: 'Fuldt hus', about: 'Køb alle ti skriveborde', reward: 1000, value: () => game.owned.desks, target: MAX_DESKS },
+  { id: 'kitchen', name: 'Kaffekultur', about: 'Byg køkkenet', reward: 100, value: () => (game.owned.rooms.includes('kitchen') ? 1 : 0), target: 1 },
+  { id: 'all-rooms', name: 'Hele kontoret', about: 'Byg alle rum og alt inventar', reward: 2000, value: () => ALL_ROOMS.filter(r => game.owned.rooms.includes(r)).length, target: ALL_ROOMS.length },
+  { id: 'wellbeing-90', name: 'Trivselsguru', about: 'Nå en trivsel på 90', reward: 500, value: () => wellbeing().score, target: 90 },
+  { id: 'days-5', name: 'Stabil', about: 'Arbejd på 5 forskellige dage', reward: 300, value: daysActive, target: 5 },
+  { id: 'days-20', name: 'Stamgæst', about: 'Arbejd på 20 forskellige dage', reward: 1000, value: daysActive, target: 20 },
+]
+
+const checkAchievements = now => {
+  game.achieved ??= {}
+  for (const a of ACHIEVEMENTS) {
+    if (game.achieved[a.id] || a.value() < a.target) continue
+    game.achieved[a.id] = now
+    game.kroner += a.reward
+    isGameChanged = true
+  }
 }
 
 // What the page sees of the game: the money, what is owned, what the next
@@ -174,7 +252,7 @@ const buy = item => {
 const gameView = () => ({
   kroner: Math.floor(game.kroner),
   owned: game.owned,
-  next: Object.fromEntries(['desk', ...Object.keys(ROOM_PRICES)].map(item => [item, priceOf(item)])),
+  next: Object.fromEntries(['desk', ...Object.keys(THING_PRICES)].map(item => [item, priceOf(item)])),
   maxDesks: MAX_DESKS,
   rates: RATES,
   wellbeing: (() => {
@@ -182,7 +260,27 @@ const gameView = () => ({
     return { score: w.score, multiplier: Math.round(w.multiplier * 100) / 100, parts: w.parts }
   })(),
   bought: (game.log ?? []).slice(-5),
+  stats: statsView(),
+  achievements: ACHIEVEMENTS.map(a => ({ id: a.id, name: a.name, about: a.about, reward: a.reward, value: Math.min(a.value(), a.target), target: a.target, at: game.achieved?.[a.id] ?? null })),
 })
+
+// The last two weeks day by day, today, the best day and the totals.
+const statsView = () => {
+  const now = Date.now()
+  const days = []
+  for (let i = 13; i >= 0; i--) {
+    const day = dayOf(now - i * 24 * 60 * 60_000)
+    const d = game.days?.[day] ?? {}
+    days.push({ day, added: d.added ?? 0, delivered: d.delivered ?? 0, kroner: Math.floor(d.kroner ?? 0) })
+  }
+  return {
+    days,
+    today: days[days.length - 1],
+    best: { added: bestDay('added') },
+    totals: { added: total('added'), removed: total('removed'), delivered: total('delivered'), tests: total('tests'), commits: total('commits'), prs: total('prs'), kroner: Math.floor(total('kroner')) },
+    daysActive: daysActive(),
+  }
+}
 
 // ── The sessions, as their files say ────────────────────────────────────
 
@@ -252,7 +350,9 @@ const send = (res, text) => {
 const publish = (isForced = false) => {
   sessionsNow = readSessions()
   floorNow = floorSittersIn(sessionsNow)
+  checkAchievements(Date.now())
   pruneCredited(Date.now())
+  pruneDays()
   saveGame()
   if (sessionsNow.length > 0) lastBusyAt = Date.now()
   current = stateOf(sessionsNow)
