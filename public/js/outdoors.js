@@ -11,11 +11,14 @@ import { FLOWERS, HEDGE_Y, TREES, TUFTS } from './scenery.js'
 export const GRASS = '#7FAE63'
 const S = GROUNDS.scene
 const LEAVES = [['#3E8A55', '#56A86B', '#6CC082'], ['#357A4A', '#4C9A60', '#62B377'], ['#4A9150', '#62AC63', '#7DC27A']]
+// In the autumn the leafy trees turn, each its own way
+const AUTUMN = [['#B5532E', '#D9752F', '#F2A541'], ['#A86A2A', '#CC912E', '#E8B84A'], ['#7E8A3A', '#A6A23E', '#CDB54D']]
+const GRASS_IN = { spring: '#80B566', summer: GRASS, autumn: '#8AA95C', winter: '#8C9F7A' }
 const PINES = [['#2F6B48', '#3E8A5A'], ['#2A6142', '#377D52'], ['#336F4A', '#45905F']]
 
 // The ground and everything on it that stands still, on the background
 // canvas `g`, skipping what lies out of view.
-export const drawGrounds = (g, view) => {
+export const drawGrounds = (g, view, { season = 'summer', snow = 0 } = {}) => {
   const seen = (x, y, pad = 40) => x > view.x - pad && x < view.x + view.w + pad && y > view.y - pad && y < view.y + view.h + pad
   const fill = (x, y, w, h, c) => {
     g.fillStyle = c
@@ -33,12 +36,18 @@ export const drawGrounds = (g, view) => {
     }
   }
 
-  // Grass under everything, as far as the window reaches
-  fill(view.x, view.y, view.w, view.h, GRASS)
+  // Grass under everything, as far as the window reaches; flowers in spring
+  // and summer; snow over it all when it lies
+  fill(view.x, view.y, view.w, view.h, GRASS_IN[season] ?? GRASS)
   for (const t of TUFTS) if (seen(t.x, t.y)) fill(t.x, t.y, 5, 2, t.k === 0 ? '#6E9E55' : t.k === 1 ? '#8DBB6F' : '#76A65C')
-  for (const f of FLOWERS) {
+  for (const f of season === 'spring' || season === 'summer' ? FLOWERS : []) {
     if (!seen(f.x, f.y)) continue
     for (const [dx, dy] of [[0, 0], [5, 2], [2, 6], [-4, 4]]) disc(f.x + dx, f.y + dy, 1.4, f.colour)
+  }
+  if (snow > 0) {
+    g.globalAlpha = 0.88 * snow
+    fill(view.x, view.y, view.w, view.h, '#EEF3F7')
+    g.globalAlpha = 1
   }
 
   // The pond, with reeds and lily pads
@@ -50,7 +59,8 @@ export const drawGrounds = (g, view) => {
     g.fill()
     g.beginPath()
     g.ellipse(p.x, p.y, p.rx, p.ry, 0, 0, Math.PI * 2)
-    g.fillStyle = '#4F97C4'
+    // Frozen over in a snowy winter
+    g.fillStyle = snow > 0.4 ? '#B9D6E6' : '#4F97C4'
     g.fill()
     g.beginPath()
     g.ellipse(p.x - 6, p.y - 4, p.rx * 0.78, p.ry * 0.7, 0, 0, Math.PI * 2)
@@ -102,7 +112,7 @@ export const drawGrounds = (g, view) => {
     g.lineWidth = 1
     g.strokeStyle = '#2C5E34'
     g.stroke()
-    fill(x + 4, HEDGE_Y + 2, 24, 3, '#56A060')
+    fill(x + 4, HEDGE_Y + 2, 24, 3, snow > 0.4 ? '#F2F6F9' : '#56A060')
     if ((x / 36) % 3 === 0) disc(x + 22, HEDGE_Y + 6, 1.4, '#E5484D')
   }
 
@@ -172,8 +182,34 @@ export const drawGrounds = (g, view) => {
         g.fillStyle = light
         g.fill()
       }
+      if (snow > 0.4) {
+        // Snow on the top of the pine
+        const top = t.y - 10 - t.r * 1.55
+        g.beginPath()
+        g.moveTo(t.x, top - t.r * 0.55)
+        g.lineTo(t.x + t.r * 0.3, top - t.r * 0.1)
+        g.lineTo(t.x - t.r * 0.3, top - t.r * 0.1)
+        g.closePath()
+        g.fillStyle = '#F4F8FB'
+        g.fill()
+      }
+    } else if (season === 'winter') {
+      // Bare in the winter: a trunk and its branches
+      fill(t.x - 2.5, t.y - 12, 5, 13, '#6E4B32')
+      g.strokeStyle = '#6E4B32'
+      g.lineCap = 'round'
+      const top = t.y - 12 - t.r * 1.2
+      for (const [dx, dy, w] of [[0, -t.r * 1.2, 3], [-t.r * 0.7, -t.r * 0.9, 2], [t.r * 0.7, -t.r * 0.8, 2], [-t.r * 0.4, -t.r * 0.4, 1.5], [t.r * 0.5, -t.r * 0.3, 1.5]]) {
+        g.lineWidth = w
+        g.beginPath()
+        g.moveTo(t.x, t.y - 10)
+        g.lineTo(t.x + dx, t.y - 12 + dy)
+        g.stroke()
+      }
+      g.lineCap = 'butt'
+      if (snow > 0.4) disc(t.x, top + 2, t.r * 0.3, '#F4F8FB')
     } else {
-      const [dark, mid, light] = LEAVES[t.shade]
+      const [dark, mid, light] = (season === 'autumn' ? AUTUMN : LEAVES)[t.shade]
       fill(t.x - 2.5, t.y - 12, 5, 13, '#6E4B32')
       const cy = t.y - 12 - t.r * 0.7
       disc(t.x, cy, t.r, dark, OUTLINE)
@@ -182,6 +218,8 @@ export const drawGrounds = (g, view) => {
       disc(t.x, cy, t.r * 0.92, dark)
       disc(t.x - t.r * 0.3, cy - t.r * 0.25, t.r * 0.5, mid)
       disc(t.x - t.r * 0.42, cy - t.r * 0.4, t.r * 0.22, light)
+      // Blossom on some of them in the spring
+      if (season === 'spring' && t.shade === 0) for (const [dx, dy] of [[-0.4, -0.2], [0.3, -0.4], [0.5, 0.2], [-0.1, 0.3], [0, -0.7]]) disc(t.x + dx * t.r, cy + dy * t.r, 1.8, '#F6C6D8')
     }
   }
 }

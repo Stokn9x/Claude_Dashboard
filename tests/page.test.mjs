@@ -585,3 +585,34 @@ test('nine helpers can hand over side by side', () => {
   const spots = new Set(Array.from({ length: 9 }, (_, seat) => JSON.stringify(plan.handoffFor(seat))))
   assert.equal(spots.size, 9)
 })
+
+// ── Weather and seasons ──────────────────────────────────────────────────
+
+test('the weather is the same for everyone, never snows in summer, and rains most in the autumn', async () => {
+  const weather = await import(js('weather'))
+  const at = (month, block) => new Date(2026, month - 1, 1).getTime() + block * weather.BLOCK_MS + weather.BLOCK_MS / 2
+  const kinds = month => Array.from({ length: 240 }, (_, b) => weather.weatherAt(at(month, b)).kind)
+  const share = (month, kind) => kinds(month).filter(k => k === kind).length / 240
+  assert.equal(share(7, 'snow'), 0)
+  assert.ok(share(1, 'snow') > 0.05, 'some snow in January')
+  assert.ok(share(10, 'rain') > share(7, 'rain'), 'more rain in October than July')
+  assert.deepEqual(weather.weatherAt(123_456_789), weather.weatherAt(123_456_789))
+  assert.equal(weather.seasonOf(new Date(2026, 9, 16)), 'autumn')
+  assert.equal(weather.isChristmasTime(new Date(2026, 11, 20)), true)
+  assert.equal(weather.isChristmasTime(new Date(2026, 11, 28)), false)
+  const asked = weather.weatherAt(0, { kind: 'snow', month: 12 })
+  assert.deepEqual([asked.kind, asked.snowCover, asked.season, asked.isChristmas], ['snow', 1, 'winter', true])
+})
+
+test('weather fades in and out at the edges of its three hours, and snow lies a while after', async () => {
+  const weather = await import(js('weather'))
+  for (let b = 0; b < 500; b++) {
+    const start = b * weather.BLOCK_MS
+    const before = weather.weatherAt(start - 1000)
+    const after = weather.weatherAt(start + 1000)
+    if (before.kind !== after.kind) {
+      assert.ok(before.intensity < 0.05 && after.intensity < 0.05, `a soft change at block ${b}`)
+      if (before.kind === 'snow') assert.ok(after.snowCover > 0.9, 'the snow still lies')
+    }
+  }
+})

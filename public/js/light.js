@@ -3,8 +3,10 @@
 // everything with the lamps, the screens and the street lights glowing.
 import { owns } from './store.js'
 import { circle, ctx } from './gfx.js'
-import { GROUNDS, PLAN, hasNow, isBuilt, isOpenDoor, shiftOf, sideWindowsOf, topWindowsOf, typeOf } from './plan.js'
+import { GROUNDS, PLAN, hasNow, isBuilt, isOpenDoor, rectOf, roomById, shiftOf, sideWindowsOf, topWindowsOf, typeOf } from './plan.js'
 import { visibleRect, visibleRooms } from './camera.js'
+import { stir } from './util.js'
+import { weatherAt } from './weather.js'
 
 // The time of day, in hours (14.5 is half past two). ?tid=21:30 in the
 // address shows the office at that time instead, to see the evening by day.
@@ -17,6 +19,13 @@ export const timeOfDay = () => {
   const d = new Date()
   return d.getHours() + d.getMinutes() / 60
 }
+
+// The weather now (weather.js). ?vejr=regn, sne, skyet or klart in the
+// address shows that weather, and ?maaned=12 that month's season.
+const params = new URLSearchParams(location.search)
+const WEATHER_WORDS = { klart: 'clear', skyet: 'cloudy', regn: 'rain', sne: 'snow' }
+const askedWeather = { kind: WEATHER_WORDS[params.get('vejr')], month: Number(params.get('maaned')) || undefined }
+export const weatherNow = () => weatherAt(Date.now(), askedWeather)
 
 // How dark it is: none in the working day, deepening through the evening.
 const NIGHT = 0.55
@@ -66,6 +75,67 @@ export const daylight = h => {
     const inner = w.isLeft ? w.x + 6 : w.x
     const far = w.isLeft ? inner + 84 : inner - 84
     beam([[inner, w.y], [inner, w.y + w.h], [far, w.y + w.h + 18], [far, w.y - 18]], inner, 0, far, 0)
+  }
+  ctx.globalAlpha = 1
+}
+
+// The weather over everything: a greyer light under clouds, rain falling
+// in streaks and running along the window panes, or snow drifting down.
+// Spread over the window, so a wide screen has as much as a small one.
+const fraction = (i, salt) => (stir(i, salt) % 10_000) / 10_000
+export const drawWeather = (w, t) => {
+  const v = visibleRect()
+  const k = w.intensity
+  const dim = w.kind === 'rain' ? 0.2 : w.kind === 'cloudy' ? 0.1 : w.kind === 'snow' ? 0.06 : 0
+  if (dim > 0) {
+    ctx.fillStyle = `rgba(40, 52, 72, ${dim * k})`
+    ctx.fillRect(v.x, v.y, v.w, v.h)
+  }
+  const pixel = v.w / ctx.canvas.clientWidth
+  if (w.kind === 'rain') {
+    ctx.strokeStyle = 'rgba(196, 214, 236, 0.5)'
+    ctx.lineWidth = pixel
+    ctx.beginPath()
+    const length = 16 * pixel
+    for (let i = 0; i < Math.round(170 * k); i++) {
+      const fy = (fraction(i, 8) + (t / 650) * (0.9 + fraction(i, 9) * 0.5)) % 1
+      const fx = (fraction(i, 7) - fy * 0.06 + 1) % 1
+      const x = v.x + fx * v.w
+      const y = v.y + fy * v.h
+      ctx.moveTo(x, y)
+      ctx.lineTo(x - length * 0.3, y + length)
+    }
+    ctx.stroke()
+    // Drops running along the panes
+    ctx.fillStyle = `rgba(227, 240, 250, ${0.75 * k})`
+    for (const { x, y } of topWindows()) {
+      for (let i = 0; i < 3; i++) ctx.fillRect(x + ((i * 19 + t / 70 + x) % 54), y + 1.5 + (i % 2), 1.4, 1.4)
+    }
+  } else if (w.kind === 'snow') {
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.9)'
+    for (let i = 0; i < Math.round(220 * k); i++) {
+      const speed = 0.6 + fraction(i, 12) * 0.8
+      const fy = (fraction(i, 11) + (t / 14_000) * speed) % 1
+      const fx = (fraction(i, 10) + Math.sin(t / 1600 + i) * 0.006 + 1) % 1
+      ctx.beginPath()
+      ctx.arc(v.x + fx * v.w, v.y + fy * v.h, (1.1 + fraction(i, 13) * 1.6) * pixel, 0, Math.PI * 2)
+      ctx.fill()
+    }
+  }
+}
+
+// In December, lights along both walls of the hall, twinkling in turn.
+const XMAS = ['#E5484D', '#F2C14E', '#3EBD6E', '#5BA4F0']
+export const christmasLights = t => {
+  const hall = roomById('hall')
+  if (!hall || !isBuilt(hall)) return
+  const r = rectOf(hall)
+  for (const y of [r.y + 2.5, r.y + r.h - 2.5]) {
+    for (let x = r.x + 8, i = 0; x < r.x + r.w - 6; x += 14, i++) {
+      const isLit = (Math.floor(t / 600) + i) % 4 !== 0
+      ctx.globalAlpha = isLit ? 1 : 0.35
+      circle(x, y, 1.7, XMAS[i % XMAS.length])
+    }
   }
   ctx.globalAlpha = 1
 }

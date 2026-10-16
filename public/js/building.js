@@ -4,9 +4,9 @@
 // what is owned changes. Rooms out of view are skipped, so a large office
 // costs no more than what is on screen.
 import { store } from './store.js'
-import { FONT, canvas, readable } from './gfx.js'
+import { FONT, OUTLINE, canvas, readable } from './gfx.js'
 import { clip } from './util.js'
-import { MAIN, PLAN, ROOM_NAMES, WORLD, topWallOf, doormat, frameOf, isBuilt, isOpenDoor, lotOf, nextStepOf, rectOf, roomById, shiftOf, topWindowsOf, typeOf } from './plan.js'
+import { MAIN, PLAN, ROOM_NAMES, WORLD, at, topWallOf, doormat, frameOf, isBuilt, isOpenDoor, lotOf, nextStepOf, rectOf, roomById, shiftOf, topWindowsOf, typeOf } from './plan.js'
 import { applyView, onResize, visibleRect, visibleRooms, view } from './camera.js'
 import { isNightAt, sideWindows, skyAt } from './light.js'
 import { drawGrounds } from './outdoors.js'
@@ -26,10 +26,16 @@ onResize(() => {
 // A plot not yet bought: levelled earth with a few tufts, pegged out with
 // stakes and a rope round it. Its sign, with the price, is drawn on top each
 // frame.
-const drawLot = (g, fill, { x, y, w, h }) => {
+const drawLot = (g, fill, { x, y, w, h }, snow = 0) => {
   fill(x, y, w, h, '#8FA572')
   fill(x + 6, y + 6, w - 12, h - 12, '#A3B184')
   for (let i = 0; i < 18; i++) fill(x + ((i * 53) % (w - 16)) + 8, y + ((i * 37) % (h - 16)) + 8, 6, 3, i % 3 ? '#93A775' : '#B9A27A')
+  // Under the snow like the rest of the grounds
+  if (snow > 0) {
+    g.globalAlpha = 0.85 * snow
+    fill(x, y, w, h, '#EEF3F7')
+    g.globalAlpha = 1
+  }
   // The rope, and a stake every forty units or so along it
   g.strokeStyle = '#E8DCC0'
   g.lineWidth = 1
@@ -101,10 +107,35 @@ const nextLot = room => {
   return isDepot ? null : lot
 }
 
-export const drawBuilding = (project, hour) => {
+// A small Christmas tree with a star, in December, in a corner of the
+// reception.
+const XMAS_TREE = { x: 200, y: 336 }
+const christmasTree = (g, fill, dot, { x, y }) => {
+  fill(x - 6, y + 12, 12, 7, '#B5683E')
+  fill(x - 1.5, y + 8, 3, 5, '#6E4B32')
+  for (const [w, top] of [[13, -2], [10, -9], [7, -15]]) {
+    g.beginPath()
+    g.moveTo(x, top + y - 6)
+    g.lineTo(x + w, top + y + 9)
+    g.lineTo(x - w, top + y + 9)
+    g.closePath()
+    g.fillStyle = '#2F7A4A'
+    g.fill()
+    g.lineWidth = 1
+    g.strokeStyle = OUTLINE
+    g.stroke()
+  }
+  for (const [dx, dy, c] of [[-6, 4, '#E5484D'], [5, 1, '#F2C14E'], [-2, -4, '#5BA4F0'], [3, -9, '#E5484D'], [-8, 9, '#F2C14E'], [8, 8, '#5BA4F0']]) dot(x + dx, y + dy, 1.5, c)
+  dot(x, y - 22, 2.4, '#F2C14E', '#AD7F26')
+}
+
+// `look` is the weather and the season (weather.js): the trees' colours,
+// snow on the ground and the walls, and Christmas.
+export const drawBuilding = (project, hour, look = {}) => {
   const isNight = isNightAt(hour)
   const owned = (store.state.game?.owned?.rooms ?? ['*']).join(',')
-  const key = `${project}|${skyAt(hour)}|${background.width}x${background.height}|${view.x.toFixed(2)},${view.y.toFixed(2)},${view.zoom.toFixed(4)}|${owned}`
+  const snow = Math.round((look.snowCover ?? 0) * 5) / 5
+  const key = `${project}|${skyAt(hour)}|${background.width}x${background.height}|${view.x.toFixed(2)},${view.y.toFixed(2)},${view.zoom.toFixed(4)}|${owned}|${look.season}|${snow}|${look.isChristmas}`
   if (key === backgroundKey) return
   backgroundKey = key
   const g = background.getContext('2d')
@@ -131,7 +162,7 @@ export const drawBuilding = (project, hour) => {
   const rooms = visibleRooms()
 
   // The grounds, then each room's walls, with a soft shadow on the grass
-  drawGrounds(g, visibleRect())
+  drawGrounds(g, visibleRect(), { season: look.season, snow })
   g.globalAlpha = isNight ? 0.12 : 0.18
   for (const room of rooms.filter(isBuilt)) {
     const f = frameOf(room)
@@ -143,7 +174,7 @@ export const drawBuilding = (project, hour) => {
     const f = frameOf(room)
     fill(f.x, f.y, f.w, f.h, WALL)
     if (topWallOf(room) > 6) {
-      fill(f.x, f.y, f.w, 6, WALL_TOP)
+      fill(f.x, f.y, f.w, 6, snow > 0.4 ? '#E6ECF0' : WALL_TOP)
       for (const wx of topWindowsOf(room)) {
         fill(wx, f.y + 1, 56, 5, sky)
         fill(wx + 27, f.y + 1, 2, 5, WALL_TOP)
@@ -155,11 +186,11 @@ export const drawBuilding = (project, hour) => {
   // the next step of one that grows out on the grounds.
   for (const room of rooms) {
     if (!isBuilt(room)) {
-      if (!room.until) drawLot(g, fill, rectOf(room))
+      if (!room.until) drawLot(g, fill, rectOf(room), snow)
       continue
     }
     const lot = nextLot(room)
-    if (lot) drawLot(g, fill, lot)
+    if (lot) drawLot(g, fill, lot, snow)
     const { dx, dy } = shiftOf(room)
     const t = typeOf(room)
     const r = rectOf(room)
@@ -181,6 +212,9 @@ export const drawBuilding = (project, hour) => {
       fill(d.x + d.w - 8, d.y + d.h / 2 - 1, 2, 2, '#D6A23C')
     }
   }
+  // Christmas in the reception
+  const reception = roomById('reception')
+  if (look.isChristmas && reception && isBuilt(reception)) christmasTree(g, fill, dot, at(reception, XMAS_TREE))
   // Every built room's sign on the hall, beside its door
   for (const d of PLAN.doors) {
     const id = (d.between ?? []).find(x => x !== 'hall')

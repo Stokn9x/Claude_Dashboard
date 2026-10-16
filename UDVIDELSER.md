@@ -28,6 +28,7 @@ Status: ✅ lavet · 🟡 delvist · ⬜ ikke lavet · ⏸️ parkeret · ➖ ik
 | 0.11.1 | Fejlrettelser: ingen går gennem væggene (døre forbinder rummene i rutegitteret, og der er fri vej ud af Claudes kontor), nyt toilet med døren ud til et frit område, ingen fliser i væggene; langsommere indtjening og højere priser, så kontoret bygges over uger |
 | 0.12.0 | En lækrere side rundt om kontoret: topbjælke med ikon, trivsel, saldo og forbindelsesprik; kort med pixel-portræt og statuspille i listen; venteboks med "Gå til"; butik med ikoner og fremdrift; kun mørkt tema |
 | 0.13.0 | Spillets fase 4: pynt og opgraderinger i butikken, 17 præstationer med belønning og notifikation, statistik i den nye fane Fremskridt |
+| 0.24.0 | Sæson og vejr, uden at noget forlader computeren: vejret skifter hver tredje time ud fra uret (klart, overskyet, regn og om vinteren sne, oftest regn om efteråret) og glider ind og ud. Regn falder i streger og løber på ruderne, sne driver ned og bliver liggende en tid på græsset, grundene, hækken og væggene, og søen fryser til. Løvtræerne er grønne om sommeren, blomstrer om foråret, bliver orange og gule om efteråret og står nøgne om vinteren. I december står der et juletræ i receptionen, og der hænger lyskæder i gangen. Se et andet vejr med `?vejr=regn` (eller `sne`, `skyet`, `klart`) og en anden måned med `?maaned=12` |
 | 0.23.1 | Småting: en hjælper med fri på plænen går hjem ad stien uden først at gå op til hoveddøren; skriveborde, der ikke er købt, står ikke længere i vejen for en gåtur; ekstra pladser ved bænken og på plænen står aldrig i træerne; ni hjælpere kan aflevere side om side; depotet mod nord har rækkens tykke ydervæg; Claude vander planten lidt højere oppe, så navnet ikke ligger oven i skiltet ved døren |
 | 0.23.0 | Tv-tilstand (📺 eller T): fuld skærm uden panel, log og kort, og kameraet følger den, der venter på dig, en hjælper på vej ind eller med et resultat, og ellers dem, der arbejder, på skift; flytter man selv kameraet, venter det lidt. Hjælpernes type og model kan ses: Explore har et forstørrelsesglas på skrivebordet, Plan en tegningsrulle, navneskiltet har modellens farve (Opus lilla, Sonnet blå, Haiku grøn, Fable gylden), og kortet siger fx "Udforsker på Haiku" |
 | 0.22.0 | Dagens opsummering: serveren husker hver opgave, hjælperne afleverer eller går i stå (en uge tilbage), og fanen Fremskridt viser dagens opgaver med tid, navn og projekt. **📋 Kopiér** giver dagen som tekst til et standup eller en note: linjer, opgaver, commits, pull requests, tests og hver opgave |
@@ -83,7 +84,7 @@ Status: ✅ lavet · 🟡 delvist · ⬜ ikke lavet · ⏸️ parkeret · ➖ ik
 | 19 | **Liv i pauserne:** hjælperne holder kaffepause, går på toilettet, spiller bordtennis og holder møde med Claude. Mangler: Claude der vander planter og går rundt. | L | 🟡 |
 | 20 | **Grænser som rekvisitter:** kaffekanden tømmes, efterhånden som 5-timers-grænsen bruges, og en plante visner, når konteksten fyldes. | M | ⬜ |
 | 21 | **Tavle og ur på væggen:** tavlen viser dagens linjer og pris, uret det rigtige klokkeslæt. | S | ✅ |
-| 22 | **Dag, nat og vejr:** Lyset følger nu tidspunktet (se punkt 41); mangler regn på ruderne og vejr. | M | 🟡 |
+| 22 | **Dag, nat og vejr:** Lyset følger tidspunktet (punkt 41), og vejret kom i 0.24.0 (punkt 63). | M | ✅ |
 | 23 | **Kontorhund eller -kat,** der vandrer rundt og lægger sig under et skrivebord. | M | ⬜ |
 | 24 | **Timelapse af dagen:** afspil sessionens forløb i 60× fart. Serveren kan gemme forløbet. | L | ⬜ |
 | 25 | **Indret selv:** vælg tema og flyt rundt på møblerne. | L | ⬜ |
@@ -153,7 +154,7 @@ Fundet ved en gennemgang af koden og det, vi har set undervejs. **P1** er fejl, 
 | 61 | **Fase 5, vækst i ét plan:** teamrum 2 (seks skriveborde mere), en lounge og en reception. Lavet i 0.18.0. | L | ✅ |
 | 73 | **Et anneks til de andre sessioner:** en bygning på grunden, hvor dine andre sessioner sidder, så man kan klikke sig over til dem. Parkeret efter dit ønske. | M | ⏸️ |
 | 62 | **Daglig bonus og stribe:** en lille bonus for første arbejde på dagen og for dage i træk. Lavet i 0.16.0: 25 kr plus 10 kr pr. dag i træk, højst en uge; vises i Fremskridt og i loggen. | S | ✅ |
-| 63 | **Sæson og vejr:** jul i december, regn på ruderne, sne om vinteren (rest af punkt 22). | M | ⬜ |
+| 63 | **Sæson og vejr:** jul i december, regn på ruderne, sne om vinteren. Lavet i 0.24.0 (rest af punkt 22). | M | ✅ |
 | 64 | **Kontorhund eller -kat** (punkt 23), evt. købt i butikken. Lavet i 0.21.0: en rød kontorkat i butikken. | M | ✅ |
 | 65 | **Indret selv:** flyt pynt og inventar rundt med træk og slip (punkt 25). | L | ⬜ |
 | 66 | **Månedens medarbejder:** hjælpernes navne går igen, så de kan få deres egen statistik og en pokal. | M | ⬜ |
@@ -169,7 +170,7 @@ Fundet ved en gennemgang af koden og det, vi har set undervejs. **P1** er fejl, 
 
 ### Forslag til rækkefølge
 
-1. **63 sæson og vejr** (64 kontorkatten kom i 0.21.0).
+1. **63 sæson og vejr** og **64 kontorkatten**, lavet i 0.24.0 og 0.21.0.
 2. **66 månedens medarbejder** (67 tv-tilstand kom i 0.23.0).
 3. **65 indret selv**: flyt pynt og inventar med træk og slip.
 

@@ -12,7 +12,7 @@ import { STAY, banterFor, breakNow, errandPose, meetingNow } from './breaks.js'
 import { bowl, cat, claudeLook, hands, lookFor, onTheFloor, sitting, sittingBack, standing } from './figures.js'
 import { blueprint, board, chair, clock, desk, deskThingsFor, magnifier, mug, steam, wateringCan } from './furniture.js'
 import { PAUSE_SLOT_MS, bowlOf, catNow, catPlaces, claudePause } from './cat.js'
-import { daylight, evening, timeOfDay } from './light.js'
+import { christmasLights, daylight, drawWeather, evening, timeOfDay, weatherNow } from './light.js'
 import { chatFor, grumbleAt } from './voices.js'
 import { IDLE_WALK_MS, idlePlan } from './idle.js'
 import { GROUNDS, handoffFor } from './plan.js'
@@ -454,7 +454,8 @@ export const draw = () => {
   const timeNow = timeOfDay()
   stepGlide()
   setPixelsPerUnit(pixelsPerUnit(), pixelsPerUnit() / view.zoom)
-  drawBuilding(s?.project ?? '', Math.floor(timeNow))
+  const weather = weatherNow()
+  drawBuilding(s?.project ?? '', Math.floor(timeNow), weather)
   ctx.setTransform(1, 0, 0, 1, 0, 0)
   ctx.imageSmoothingEnabled = false
   ctx.clearRect(0, 0, canvas.width, canvas.height)
@@ -550,7 +551,9 @@ export const draw = () => {
   drawFloorSitters(frame)
   drawCat(frame)
   drawWalkers(frame)
+  drawWeather(weather, t)
   evening(timeNow, glowing, headlights)
+  if (weather.isChristmas) christmasLights(t)
   drawSaleSigns(sales, hits, t)
   construction(now, t)
   drawSpeech(frame)
