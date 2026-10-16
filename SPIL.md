@@ -1,6 +1,6 @@
 # Spillet i Agent-kontor
 
-Status: **fase 0 er lavet (0.8.0).** Beslutningerne står under [Besluttet](#besluttet).
+Status: **fase 0 og 1 er lavet (0.8.0 og 0.9.0).** Beslutningerne står under [Besluttet](#besluttet).
 
 ## Idéen
 
@@ -124,7 +124,7 @@ Det betyder, at **fase 0 er større**, end den ellers ville være. Til gengæld 
 | Fase | Indhold | Størrelse |
 |---|---|---|
 | **0. Fundament** | Gitter og grundplan som data, kamera med træk og zoom, ruter med A\*, gåture med fast varighed, tællere i statusfilen, `spil.json` på serveren, saldo på siden | L+ ✅ |
-| **1. Pladser** | Køb skriveborde, gulvsiddere med laptop og brok, butik-fanen | M |
+| **1. Pladser** | Køb skriveborde, gulvsiddere med laptop og brok, butik-fanen | M ✅ |
 | **2. Rum** | Ledige grunde, køb rum, byggeri med stillads, køkken/toilet/sofa/bordtennis/mødelokale | L |
 | **3. Liv** | Rummene bliver brugt: kaffe, toiletbesøg, bordtennis, møder; trivsel; **drama og banter** mellem hjælperne, når de står i kantinen | L |
 | **4. Mere** | Pynt-butik, opgraderinger (bedre stole, større skærme), præstationer ("1.000 linjer på en dag"), statistik | M |

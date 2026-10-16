@@ -8,13 +8,14 @@
 //   node server.mjs --detach   start in the background and return at once
 
 import { spawn } from 'node:child_process'
+import { randomBytes } from 'node:crypto'
 import fs from 'node:fs'
 import http from 'node:http'
 import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-const VERSION = '0.8.0'
+const VERSION = '0.9.0'
 const HOST = '127.0.0.1'
 const PORT = Number(process.env.AGENT_KONTOR_PORT || 4747)
 const HERE = path.dirname(fileURLToPath(import.meta.url))
@@ -116,8 +117,39 @@ const pruneCredited = now => {
   }
 }
 
-// What the page sees of the game.
-const gameView = () => ({ kroner: Math.floor(game.kroner), owned: game.owned })
+// ── The shop ────────────────────────────────────────────────────────────
+// Prices live here and only here: the page asks to buy, the server decides.
+// Desks 1-2 come with the office; the team room has room for six.
+const DESK_PRICES = [0, 0, 500, 750, 1000, 1500]
+const MAX_DESKS = DESK_PRICES.length
+
+const priceOf = item => {
+  if (item === 'desk') return game.owned.desks < MAX_DESKS ? DESK_PRICES[game.owned.desks] : null
+  return null
+}
+
+const buy = item => {
+  const price = priceOf(item)
+  if (price === null) return { status: 409, error: 'Det kan ikke købes lige nu' }
+  if (game.kroner < price) return { status: 409, error: `Det koster ${price} kr, og du har ${Math.floor(game.kroner)} kr` }
+  game.kroner -= price
+  if (item === 'desk') game.owned.desks += 1
+  game.log = [...(game.log ?? []), { at: Date.now(), item, price }].slice(-50)
+  isGameChanged = true
+  saveGame()
+  return { status: 200 }
+}
+
+// What the page sees of the game: the money, what is owned, what the next
+// things cost, and the latest purchases (for a celebration).
+const gameView = () => ({
+  kroner: Math.floor(game.kroner),
+  owned: game.owned,
+  next: { desk: priceOf('desk') },
+  maxDesks: MAX_DESKS,
+  rates: RATES,
+  bought: (game.log ?? []).slice(-5),
+})
 
 // ── The sessions, as their files say ────────────────────────────────────
 
@@ -161,7 +193,10 @@ const readSessions = () => {
 
 // updatedAt moves with every heartbeat; only what the page draws counts as news.
 const shapeOf = sessions => JSON.stringify([sessions.map(({ updatedAt, ...rest }) => rest), gameView()])
-const stateOf = sessions => JSON.stringify({ sessions, game: gameView() })
+// A buy must carry this token, which only the office's own page can read:
+// another site in the browser can neither read the state nor send the header.
+const TOKEN = randomBytes(16).toString('hex')
+const stateOf = sessions => JSON.stringify({ sessions, game: gameView(), token: TOKEN })
 
 let sessionsNow = readSessions()
 saveGame()
@@ -181,14 +216,14 @@ const send = (res, text) => {
   res.write(text)
 }
 
-const publish = () => {
+const publish = (isForced = false) => {
   sessionsNow = readSessions()
   pruneCredited(Date.now())
   saveGame()
   if (sessionsNow.length > 0) lastBusyAt = Date.now()
   current = stateOf(sessionsNow)
   const shape = shapeOf(sessionsNow)
-  if (shape === currentShape) return
+  if (shape === currentShape && !isForced) return
   currentShape = shape
   for (const res of listeners) send(res, `data: ${current}\n\n`)
 }
@@ -234,10 +269,43 @@ const files = {
 // Only this computer's own page may talk to it: a page elsewhere that points
 // a hostname at 127.0.0.1 carries a foreign Host header.
 const isLocalHost = host => host === `${HOST}:${PORT}` || host === `localhost:${PORT}`
+const isLocalOrigin = origin => origin === `http://${HOST}:${PORT}` || origin === `http://localhost:${PORT}`
+
+// POST /api/buy {"item":"desk"}: from the office page only (its Host, its
+// Origin and its token), a small body, and the server checks price and saldo.
+const handleBuy = (req, res) => {
+  const json = (status, body) => res.writeHead(status, { 'content-type': 'application/json', 'cache-control': 'no-store' }).end(JSON.stringify(body))
+  if (!isLocalOrigin(req.headers.origin ?? '') || req.headers['x-kontor-token'] !== TOKEN) return json(403, { error: 'Ikke tilladt' })
+  let body = ''
+  req.setEncoding('utf8')
+  req.on('data', chunk => {
+    body += chunk
+    if (body.length > 1024) req.destroy()
+  })
+  req.on('end', () => {
+    let item = null
+    try {
+      item = JSON.parse(body).item
+    } catch {
+      return json(400, { error: 'Forkert forespørgsel' })
+    }
+    const result = buy(item)
+    if (result.status === 200) {
+      publish(true)
+      return json(200, { ok: true, game: gameView() })
+    }
+    return json(result.status, { error: result.error, game: gameView() })
+  })
+}
 
 const server = http.createServer((req, res) => {
   const url = new URL(req.url ?? '/', `http://${HOST}:${PORT}`)
-  if (req.method !== 'GET' || !isLocalHost(req.headers.host ?? '')) {
+  if (!isLocalHost(req.headers.host ?? '')) {
+    res.writeHead(403).end()
+    return
+  }
+  if (req.method === 'POST' && url.pathname === '/api/buy') return handleBuy(req, res)
+  if (req.method !== 'GET') {
     res.writeHead(403).end()
     return
   }

@@ -46,6 +46,8 @@ const ROOM_TYPES = {
     h: 240,
     desks: [0, 1, 2, 3, 4, 5].map(i => ({ cx: 92 + (i % 3) * 148, dy: 202 + Math.floor(i / 3) * 102 })),
     sideWindows: [[0, 284, 40], [474, 300, 40]],
+    // Where a helper without a desk sits on the floor with its laptop
+    floor: [[70, 372], [100, 372], [252, 372], [276, 372], [364, 372], [394, 372], [424, 372], [34, 278], [62, 278], [90, 278]].map(([x, y]) => ({ x, y })),
     plants: [[462, 150, true], [20, 150], [380, 368], [56, 368], [234, 366, true]],
     lights: [[130, 366, 54, 0.42], ...[[166, 200], [314, 200], [166, 300], [314, 300]].map(([x, y]) => [x, y, 66, 0.16, 'ceiling'])],
     bulbs: [[130, 366]],
@@ -114,8 +116,19 @@ const H = WORLD.h
 // fit() from the window and the screen's pixel density.
 let S = 3
 
-// Places, as the floor plan has them now.
-const desks = () => roomsOf('team').flatMap(room => typeOf(room).desks.map(d => at(room, d)))
+// Places, as the floor plan has them now. Every desk the rooms have room
+// for, and how many of them are bought (all of them before the server tells).
+const deskSlots = () => roomsOf('team').flatMap(room => typeOf(room).desks.map(d => at(room, d)))
+const ownedDesks = () => Math.min(deskSlots().length, state.game?.owned?.desks ?? deskSlots().length)
+const desks = () => deskSlots().slice(0, ownedDesks())
+// Floor spots, the ones that hurt most first: two on the rug of every desk
+// not yet bought, then along the walls.
+const floorSpots = () => [
+  ...deskSlots()
+    .slice(ownedDesks())
+    .flatMap(({ cx, dy }) => [{ x: cx - 22, y: dy + 28 }, { x: cx + 22, y: dy + 28 }]),
+  ...roomsOf('team').flatMap(room => (typeOf(room).floor ?? []).map(p => at(room, p))),
+]
 const MAIN = (() => {
   const room = firstRoom('corner')
   return at(room, typeOf(room).claude)
@@ -128,8 +141,8 @@ const handoffFor = seat => {
   const room = firstRoom('corner')
   return at(room, typeOf(room).handoff(seat))
 }
-// A helper's place: its desk, or, once the desks run out, a spot by the door
-// to wait at (phase 1 gives it the floor and a laptop).
+// A helper's place: its desk, or, once the bought desks run out, a spot on
+// the floor, where it works on a laptop and lets everyone know.
 const placeOf = seat => {
   const list = desks()
   if (seat >= 0 && seat < list.length) {
@@ -137,8 +150,12 @@ const placeOf = seat => {
     return { isDesk: true, cx: d.cx, dy: d.dy, spot: { x: d.cx, y: d.dy - 6 } }
   }
   const n = Math.max(0, seat - list.length)
+  const spots = floorSpots()
+  if (n < spots.length) return { isDesk: false, spot: spots[n] }
+  // More than the floor holds: in a queue by the door.
   const e = PLAN.entrance
-  return { isDesk: false, spot: { x: e.x - 30 - (n % 3) * 14, y: e.y - 12 + Math.floor(n / 3) * 16 } }
+  const k = n - spots.length
+  return { isDesk: false, spot: { x: e.x - 30 - (k % 3) * 14, y: e.y - 12 + Math.floor(k / 3) * 16 } }
 }
 
 // ── Routes ───────────────────────────────────────────────────────────────
@@ -494,6 +511,46 @@ const shadow = (x, y, rx, ry, alpha = 0.2) => {
   ctx.fillStyle = '#000000'
   ctx.fill()
   ctx.globalAlpha = 1
+}
+
+// On the floor, legs crossed, laptop on the lap.
+const onTheFloor = (x, y, look, t, seed) => {
+  shadow(x, y + 1, 12, 3)
+  sitting(x, y - 4, look, false, t, seed)
+  rect(x - 11, y - 6, 22, 6, OUTLINE)
+  rect(x - 10, y - 5, 20, 4, '#3B4A6B')
+  // The laptop, its screen towards them
+  rect(x - 9, y - 14, 18, 2.5, OUTLINE)
+  rect(x - 9, y - 11.5, 18, 6, OUTLINE)
+  rect(x - 8, y - 10.5, 16, 4, '#C9CED3')
+  rect(x - 6, y - 9.5, 12, 0.8, '#9CA6B0')
+  rect(x - 6, y - 8, 12, 0.8, '#9CA6B0')
+}
+
+// What a helper on the floor has to say about it, now and then, in turn
+// with what it is doing.
+const GRUMBLES = [
+  'Av, min ryg',
+  'Har vi ikke en stol?',
+  'Jeg vil også have et skrivebord',
+  'Gulvet er koldt',
+  'Laptop på skødet, seriøst?',
+  'Hvem har taget min plads?',
+  'Jeg skriver det her i et klagebrev',
+  'Mine ben sover',
+]
+const grumbleAt = (t, seed) => ((t + seed * 997) % 9000 < 3000 ? GRUMBLES[Math.floor((t + seed * 997) / 9000 + seed) % GRUMBLES.length] : null)
+
+// A desk you can buy next: an outline on the floor where it will stand, and
+// a sign over it with the price, drawn above everyone so it is never hidden.
+const forSaleOutline = (cx, dy, canAfford) => {
+  ctx.setLineDash([3, 3])
+  rounded(cx - 42, dy - 18, 84, 48, 4, 'rgba(255,255,255,0.18)', canAfford ? '#2E9E8F' : '#8A94A0', 1.2)
+  ctx.setLineDash([])
+}
+const forSaleSign = (cx, dy, price, canAfford, t) => {
+  const bob = canAfford ? Math.sin(t / 300) * 1 : 0
+  tag(cx, dy - 32 + bob, canAfford ? `Køb skrivebord: ${kr(price)}` : `Skrivebord: ${kr(price)}`, canAfford ? '#2E9E8F' : '#5B6672')
 }
 
 const chair = (cx, dy) => {
@@ -1263,17 +1320,34 @@ const draw = () => {
       frameHits.push({ kind: 'sub', id: sub.id, ...seatedBox(cx, dy) })
     }
   })
-  // Everyone on their feet: walking, handing over, or waiting by the door
-  // for a desk.
+  // The next desk, for sale where it will stand
+  const nextPrice = state.game?.next?.desk
+  const slots = deskSlots()
+  if (typeof nextPrice === 'number' && list.length < slots.length) {
+    const { cx, dy } = slots[list.length]
+    forSaleOutline(cx, dy, (state.game?.kroner ?? 0) >= nextPrice)
+    frameHits.push({ kind: 'shop', id: 'desk', x0: cx - 44, y0: dy - 40, x1: cx + 44, y1: dy - 20 })
+  }
+  // On the floor, with a laptop: those the desks did not stretch to
+  const floorSitters = []
+  for (const sub of subs) {
+    const pose = poseOf(sub, now, walks)
+    if (!pose?.seated || sub.seat < list.length) continue
+    const { spot } = placeOf(sub.seat)
+    floorSitters.push({ sub, spot })
+  }
+  floorSitters.sort((a, b) => a.spot.y - b.spot.y)
+  for (const { sub, spot } of floorSitters) {
+    onTheFloor(spot.x, spot.y, lookFor(sub.id), t, hashOf(sub.id))
+    glowing.push([spot.x, spot.y - 10])
+    tag(spot.x, spot.y + 3, sub.name, '#4A5868')
+    frameHits.push({ kind: 'sub', id: sub.id, x0: spot.x - 20, y0: spot.y - 44, x1: spot.x + 20, y1: spot.y + 14 })
+  }
+  // Everyone on their feet: walking or handing over.
   const walkers = []
   for (const sub of subs) {
     const pose = poseOf(sub, now, walks)
-    if (!pose) continue
-    if (!pose.seated) walkers.push({ sub, pose })
-    else if (sub.seat >= list.length) {
-      const { spot } = placeOf(sub.seat)
-      walkers.push({ sub, pose: { x: spot.x, y: spot.y, facing: 'front', isWalking: false, isWaiting: true } })
-    }
+    if (pose && !pose.seated) walkers.push({ sub, pose })
   }
   walkers.sort((a, b) => a.pose.y - b.pose.y)
   for (const { sub, pose } of walkers) {
@@ -1321,7 +1395,15 @@ const draw = () => {
   })
   for (const { sub, pose } of walkers) {
     if (pose.handover) bubble(pose.x, pose.y - 52, sub.outcome === 'failed' ? `Gik i stå: ${sub.task}` : `Afleverer: ${sub.task}`, sub.outcome === 'failed', t)
-    else if (pose.isWaiting) say(pose.x, pose.y - 52, sub.activity, t + sub.seat * 190)
+  }
+  // On the floor they sit close, so each speaks only now and then: to
+  // grumble, or when it waits for you. What they do is in the list.
+  for (const { sub, spot } of floorSitters) {
+    if (sub.activity.state === 'waiting') say(spot.x, spot.y - 44, sub.activity, t)
+    else {
+      const grumble = grumbleAt(t, hashOf(sub.id))
+      if (grumble) bubble(spot.x, spot.y - 44, grumble, false, t)
+    }
   }
   seats.forEach(({ cx, dy }, i) => {
     const o = others[i]
@@ -1329,6 +1411,10 @@ const draw = () => {
     if (o.main.state === 'idle') tag(cx, dy - 26, 'Holder pause', '#8A94A0')
     else say(cx, dy - 34, o.main, t + i * 170)
   })
+  if (typeof nextPrice === 'number' && list.length < slots.length) {
+    const { cx, dy } = slots[list.length]
+    forSaleSign(cx, dy, nextPrice, (state.game?.kroner ?? 0) >= nextPrice, t)
+  }
   // The one whose card is open, ringed.
   const ring = selected && frameHits.find(h => h.kind === selected.kind && h.id === selected.id)
   if (ring) {
@@ -1342,6 +1428,12 @@ const draw = () => {
     const who = subs.find(x => x.id === s.party.who)
     const spot = who && placeOf(who.seat).isDesk ? placeOf(who.seat) : MAIN
     party({ ...s.party, at: performance.now() - (now - s.party.at) }, spot, t)
+  }
+  // A desk just bought: confetti where it now stands
+  const bought = state.game?.bought?.at(-1)
+  if (bought?.item === 'desk' && now - bought.at < 5000) {
+    const d = list[list.length - 1]
+    if (d) party({ kind: 'confetti', label: 'Nyt skrivebord!', at: performance.now() - (now - bought.at) }, d, t)
   }
 
   drawMinimap()
@@ -1504,6 +1596,7 @@ const el = (tagName, props = {}, children = []) => {
 const dot = state => el('span', { className: 'dot', style: `background:${stateColor[state] ?? '#8A94A0'}` })
 
 const renderPage = () => {
+  renderShop()
   const s = focused()
   saldo.hidden = typeof state.game?.kroner !== 'number'
   if (!saldo.hidden) saldo.textContent = kr(state.game.kroner)
@@ -1668,6 +1761,10 @@ canvas.addEventListener('click', e => {
   if (h?.kind === 'session') {
     select(null)
     choose(h.id)
+  } else if (h?.kind === 'shop') {
+    select(null)
+    showPanel('shop')
+    if ((state.game?.kroner ?? 0) >= (state.game?.next?.[h.id] ?? Infinity)) void buyItem(h.id)
   } else {
     select(h && !(selected && selected.kind === h.kind && selected.id === h.id) ? { kind: h.kind, id: h.id } : null)
   }
@@ -1682,6 +1779,76 @@ const follow = () => {
   requestAnimationFrame(follow)
 }
 requestAnimationFrame(follow)
+
+// ── The shop ─────────────────────────────────────────────────────────────
+// Beside the list: what you have, what the next thing costs, how kroner are
+// earned. The server holds the prices and the money; a buy is asked of it.
+const shop = document.getElementById('shop')
+const panelButtons = document.querySelectorAll('[data-panel]')
+let shopMessage = ''
+let isBuying = false
+
+const showPanel = name => {
+  for (const button of panelButtons) button.ariaPressed = String(button.dataset.panel === name)
+  people.hidden = name !== 'people'
+  shop.hidden = name !== 'shop'
+  try {
+    localStorage.setItem('agent-kontor:panel', name)
+  } catch {}
+}
+for (const button of panelButtons) button.addEventListener('click', () => showPanel(button.dataset.panel))
+
+const buyItem = async item => {
+  if (isBuying || !state.token) return
+  isBuying = true
+  shopMessage = ''
+  renderShop()
+  try {
+    const res = await fetch('/api/buy', { method: 'POST', headers: { 'content-type': 'application/json', 'x-kontor-token': state.token }, body: JSON.stringify({ item }) })
+    const answer = await res.json()
+    if (answer.game) state.game = answer.game
+    shopMessage = res.ok ? 'Købt! Den næste hjælper uden plads sætter sig ved det.' : answer.error ?? 'Det gik ikke'
+  } catch {
+    shopMessage = 'Kontoret svarer ikke lige nu'
+  }
+  isBuying = false
+  renderPage()
+}
+
+const RATE_TEXT = { added: 'linje tilføjet', removed: 'linje fjernet', delivered: 'opgave afleveret af en hjælper', tests: 'grønne tests (højst hvert 10. minut)', commits: 'commit', prs: 'pull request' }
+
+const renderShop = () => {
+  const g = state.game
+  if (!g) {
+    shop.replaceChildren(el('p', { className: 'empty' }, ['Butikken åbner, når kontoret er forbundet.']))
+    return
+  }
+  const price = g.next?.desk
+  const canAfford = typeof price === 'number' && g.kroner >= price
+  const deskItem = el('li', { className: 'item' }, [
+    el('div', { className: 'item-head' }, [el('strong', {}, ['Skrivebord']), el('span', { className: 'item-count' }, [`${g.owned.desks} af ${g.maxDesks}`])]),
+    el('p', { className: 'hint' }, ['Hjælpere uden skrivebord sidder på gulvet med en laptop og brokker sig.']),
+    typeof price === 'number'
+      ? el('button', { className: 'buy', type: 'button', disabled: !canAfford || isBuying, onclick: () => buyItem('desk') }, [isBuying ? 'Køber…' : `Køb nr. ${g.owned.desks + 1} for ${kr(price)}`])
+      : el('p', { className: 'hint' }, ['Teamrummet er fuldt. Flere pladser kommer med teamrum 2.']),
+    ...(typeof price === 'number' && !canAfford ? [el('p', { className: 'hint' }, [`Mangler ${kr(price - g.kroner)}`])] : []),
+  ])
+  const rates = Object.entries(g.rates ?? {}).map(([k, v]) => el('li', {}, [el('span', { className: 'rate' }, [`${String(v).replace('.', ',')} kr`]), RATE_TEXT[k] ?? k]))
+  shop.replaceChildren(
+    el('div', { className: 'shop-saldo' }, [el('span', { className: 'hint' }, ['Saldo']), el('strong', {}, [kr(g.kroner)])]),
+    ...(shopMessage ? [el('p', { className: 'shop-message' }, [shopMessage])] : []),
+    el('ul', { className: 'items' }, [deskItem]),
+    el('p', { className: 'hint' }, ['Kommer snart: køkken, toilet, sofahjørne, bordtennis og mødelokale.']),
+    el('h3', {}, ['Sådan tjener du kroner']),
+    el('ul', { className: 'rates' }, rates),
+  )
+}
+
+try {
+  showPanel(localStorage.getItem('agent-kontor:panel') === 'shop' ? 'shop' : 'people')
+} catch {
+  showPanel('people')
+}
 
 const choose = key => {
   focusKey = key

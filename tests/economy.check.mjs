@@ -49,5 +49,24 @@ check('the ending file is credited', (await state()).game.kroner, 260)
 check('and then removed', fs.existsSync(path.join(dir, 'sA.json')), false)
 check('spil.json has the kroner', JSON.parse(fs.readFileSync(path.join(home, '.claude', 'agent-kontor', 'spil.json'), 'utf8')).kroner, 260)
 
+// Buying: only from the page (Origin and token), and only what you can afford.
+const buy = (headers, item = 'desk') =>
+  fetch(`http://127.0.0.1:${PORT}/api/buy`, { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body: JSON.stringify({ item }) })
+const { token } = await state()
+const origin = `http://127.0.0.1:${PORT}`
+check('a buy without the token is refused', (await buy({ origin })).status, 403)
+check('a buy from another site is refused', (await buy({ origin: 'https://example.com', 'x-kontor-token': token })).status, 403)
+check('a desk you cannot afford is refused', (await buy({ origin, 'x-kontor-token': token })).status, 409)
+write({ ...zero, added: 500 }, { key: 'sB' })
+fs.renameSync(path.join(dir, 'sA.json'), path.join(dir, 'sB.json'))
+await sleep(900)
+check('earned enough', (await state()).game.kroner, 760)
+check('the third desk costs 500', (await state()).game.next.desk, 500)
+check('buying it works', (await buy({ origin, 'x-kontor-token': token })).status, 200)
+const after = (await state()).game
+check('three desks now', after.owned.desks, 3)
+check('and 500 kr less', after.kroner, 260)
+check('the next costs 750', after.next.desk, 750)
+
 child.kill()
 fs.rmSync(home, { recursive: true, force: true })

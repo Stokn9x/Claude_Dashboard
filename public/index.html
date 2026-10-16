@@ -72,6 +72,25 @@
     .card-steps { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 2px; }
     .card-steps time { color: var(--soft); font-variant-numeric: tabular-nums; margin-right: 8px; }
 
+    .panels { display: flex; gap: 4px; padding: 3px; border-radius: 10px; background: var(--chip); border: 1px solid var(--line); }
+    .panels button { flex: 1; border: 0; background: none; color: var(--soft); font: inherit; font-size: 13px; padding: 5px 8px; border-radius: 7px; cursor: pointer; }
+    .panels button[aria-pressed="true"] { background: var(--bg); color: var(--ink); font-weight: 600; }
+    .shop[hidden], .people[hidden] { display: none; }
+    .shop { display: grid; gap: 12px; }
+    .shop h3 { font-size: 13px; margin: 6px 0 0; }
+    .shop-saldo { display: grid; }
+    .shop-saldo strong { font-size: 24px; font-variant-numeric: tabular-nums; }
+    .shop-message { margin: 0; padding: 8px 10px; border-radius: 8px; background: var(--chip); border: 1px solid var(--line); }
+    .items, .rates { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+    .item { padding: 10px 12px; border-radius: 10px; background: var(--chip); border: 1px solid var(--line); display: grid; gap: 6px; }
+    .item-head { display: flex; justify-content: space-between; align-items: baseline; }
+    .item-count { color: var(--soft); font-size: 12px; }
+    .hint { color: var(--soft); font-size: 12px; margin: 0; }
+    .buy { border: 0; border-radius: 8px; padding: 7px 10px; font: inherit; font-weight: 600; cursor: pointer; background: #2E9E8F; color: #FFFFFF; }
+    .buy:disabled { background: var(--line); color: var(--soft); cursor: default; }
+    .rates li { display: grid; grid-template-columns: 64px 1fr; font-size: 13px; }
+    .rate { font-weight: 600; font-variant-numeric: tabular-nums; }
+
     .alert { border: 1px solid var(--alert); color: var(--alert); border-radius: 10px; padding: 8px 12px; cursor: pointer; }
     .alert:empty { display: none; }
     ul.people { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
@@ -100,7 +119,12 @@
     </div>
     <aside>
       <div class="alert" id="alert" role="status"></div>
+      <div class="panels" role="tablist">
+        <button type="button" data-panel="people" aria-pressed="true">Hvem laver hvad</button>
+        <button type="button" data-panel="shop" aria-pressed="false">Butik</button>
+      </div>
       <ul class="people" id="people"></ul>
+      <section class="shop" id="shop" hidden></section>
     </aside>
   </main>
   <script src="/app.js"></script>
