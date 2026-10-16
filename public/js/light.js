@@ -3,7 +3,7 @@
 // everything with the lamps, the screens and the street lights glowing.
 import { owns } from './store.js'
 import { circle, ctx } from './gfx.js'
-import { GROUNDS, PLAN, isBuilt, shiftOf, typeOf } from './plan.js'
+import { GROUNDS, PLAN, isBuilt, isOpenDoor, shiftOf, typeOf } from './plan.js'
 import { visibleRect, visibleRooms } from './camera.js'
 
 // The time of day, in hours (14.5 is half past two). ?tid=21:30 in the
@@ -30,13 +30,16 @@ export const isNightAt = h => h < 7 || h >= 19
 export const skyAt = h => (isNightAt(h) ? '#16233D' : h < 9 || h >= 17 ? '#F4B88A' : '#A9D8F5')
 
 // The windows in side walls: x of the wall, y, height, and which way in.
+// A window where an open door now joins two rooms is gone.
 export const sideWindows = () =>
-  PLAN.rooms.flatMap(room =>
-    (typeOf(room).sideWindows ?? []).map(([x, y, h]) => {
-      const { dx, dy } = shiftOf(room)
-      return { x: x + dx, y: y + dy, h, isLeft: x + dx < room.x }
-    }),
-  )
+  PLAN.rooms
+    .flatMap(room =>
+      (typeOf(room).sideWindows ?? []).map(([x, y, h]) => {
+        const { dx, dy } = shiftOf(room)
+        return { x: x + dx, y: y + dy, h, isLeft: x + dx < room.x }
+      }),
+    )
+    .filter(w => !PLAN.doors.some(d => isOpenDoor(d) && d.x < w.x + 6 && w.x < d.x + d.w && d.y < w.y + w.h && w.y < d.y + d.h))
 const topWindows = () => PLAN.rooms.filter(isBuilt).flatMap(room => (typeOf(room).windows ?? []).map(x => ({ x: x + shiftOf(room).dx, y: room.y })))
 
 // Sunlight through the windows, falling at an angle that follows the sun:

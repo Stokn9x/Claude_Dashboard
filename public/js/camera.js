@@ -247,7 +247,7 @@ const fitAllButton = document.getElementById('fit-all')
 const mini = minimap.getContext('2d')
 // The map shows the office and a little of the grounds round it.
 const MAP = { x: WORLD.x - 60, y: WORLD.y - 50, w: WORLD.w + 120, h: WORLD.h + 100 }
-const MAP_COLOURS = { corner: '#DCC194', kitchen: '#F3F5F6', team: '#CBD9C7', quiet: '#D6DCE6', toilet: '#E3EEF2', meeting: '#B48A64' }
+const MAP_COLOURS = { corner: '#DCC194', kitchen: '#F3F5F6', team: '#CBD9C7', quiet: '#D6DCE6', toilet: '#E3EEF2', meeting: '#B48A64', team2: '#D3D0C8', hobby: '#E8DCC8', reception: '#E6E2DA' }
 
 export const drawMinimap = () => {
   const isAway = !isHome()

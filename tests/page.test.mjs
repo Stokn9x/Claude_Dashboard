@@ -18,7 +18,7 @@ const voices = await import(js('voices'))
 const util = await import(js('util'))
 
 const { PLAN, WORLD, GROUNDS, typeOf, frameOf, deskSlots, desks, placeOf } = plan
-const ALL_ROOMS = ['claude', 'team', 'kitchen', 'toilet', 'lounge', 'pingpong', 'meeting', 'plants', 'art', 'neon', 'espresso', 'aquarium', 'chairs', 'screens']
+const ALL_ROOMS = ['claude', 'team', 'kitchen', 'toilet', 'lounge', 'pingpong', 'meeting', 'plants', 'art', 'neon', 'espresso', 'aquarium', 'chairs', 'screens', 'team2', 'hobby', 'reception']
 const owning = (rooms, deskCount) => {
   store.state = { sessions: [], game: { owned: { rooms, desks: deskCount }, kroner: 0, next: {} } }
 }
@@ -45,13 +45,13 @@ test('every door joins rooms that exist, and the front door opens to the path', 
   for (const door of PLAN.doors) for (const id of door.between) assert.ok(plan.roomById(id), id)
   const front = PLAN.doors.find(d => d.isEntrance)
   assert.ok(front)
-  assert.deepEqual(GROUNDS.walkway[0], PLAN.entrance)
-  assert.ok(util.isIn(GROUNDS.walkway[1].x, GROUNDS.walkway[1].y, GROUNDS.path[0]))
+  assert.deepEqual(plan.walkway()[0], plan.entrance())
+  assert.ok(GROUNDS.path.some(p => util.isIn(plan.walkway()[1].x, plan.walkway()[1].y, p)), 'the corner is on the path')
 })
 
-test('ten desks in all; only the bought ones are used', () => {
+test('sixteen desks in all with the second team room; only the bought ones are used', () => {
   everything()
-  assert.equal(deskSlots().length, 10)
+  assert.equal(deskSlots().length, 16, 'ten, and six more in the second team room')
   owning(['claude', 'team'], 4)
   assert.equal(desks().length, 4)
   assert.equal(placeOf(3).isDesk, true)
@@ -83,8 +83,8 @@ test('a helper on the bench goes in by the path and the front door', () => {
   startOffice()
   const bench = GROUNDS.benchSpots[0]
   const points = routes.route(bench, plan.handoffFor(0))
-  assert.deepEqual(points[1], GROUNDS.walkway[1])
-  assert.deepEqual(points[2], GROUNDS.walkway[0])
+  assert.deepEqual(points[1], plan.walkway()[1])
+  assert.deepEqual(points[2], plan.walkway()[0])
 })
 
 // ── Routes and walks ─────────────────────────────────────────────────────
@@ -124,7 +124,7 @@ test('a helper comes up the path, sits, hands over, and walks out', () => {
   const walks = routes.WALKS
   const arriving = helper('a', { phase: 'arriving', since: 1000 })
   const first = routes.poseOf(arriving, 1000)
-  assert.deepEqual([first.x, first.y], [GROUNDS.walkway[1].x, GROUNDS.walkway[1].y], 'starts on the path outside')
+  assert.deepEqual([first.x, first.y], [plan.walkway()[1].x, plan.walkway()[1].y], 'starts on the path outside')
   assert.equal(routes.poseOf(arriving, 1000 + walks.arrive).seated, true)
   assert.equal(routes.poseOf(helper('a'), 5000).seated, true)
   const delivering = helper('a', { phase: 'delivering', since: 0 })
@@ -140,8 +140,8 @@ test('out of the door a helper walks down the path and off along the pavement', 
   assert.equal(routes.homewardPose('b', out, out - 1), null)
   assert.equal(routes.homewardPose('b', out, out + routes.HOMEWARD_MS), null)
   const late = routes.homewardPose('b', out, out + routes.HOMEWARD_MS * 0.95)
-  assert.equal(late.y, GROUNDS.walkway[2].y, 'on the pavement at the end')
-  assert.ok(Math.abs(late.x - GROUNDS.walkway[2].x) > 300, 'well along it')
+  assert.equal(late.y, plan.walkway()[2].y, 'on the pavement at the end')
+  assert.ok(Math.abs(late.x - plan.walkway()[2].x) > 300, 'well along it')
 })
 
 // ── Breaks and meetings ──────────────────────────────────────────────────
@@ -336,4 +336,17 @@ test('kroner are written the Danish way', () => {
 test('helpers with neighbouring ids still look different', () => {
   const picks = Array.from({ length: 6 }, (_, i) => util.stir(util.hashOf(`agent-${i}`), 1) % 6)
   assert.ok(new Set(picks).size >= 3)
+})
+
+test('everything the server sells has a name, an icon and a text in the shop', async () => {
+  // The names the server has prices for, read from its source.
+  const server = (await import('node:fs')).readFileSync(new URL('../server/server.mjs', import.meta.url), 'utf8')
+  const keysOf = name => [...new RegExp(`const ${name} = \{([^}]*)\}`).exec(server)[1].matchAll(/(\w+):/g)].map(m => m[1])
+  const prices = ['desk', ...keysOf('ROOM_PRICES'), ...keysOf('DECOR_PRICES')]
+  assert.ok(prices.includes('reception') && prices.includes('screens'))
+  for (const item of prices) {
+    assert.ok(plan.ITEMS[item]?.name && plan.ITEMS[item]?.icon && plan.ITEMS[item]?.about, item)
+  }
+  // And every room that can be bought is one of them.
+  for (const room of PLAN.rooms.filter(r => r.buy)) assert.ok(plan.ITEMS[room.buy], room.id)
 })

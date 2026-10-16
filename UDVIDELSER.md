@@ -2,7 +2,7 @@
 
 Alt det, vi har lavet, og det, der kan laves. Størrelserne er grove: **S** er under en time, **M** er nogle timer, **L** er en større omgang.
 
-Status: ✅ lavet · 🟡 delvist · ⬜ ikke lavet · ➖ ikke længere relevant
+Status: ✅ lavet · 🟡 delvist · ⬜ ikke lavet · ⏸️ parkeret · ➖ ikke længere relevant
 
 ## Det er lavet
 
@@ -28,6 +28,7 @@ Status: ✅ lavet · 🟡 delvist · ⬜ ikke lavet · ➖ ikke længere relevan
 | 0.11.1 | Fejlrettelser: ingen går gennem væggene (døre forbinder rummene i rutegitteret, og der er fri vej ud af Claudes kontor), nyt toilet med døren ud til et frit område, ingen fliser i væggene; langsommere indtjening og højere priser, så kontoret bygges over uger |
 | 0.12.0 | En lækrere side rundt om kontoret: topbjælke med ikon, trivsel, saldo og forbindelsesprik; kort med pixel-portræt og statuspille i listen; venteboks med "Gå til"; butik med ikoner og fremdrift; kun mørkt tema |
 | 0.13.0 | Spillets fase 4: pynt og opgraderinger i butikken, 17 præstationer med belønning og notifikation, statistik i den nye fane Fremskridt |
+| 0.18.0 | Fase 5: teamrum 2 med seks skriveborde mere, en lounge med pool, bar, spillekonsol, dart, arkademaskine, jukebox, guitar og sofa, hvor hjælperne med fri slapper af, og en større reception foran hoveddøren, som står tom til den bliver indrettet, og hvor Bodil byder velkommen; vores egne tooltips i stedet for browserens; mødelokalets skærm hang under døren og er flyttet |
 | 0.17.0 | Lyd (slås fra med 🔊), en browser-besked når nogen venter på dig og fanen er skjult (🔔), og titlen på fanen siger det; saldo, trivsel og stribe i `/kontor panel`; linjer lavet med scripts tæller ved commit |
 | 0.16.1 | En server fra før 0.13.1 kender ikke `/api/quit` og blev ved med at køre efter en opdatering, så man så den gamle side; nu stopper mod'en den ud fra porten, men kun hvis det er kontorets egen `server.mjs` |
 | 0.16.0 | Færdige hjælpere bliver og holder fri i nogle minutter (bordtennis, kaffe, sofaen eller en snak på græsset), går tilbage til arbejdet, hvis Claude tager fat i dem igen, og går ellers hjem; hver hjælper har et temperament, der farver replikkerne; daglig bonus og stribe; nyt kontor starter uden skriveborde; gulvsiddere beholder deres plads, og dem uden plads venter på bænken; `node --test` tæller som tests; planten foran døren er flyttet |
@@ -140,7 +141,8 @@ Fundet ved en gennemgang af koden og det, vi har set undervejs. **P1** er fejl, 
 |---|---|---|---|
 | 59 | **Personlighed i dialogen:** hver hjælper får et temperament ud fra navnet (kæk, tør, dramatisk, positiv), så replikkerne lyder forskelligt (rest fra fase 3). Lavet i 0.16.0, og temperamentet står på hjælperens kort. | S | ✅ |
 | 60 | **Claude laver noget i pauserne:** vander planter, går en tur, spiller bordtennis med en hjælper (rest af punkt 19). | M | ⬜ |
-| 61 | **Fase 5, vækst:** mere grund, teamrum 2 og en ny bygning på grunden, hvor de andre sessioner sidder. Alt i ét plan, ingen etager. | L | ⬜ |
+| 61 | **Fase 5, vækst i ét plan:** teamrum 2 (seks skriveborde mere), en lounge og en reception. Lavet i 0.18.0. | L | ✅ |
+| 73 | **Et anneks til de andre sessioner:** en bygning på grunden, hvor dine andre sessioner sidder, så man kan klikke sig over til dem. Parkeret efter dit ønske. | M | ⏸️ |
 | 62 | **Daglig bonus og stribe:** en lille bonus for første arbejde på dagen og for dage i træk. Lavet i 0.16.0: 25 kr plus 10 kr pr. dag i træk, højst en uge; vises i Fremskridt og i loggen. | S | ✅ |
 | 63 | **Sæson og vejr:** jul i december, regn på ruderne, sne om vinteren (rest af punkt 22). | M | ⬜ |
 | 64 | **Kontorhund eller -kat** (punkt 23), evt. købt i butikken. | M | ⬜ |
@@ -156,9 +158,9 @@ Fundet ved en gennemgang af koden og det, vi har set undervejs. **P1** er fejl, 
 
 ### Forslag til rækkefølge
 
-1. **Fase 5** i ét plan: mere grund, teamrum 2 og en bygning til de andre sessioner.
-2. **63 sæson og vejr** og **64 kontorhund eller -kat**.
-3. **66 månedens medarbejder** og **67 tv-tilstand**.
+1. **63 sæson og vejr** og **64 kontorhund eller -kat**.
+2. **66 månedens medarbejder** og **67 tv-tilstand**.
+3. **65 indret selv**: flyt pynt og inventar med træk og slip.
 
 ## 🧹 Oprydning
 

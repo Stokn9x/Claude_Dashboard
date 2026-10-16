@@ -231,6 +231,63 @@ const fish = t => {
   }
 }
 
+// The receptionist behind the counter: greets helpers coming in by name,
+// says goodbye to those going home, answers the phone now and then.
+const RECEPTIONIST = { name: 'Bodil', look: lookFor('reception-bodil') }
+const receptionist = ({ subs, walkers, hits, t }, now, walks) => {
+  const room = firstRoom('reception')
+  if (!room || !owns('reception')) return null
+  const { cx, dy } = at(room, typeOf(room).receptionist)
+  chair(cx, dy - 4)
+  sitting(cx, dy, RECEPTIONIST.look, false, t, 3)
+  // The counter in front of her, curved, with a screen and a bell
+  rounded(cx - 45, dy - 2, 90, 30, 10, OUTLINE)
+  rounded(cx - 44, dy - 1, 88, 28, 9, '#2F5F9C')
+  rounded(cx - 44, dy - 1, 88, 7, 4, '#E9EEF2')
+  rect(cx + 12, dy - 12, 18, 12, OUTLINE)
+  rect(cx + 13, dy - 11, 16, 9, '#7FB4F0')
+  circle(cx - 28, dy + 2, 2.6, '#D6A23C', OUTLINE)
+  tag(cx, dy + 31, RECEPTIONIST.name, '#20262E')
+  const arriving = subs.find(s => s.phase === 'arriving' && now - s.since < walks.arrive)
+  const leaving = walkers.find(w => w.pose.isHomeward || (w.sub.phase === 'leaving' && !w.pose.isIdle))
+  const line = arriving
+    ? `Velkommen, ${arriving.name}!`
+    : leaving
+      ? `Farvel, ${leaving.sub.name}!`
+      : (t % 14_000) < 2600
+        ? ['Claude & Co, goddag!', 'Et øjeblik, jeg stiller om.', 'Kaffen er på 2. sal. Spøg.'][Math.floor(t / 14_000) % 3]
+        : null
+  return line ? { x: cx, y: dy - 34, line } : null
+}
+
+// The lounge's screens light up while someone plays.
+const hobbyScreens = (walkers, t) => {
+  const room = firstRoom('hobby')
+  if (!room || !isBuilt(room)) return
+  const playing = kind => walkers.some(w => w.pose.isIdle && w.pose.isThere && w.pose.errand.kind === kind)
+  const { tv, arcade } = typeOf(room)
+  const colours = ['#3E7CC9', '#2E9E8F', '#D6A23C', '#E5484D', '#8A6FD6']
+  if (playing('gaming')) {
+    rect(tv.x, tv.y, tv.w, tv.h, colours[Math.floor(t / 400) % colours.length])
+    rect(tv.x + 6 + ((t / 30) % (tv.w - 14)), tv.y + 3, 4, 4, '#FFFFFF')
+  }
+  if (playing('arcade')) {
+    rect(arcade.x + 3, arcade.y + 3, arcade.w - 6, 9, colours[Math.floor(t / 250) % colours.length])
+    rect(arcade.x + 6 + ((t / 90) % (arcade.w - 14)), arcade.y + 6, 3, 3, '#F2C94C')
+  }
+}
+
+// What they say now and then in the lounge, by pastime.
+const HOBBY_LINES = {
+  gaming: ['Én runde til!', 'Du snyder!', 'GG', 'Pause? Aldrig.'],
+  darts: ["Bull's-eye!", 'Lige ved og næsten', 'Tredobbelt tyve!'],
+  arcade: ['Ny highscore!', 'Game over …', 'Insert coin'],
+  pool: ['Otte-ballen i hjørnet', 'Flot stød!', 'Din tur', 'Kridt på køen'],
+  bar: ['En limonade, tak', 'Skål!', 'Det har været en lang dag'],
+  sofa: ['Ahh, endelig', 'Fem minutter mere …', 'Det her er livet'],
+  guitar: ['♪ ♫ ♪', '♫ la la la ♫', '♪ Wonderwall ♪'],
+}
+
 const espresso = t => {
   const room = firstRoom('kitchen')
   if (!owns('espresso') || !room || !isBuilt(room)) return
@@ -337,6 +394,14 @@ const drawWalkers = ({ walkers, players, hits, t }) => {
       continue
     }
     if (kind === 'lounge') sitting(pose.x, pose.y, look, false, t, hashOf(sub.id))
+    else if (pose.isThere && pose.errand?.dest?.sit) {
+      if (pose.errand.dest.facing === 'back') sittingBack(pose.x, pose.y, look)
+      else sitting(pose.x, pose.y, look, false, t, hashOf(sub.id))
+      if (kind === 'guitar') {
+        rect(pose.x - 12, pose.y - 16, 16, 6, '#B85A33')
+        rect(pose.x + 3, pose.y - 15, 10, 2, '#6E4B32')
+      }
+    }
     else if (kind === 'meeting') {
       if (pose.errand.dest.row === 'front') sittingBack(pose.x, pose.y, look)
       else sitting(pose.x, pose.y, look, false, t, hashOf(sub.id))
@@ -358,7 +423,8 @@ const drawWalkers = ({ walkers, players, hits, t }) => {
 }
 
 // What everyone says, on top of everything.
-const drawSpeech = ({ s, main, where, meeting, meetingPose, pause, kitchenSpot, list, seatedAt, subs, walkers, players, floorSitters, t }) => {
+const drawSpeech = frame => {
+  const { s, main, where, meeting, meetingPose, pause, kitchenSpot, list, seatedAt, subs, walkers, players, floorSitters, t } = frame
   const thanking = walkers.find(w => w.pose.handover)
   if (where === 'kitchen') {
     const lines = ['Kaffepause', s?.stats?.linesAdded ? `${s.stats.linesAdded} linjer i dag` : 'Klar når du er', 'Godt arbejde, team', 'Hvad nu?']
@@ -397,6 +463,13 @@ const drawSpeech = ({ s, main, where, meeting, meetingPose, pause, kitchenSpot, 
       if (w) bubble(w.pose.x, w.pose.y - 52, text, false, t, 48)
     }
   }
+  // In the hobby room each says a line now and then, on its own beat.
+  for (const w of walkers) {
+    const lines = w.pose.isIdle && w.pose.isThere ? HOBBY_LINES[w.pose.errand.kind] : null
+    const beat = (t + hashOf(w.sub.id) % 7000) % 10_000
+    if (lines && beat < 2400) bubble(w.pose.x, w.pose.y - (w.pose.errand.dest.sit ? 44 : 52), lines[Math.floor((t + hashOf(w.sub.id)) / 10_000) % lines.length], false, t)
+  }
+  if (frame.greeting) bubble(frame.greeting.x, frame.greeting.y, frame.greeting.line, false, t)
   // Off work on the lawn: those standing two by two chat, a line every three
   // seconds, a new subject every fifteen.
   const onLawn = walkers.filter(w => w.pose.isIdle && w.pose.isThere && w.pose.errand.kind === 'garden')
@@ -503,6 +576,8 @@ export const draw = () => {
   fish(t)
   espresso(t)
   clock(new Date())
+  hobbyScreens(walkers, t)
+  frame.greeting = receptionist(frame, now, walks)
   drawClaude(frame)
   drawDesks(frame)
   drawSaleOutlines(sales, hits)

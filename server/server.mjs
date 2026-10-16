@@ -15,7 +15,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-const VERSION = '0.17.0'
+const VERSION = '0.18.0'
 const HOST = '127.0.0.1'
 const PORT = Number(process.env.AGENT_KONTOR_PORT || 4747)
 const HERE = path.dirname(fileURLToPath(import.meta.url))
@@ -140,11 +140,11 @@ const backupGame = now => {
 // multiplies what the work earns by 0.8 to 1.2.
 const WELLBEING = {
   base: 40,
-  kitchen: 15, toilet: 10, lounge: 10, pingpong: 10, meeting: 5,
+  kitchen: 15, toilet: 10, lounge: 10, pingpong: 10, meeting: 5, reception: 5, hobby: 8, team2: 6,
   plants: 3, art: 3, neon: 2, espresso: 3, aquarium: 5, chairs: 6, screens: 5,
   perFloorSitter: -8,
 }
-const LIFTS = ['kitchen', 'toilet', 'lounge', 'pingpong', 'meeting', 'plants', 'art', 'neon', 'espresso', 'aquarium', 'chairs', 'screens']
+const LIFTS = ['kitchen', 'toilet', 'lounge', 'pingpong', 'meeting', 'reception', 'hobby', 'team2', 'plants', 'art', 'neon', 'espresso', 'aquarium', 'chairs', 'screens']
 // Helpers on the floor right now: the most any session has beyond the
 // desks, and which session that is (the page names it when it is not the
 // one in view).
@@ -262,16 +262,19 @@ const pruneCredited = now => {
 // Prices live here and only here: the page asks to buy, the server decides.
 // Every desk is bought, the first two cheaply; the team room has room for six, the
 // quiet room for four more.
-const DESK_PRICES = [300, 500, 800, 1200, 1800, 2500, 3500, 4500, 6000, 8000]
+// Six more come with the second team room (phase 5).
+const DESK_PRICES = [300, 500, 800, 1200, 1800, 2500, 3500, 4500, 6000, 8000, 10_000, 11_000, 12_000, 13_000, 14_000, 15_000]
 const MAX_DESKS = DESK_PRICES.length
+// The desks the rooms that stand have room for: ten, sixteen with team room 2.
+const desksRoom = () => (game.owned.rooms.includes('team2') ? MAX_DESKS : 10)
 // Rooms, and furniture for the team room, bought once each.
-const ROOM_PRICES = { kitchen: 3000, toilet: 2500, lounge: 4000, pingpong: 6000, meeting: 12000 }
+const ROOM_PRICES = { kitchen: 3000, toilet: 2500, lounge: 4000, pingpong: 6000, meeting: 12000, reception: 7000, hobby: 9000, team2: 15000 }
 // Decor and upgrades: bought once each, for the look and for wellbeing.
 const DECOR_PRICES = { plants: 600, art: 900, neon: 1200, espresso: 1500, aquarium: 2500, chairs: 4000, screens: 5000 }
 const THING_PRICES = { ...ROOM_PRICES, ...DECOR_PRICES }
 
 const priceOf = item => {
-  if (item === 'desk') return game.owned.desks < MAX_DESKS ? DESK_PRICES[game.owned.desks] : null
+  if (item === 'desk') return game.owned.desks < desksRoom() ? DESK_PRICES[game.owned.desks] : null
   if (item in THING_PRICES) return game.owned.rooms.includes(item) ? null : THING_PRICES[item]
   return null
 }
@@ -311,7 +314,7 @@ const ACHIEVEMENTS = [
   { id: 'commits-10', name: 'Committed', about: 'Lav 10 commits', reward: 150, value: () => total('commits'), target: 10 },
   { id: 'prs-5', name: 'Ship it', about: 'Åbn 5 pull requests', reward: 300, value: () => total('prs'), target: 5 },
   { id: 'desk-3', name: 'Indflytning', about: 'Køb det første skrivebord', reward: 50, value: () => game.owned.desks, target: 1 },
-  { id: 'desk-10', name: 'Fuldt hus', about: 'Køb alle ti skriveborde', reward: 1000, value: () => game.owned.desks, target: MAX_DESKS },
+  { id: 'desk-10', name: 'Fuldt hus', about: 'Køb alle seksten skriveborde', reward: 1000, value: () => game.owned.desks, target: MAX_DESKS },
   { id: 'kitchen', name: 'Kaffekultur', about: 'Byg køkkenet', reward: 100, value: () => (game.owned.rooms.includes('kitchen') ? 1 : 0), target: 1 },
   { id: 'all-rooms', name: 'Hele kontoret', about: 'Byg alle rum og alt inventar', reward: 2000, value: () => ALL_ROOMS.filter(r => game.owned.rooms.includes(r)).length, target: ALL_ROOMS.length },
   { id: 'wellbeing-90', name: 'Trivselsguru', about: 'Nå en trivsel på 90', reward: 500, value: () => wellbeing().score, target: 90 },
@@ -336,7 +339,7 @@ const gameView = () => ({
   kroner: Math.floor(game.kroner),
   owned: game.owned,
   next: Object.fromEntries(['desk', ...Object.keys(THING_PRICES)].map(item => [item, priceOf(item)])),
-  maxDesks: MAX_DESKS,
+  maxDesks: desksRoom(),
   rates: RATES,
   wellbeing: (() => {
     const w = wellbeing()

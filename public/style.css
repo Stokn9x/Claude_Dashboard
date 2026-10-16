@@ -173,6 +173,13 @@ button.chip { cursor: pointer; }
 .feed-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .feed-item.is-waiting .feed-text, .feed-item.is-stuck .feed-text, .feed-item.is-rain .feed-text { color: #FFB4B6; }
 
+/* Our own tooltips, in place of the browser's grey ones */
+.tip { position: fixed; left: 0; top: 0; z-index: 30; max-width: 280px; padding: 7px 11px; border-radius: 9px; background: #0D1115; color: var(--ink); border: 1px solid rgba(255, 255, 255, 0.1); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45); font-size: 12.5px; line-height: 1.4; pointer-events: none; animation: tip-in 0.12s ease-out; }
+.tip::before { content: ''; position: absolute; left: calc(var(--arrow, 50%) - 5px); width: 10px; height: 10px; background: #0D1115; border: 1px solid rgba(255, 255, 255, 0.1); transform: rotate(45deg); }
+.tip[data-side="below"]::before { top: -6px; border-right: 0; border-bottom: 0; }
+.tip[data-side="above"]::before { bottom: -6px; border-left: 0; border-top: 0; }
+@keyframes tip-in { from { opacity: 0; } }
+
 /* Notices at the bottom, in the middle */
 .toasts { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); display: grid; gap: 8px; z-index: 5; }
 .toast { display: flex; gap: 10px; align-items: center; padding: 10px 14px; border-radius: 12px; background: var(--surface); border: 1px solid color-mix(in srgb, var(--warn) 50%, var(--line)); box-shadow: var(--shadow); animation: toast-in 0.3s ease-out; transition: opacity 0.5s, transform 0.5s; }

@@ -20,7 +20,7 @@ export const onBought = fn => {
 }
 
 const GROUPS = [
-  ['Pladser og rum', ['desk', 'kitchen', 'toilet', 'lounge', 'pingpong', 'meeting']],
+  ['Pladser og rum', ['desk', 'kitchen', 'toilet', 'lounge', 'pingpong', 'meeting', 'reception', 'hobby', 'team2']],
   ['Pynt og opgraderinger', ['plants', 'art', 'neon', 'espresso', 'aquarium', 'chairs', 'screens']],
 ]
 const RATE_TEXT = { added: 'linje tilføjet', removed: 'linje fjernet', delivered: 'opgave afleveret af en hjælper', tests: 'grønne tests (højst hvert 10. minut)', commits: 'commit', prs: 'pull request' }
@@ -128,7 +128,7 @@ export const renderShop = () => {
     row.missing.hidden = !isForSale || canAfford
     row.missing.textContent = isForSale ? `Mangler ${kr(Math.max(0, price - g.kroner))}` : ''
     row.done.hidden = isForSale
-    row.done.textContent = isDesk ? 'Alle skriveborde er købt. Flere pladser kommer med flere rum.' : 'Ejet ✓'
+    row.done.textContent = isDesk ? (g.owned.rooms.includes('team2') ? 'Alle seksten skriveborde er købt.' : 'Alle ti skriveborde er købt. Byg teamrum 2 for seks mere.') : 'Ejet ✓'
     row.li.classList.toggle('is-owned', !isForSale)
     row.progress.hidden = !isForSale || canAfford
     row.fill.style.width = isForSale ? `${Math.min(100, (100 * g.kroner) / price)}%` : '0%'

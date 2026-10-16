@@ -17,7 +17,7 @@ export const isClear = (x, y, r = 0) => {
     [S.x, HEDGE_Y - 18 - r, S.w, GROUNDS.farPavement.y + GROUNDS.farPavement.h - HEDGE_Y + 30 + r],
     [GROUNDS.bench.x - 30, GROUNDS.bench.y - 30, 60, 50],
     // The lawn where helpers off work hang out
-    [598 - r, 282 - r, 190 + 2 * r, 160 + 2 * r],
+    [638 - r, 312 - r, 190 + 2 * r, 160 + 2 * r],
   ]
   if (keepOut.some(box => isIn(x, y, box))) return false
   const p = GROUNDS.pond

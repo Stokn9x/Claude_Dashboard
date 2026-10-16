@@ -102,6 +102,67 @@ export const ROOM_TYPES = {
     // The desks and chairs, and the aquarium's place by the wall
     blocks: [...[0, 1, 2, 3].flatMap(i => [[30 + i * 112, 439, 84, 30], [51 + i * 112, 422, 42, 22]]), [330, 388, 64, 14]],
   },
+  // The second team room, built west of the first: six more desks (phase 5)
+  team2: {
+    home: { x: -468, y: 138 },
+    w: 462,
+    h: 240,
+    desks: [0, 1, 2, 3, 4, 5].map(i => ({ cx: -382 + (i % 3) * 148, dy: 202 + Math.floor(i / 3) * 102 })),
+    sideWindows: [[-474, 190, 40], [-474, 300, 40]],
+    plants: [[-456, 150, true], [-20, 150], [-456, 368], [-20, 368, true]],
+    lights: [[-308, 200], [-160, 200], [-308, 300], [-160, 300]].map(([x, y]) => [x, y, 66, 0.16, 'ceiling']),
+    blocks: [
+      ...[0, 1, 2, 3, 4, 5].map(i => [-424 + (i % 3) * 148, 201 + Math.floor(i / 3) * 102, 84, 30]),
+      ...[0, 1, 2, 3, 4, 5].map(i => [-403 + (i % 3) * 148, 184 + Math.floor(i / 3) * 102, 42, 22]),
+      // A long bookcase and a water cooler
+      [-466, 196, 14, 76], [-60, 340, 16, 24],
+    ],
+  },
+  // The reception, in front of the front door: it always stands, empty,
+  // and arrivals come in by its door in the south wall; bought, it gets a
+  // counter, sofas and Bodil, who greets everyone by name.
+  reception: {
+    home: { x: 486, y: 176 },
+    w: 160,
+    h: 140,
+    receptionist: { cx: 566, dy: 228 },
+    // Where its sign stands until it is bought
+    items: { reception: { x: 566, y: 250 } },
+    lights: [[566, 214, 64, 0.36, 'lamp', 'reception'], [512, 292, 46, 0.26, 'lamp', 'reception'], [622, 292, 46, 0.26, 'lamp', 'reception']],
+    // The counter, the sofa in the west corner, the sofa and table by the east
+    // wall: only once it is bought. The fifth entry says what a block needs.
+    blocks: [[522, 224, 90, 32, 'reception'], [492, 280, 40, 30, 'reception'], [624, 246, 18, 56, 'reception'], [598, 262, 18, 26, 'reception']],
+  },
+  // The lounge, west of the quiet room: where helpers off work go to play
+  // and unwind. Each pastime has its spots: where to stand or sit, and facing.
+  hobby: {
+    home: { x: -468, y: 384 },
+    w: 462,
+    h: 118,
+    lights: [[-140, 394, 58, 0.5, 'neon'], [-400, 440, 62, 0.22, 'ceiling'], [-260, 456, 62, 0.3, 'lamp'], [-70, 410, 50, 0.3, 'lamp']],
+    tv: { x: -440, y: 386, w: 56, h: 10 },
+    arcade: { x: -362, y: 386, w: 26, h: 22 },
+    dartboard: { x: -464, y: 474 },
+    pool: { x: -300, y: 438, w: 80, h: 38 },
+    jukebox: { x: -196, y: 386, w: 20, h: 20 },
+    bar: { x: -112, y: 388, w: 84, h: 16 },
+    sofa: { x: -392, y: 484, w: 64, h: 16 },
+    hobbies: {
+      // On beanbags in front of the TV, backs to us
+      gaming: [{ x: -426, y: 446, facing: 'back', sit: true }, { x: -398, y: 446, facing: 'back', sit: true }],
+      // At the line, throwing at the board on the west wall
+      darts: [{ x: -418, y: 490, facing: 'left' }],
+      arcade: [{ x: -349, y: 432, facing: 'back' }],
+      // One at each end of the pool table
+      pool: [{ x: -312, y: 462, facing: 'right' }, { x: -208, y: 462, facing: 'left' }],
+      // On stools at the bar, backs to us
+      bar: [{ x: -94, y: 428, facing: 'back', sit: true }, { x: -62, y: 428, facing: 'back', sit: true }],
+      guitar: [{ x: -140, y: 492, facing: 'front', sit: true }],
+      // On the sofa by the south wall
+      sofa: [{ x: -374, y: 496, facing: 'front', sit: true }, { x: -346, y: 496, facing: 'front', sit: true }],
+    },
+    blocks: [[-444, 386, 64, 14], [-366, 386, 34, 26], [-304, 434, 88, 46], [-200, 386, 28, 24], [-116, 386, 92, 22], [-396, 482, 72, 20], [-164, 484, 14, 14]],
+  },
 }
 
 export const PLAN = {
@@ -112,6 +173,9 @@ export const PLAN = {
     { id: 'quiet', type: 'quiet', x: 6, y: 384 },
     { id: 'toilet', type: 'toilet', x: 6, y: 514, buy: 'toilet' },
     { id: 'meeting', type: 'meeting', x: 126, y: 514, buy: 'meeting' },
+    { id: 'team2', type: 'team2', x: -468, y: 138, buy: 'team2' },
+    { id: 'hobby', type: 'hobby', x: -468, y: 384, buy: 'hobby' },
+    { id: 'reception', type: 'reception', x: 486, y: 176 },
   ],
   // Openings in the walls, in world units, between two rooms (open once
   // both are built), and the front door.
@@ -122,11 +186,22 @@ export const PLAN = {
     { x: 214, y: 378, w: 48, h: 6, colour: '#C3CCD6', between: ['team', 'quiet'] },
     { x: 18, y: 502, w: 40, h: 12, colour: '#C3CCD6', between: ['quiet', 'toilet'] },
     { x: 280, y: 502, w: 48, h: 12, colour: '#C3CCD6', between: ['quiet', 'meeting'] },
-    { x: 474, y: 236, w: 6, h: 40, colour: '#8C6B4A', isEntrance: true, between: ['team'] },
+    // The front door: out to the path, or, once there is a reception, into it
+    { x: 474, y: 236, w: 6, h: 40, colour: '#8C6B4A', between: ['team'] },
+    { x: 480, y: 236, w: 6, h: 40, colour: '#CDB892', between: ['team', 'reception'] },
+    { x: 540, y: 316, w: 24, h: 6, colour: '#8C6B4A', isEntrance: true, between: ['reception'] },
+    // Through both west walls, where the team room's window was
+    { x: -6, y: 286, w: 12, h: 36, colour: '#C3CCD6', between: ['team', 'team2'] },
+    { x: -6, y: 400, w: 12, h: 36, colour: '#C3CCD6', between: ['quiet', 'hobby'] },
+    { x: -262, y: 378, w: 48, h: 6, colour: '#C3CCD6', between: ['team2', 'hobby'] },
   ],
-  entrance: { x: 478, y: 256 },
-  doormat: [462, 242, 12, 28],
 }
+
+// Where helpers come in and go out: the reception's door to the path. The
+// walkway outside runs from that door to the path and down to the pavement.
+export const entrance = () => ({ x: 552, y: 318 })
+export const doormat = () => [540, 322, 24, 8]
+export const walkway = () => [entrance(), { x: 552, y: 340 }, { x: 552, y: 684 }]
 
 export const typeOf = room => ROOM_TYPES[room.type]
 export const roomById = id => PLAN.rooms.find(r => r.id === id) ?? null
@@ -168,25 +243,25 @@ export const GROUNDS = {
   pavement: { y: 676, h: 16 },
   road: { y: 692, h: 44 },
   farPavement: { y: 736, h: 12 },
-  pond: { x: -250, y: 300, rx: 84, ry: 48 },
-  bench: { x: 598, y: 226 },
+  // West of the second team room's lot
+  pond: { x: -720, y: 300, rx: 84, ry: 48 },
+  // South of the reception's corner, so the walk to the path goes clear of it
+  bench: { x: 612, y: 372 },
   // Where helpers with no room inside sit: on the bench, two side by side,
   // then on the grass round it
-  benchSpots: [{ x: 590, y: 232 }, { x: 607, y: 232 }, { x: 578, y: 212 }, { x: 618, y: 212 }],
+  benchSpots: [{ x: 604, y: 378 }, { x: 621, y: 378 }, { x: 594, y: 356 }, { x: 628, y: 356 }],
   // A lawn east of the path where helpers off work stand and chat, two by
   // two, facing each other
-  hangout: [[630, 312], [700, 342], [640, 384], [712, 414]].flatMap(([x, y]) => [{ x, y, facing: 'right' }, { x: x + 34, y, facing: 'left' }]),
-  // The walk between the front door and the street: out of the door, to
-  // the corner of the path, down to the pavement
-  walkway: [{ x: 478, y: 256 }, { x: 552, y: 256 }, { x: 552, y: 684 }],
+  hangout: [[670, 342], [740, 372], [680, 414], [752, 444]].flatMap(([x, y]) => [{ x, y, facing: 'right' }, { x: x + 34, y, facing: 'left' }]),
   // Lamp posts along the pavement, every so often
   lamps: [-560, -400, -240, -80, 80, 240, 400, 620, 780, 940, 1100].map(x => ({ x, y: 680 })),
 }
 
 // ── Places, as the floor plan has them now ───────────────────────────────
-// Every desk the rooms have room for, and how many of them are bought (all of
-// them before the server tells).
-export const deskSlots = () => PLAN.rooms.filter(room => typeOf(room).desks).flatMap(room => typeOf(room).desks.map(d => at(room, d)))
+// Every desk the rooms that stand have room for, and how many of them are
+// bought (all of them before the server tells). A room still to be built
+// adds its desks once it stands.
+export const deskSlots = () => PLAN.rooms.filter(room => typeOf(room).desks && isBuilt(room)).flatMap(room => typeOf(room).desks.map(d => at(room, d)))
 export const ownedDesks = () => Math.min(deskSlots().length, store.state.game?.owned?.desks ?? deskSlots().length)
 export const desks = () => deskSlots().slice(0, ownedDesks())
 
@@ -244,6 +319,9 @@ export const ITEMS = {
   lounge: { name: 'Sofahjørne', icon: '🛋️', about: 'En sofa, et sofabord og en lampe i teamrummet.' },
   pingpong: { name: 'Bordtennisbord', icon: '🏓', about: 'Et bordtennisbord i teamrummet.' },
   meeting: { name: 'Mødelokale', icon: '📊', about: 'Et mødelokale med et langt bord og en skærm på væggen.' },
+  reception: { name: 'Reception', icon: '🛎️', about: 'Indretning af receptionen foran hoveddøren: skranke, sofaer, logo og Bodil, der byder hjælperne velkommen og siger farvel.' },
+  hobby: { name: 'Lounge', icon: '🎱', about: 'En lounge vest for stillerummet med pool, bar, spillekonsol, dart, arkademaskine, jukebox, guitar og sofa. Her slapper hjælperne af, når de har fri.' },
+  team2: { name: 'Teamrum 2', icon: '🏗️', about: 'Et nyt teamrum vest for det første, med plads til seks skriveborde mere.' },
   plants: { name: 'Planter overalt', icon: '🪴', about: 'Store planter i teamrummet og stillerummet.' },
   art: { name: 'Kunst på væggene', icon: '🖼️', about: 'Malerier på væggene i teamrummet og hos Claude.' },
   neon: { name: 'Neonskilt', icon: '💡', about: 'Et lyserødt "SHIP IT" over teamrummet, der lyser om aftenen.' },

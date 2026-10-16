@@ -202,3 +202,26 @@ test('a streak with a day missing starts over', async () => {
     await stop(child)
   }
 })
+
+test('desks beyond the tenth are for sale only once the second team room stands', async () => {
+  const home = newHome()
+  fs.writeFileSync(gameFile(home), JSON.stringify({ v: 1, kroner: 0, owned: { desks: 10, rooms: ['claude', 'team'] }, credited: {} }))
+  const first = await start(home)
+  try {
+    const { game } = JSON.parse((await get('/api/state')).body)
+    assert.equal(game.next.desk, null)
+    assert.equal(game.maxDesks, 10)
+    assert.equal(typeof game.next.team2, 'number')
+  } finally {
+    await stop(first)
+  }
+  fs.writeFileSync(gameFile(home), JSON.stringify({ v: 1, kroner: 0, owned: { desks: 10, rooms: ['claude', 'team', 'team2'] }, credited: {} }))
+  const second = await start(home)
+  try {
+    const { game } = JSON.parse((await get('/api/state')).body)
+    assert.equal(game.maxDesks, 16)
+    assert.ok(game.next.desk > 8000, 'the eleventh desk costs more than the tenth')
+  } finally {
+    await stop(second)
+  }
+})

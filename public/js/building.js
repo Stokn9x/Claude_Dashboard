@@ -6,7 +6,7 @@
 import { store, owns } from './store.js'
 import { OUTLINE, FONT, canvas } from './gfx.js'
 import { clip } from './util.js'
-import { PLAN, ROOM_TYPES, WORLD, frameOf, isBuilt, isOpenDoor, shiftOf, typeOf } from './plan.js'
+import { PLAN, ROOM_TYPES, WORLD, doormat, frameOf, isBuilt, isOpenDoor, shiftOf, typeOf } from './plan.js'
 import { applyView, onResize, visibleRect, visibleRooms, view } from './camera.js'
 import { isNightAt, sideWindows, skyAt } from './light.js'
 import { drawGrounds } from './outdoors.js'
@@ -282,8 +282,9 @@ const roomDrawers = {
       fill(140 + ((i * 61) % 320), 516 + i * 10, 1, 10, '#A47A55')
     }
     // A screen on the wall, and a whiteboard in the corner
-    fill(270, 515, 60, 6, OUTLINE)
-    fill(271, 516, 58, 4, '#1F2A44')
+    // The screen on the north wall, left of the door from the quiet room
+    fill(184, 515, 60, 6, OUTLINE)
+    fill(185, 516, 58, 4, '#1F2A44')
     fill(424, 516, 40, 16, OUTLINE)
     fill(425, 517, 38, 14, '#F6F7F8')
     fill(428, 520, 20, 1.5, '#3E7CC9')
@@ -322,6 +323,164 @@ const roomDrawers = {
       for (let i = 0; i < 5; i++) fill(x + 4 + i * 11, y + h - 3, 3, 3, i % 2 ? '#56A86B' : '#D9B88A')
     }
     if (owns('plants')) for (const [x, y] of [[124, 398], [302, 398]]) bigPlant(g, fill, x, y)
+  },
+
+  team2: (g, fill) => {
+    // A warm grey carpet in squares, a rug under each desk
+    fill(-468, 138, 462, 240, '#D3D0C8')
+    for (let c = 0; c < 20; c++) fill(-468 + c * 24, 138, 1, 240, '#C4C0B6')
+    for (let r = 0; r < 10; r++) fill(-468, 138 + r * 24, 462, 1, '#C4C0B6')
+    rugs(g, ROOM_TYPES.team2.desks, [['#C9D6CF', '#BCCAC2'], ['#D8CCC0', '#CBBFB2'], ['#CCD0E0', '#BFC3D4'], ['#DCD3BE', '#CFC6B0'], ['#D3C8D9', '#C6BBCC'], ['#C4D6DA', '#B6C9CD']], 104, 64)
+    // A long bookcase on the west wall, a whiteboard on the north wall
+    fill(-466, 196, 14, 76, OUTLINE)
+    fill(-465, 197, 12, 74, '#8B5E3C')
+    ;['#3E7CC9', '#D6A23C', '#2E9E8F', '#D45D7A', '#8A6FD6', '#E07A4F', '#56A86B', '#3E7CC9', '#D6A23C', '#D45D7A'].forEach((c, i) => fill(-464, 199 + i * 7, 10, 5, c))
+    fill(-300, 140, 70, 14, OUTLINE)
+    fill(-299, 141, 68, 12, '#F6F7F8')
+    fill(-294, 144, 30, 1.5, '#3E7CC9')
+    fill(-294, 148, 44, 1.5, '#E07A4F')
+    // The water cooler
+    fill(-60, 340, 16, 24, OUTLINE)
+    fill(-59, 341, 14, 10, '#9CC4EC')
+    fill(-59, 352, 14, 11, '#E9EEF2')
+    if (owns('plants')) for (const [x, y] of [[-308, 156], [-160, 156]]) bigPlant(g, fill, x, y)
+  },
+
+  hobby: (g, fill, dot) => {
+    const t = ROOM_TYPES.hobby
+    // Dark oak planks, and a big purple rug in the middle
+    fill(-468, 384, 462, 118, '#5E4535')
+    for (let i = 0; i < 12; i++) {
+      fill(-468, 386 + i * 10, 462, 1, '#4E392B')
+      fill(-460 + ((i * 67) % 440), 386 + i * 10, 1, 10, '#4E392B')
+    }
+    slab(g, -320, 424, 120, 66, 8, '#4B2E5C')
+    slab(g, -316, 428, 112, 58, 6, '#5E3A72')
+    g.strokeStyle = '#7C55A0'
+    g.lineWidth = 1
+    g.strokeRect(-310.5, 433.5, 100, 47)
+    // The games corner: a TV, a rug and two beanbags
+    slab(g, -452, 420, 80, 44, 8, '#2E4C6E')
+    slab(g, -449, 423, 74, 38, 6, '#36597F')
+    fill(t.tv.x - 1, t.tv.y - 1, t.tv.w + 2, t.tv.h + 2, OUTLINE)
+    fill(t.tv.x, t.tv.y, t.tv.w, t.tv.h, '#1B2433')
+    dot(-426, 452, 10, '#D45D7A', OUTLINE)
+    dot(-398, 452, 10, '#3E7CC9', OUTLINE)
+    // The dartboard on the west wall, and the line on the floor
+    const d = t.dartboard
+    dot(d.x + 3, d.y, 9, OUTLINE)
+    dot(d.x + 3, d.y, 8, '#2B2F36')
+    dot(d.x + 3, d.y, 6, '#E9E2C9')
+    dot(d.x + 3, d.y, 4, '#E5484D')
+    dot(d.x + 3, d.y, 1.6, '#2E9E8F')
+    fill(-410, 482, 2, 18, '#E5484D')
+    // The arcade machine against the north wall
+    const a = t.arcade
+    fill(a.x - 1, a.y - 1, a.w + 2, a.h + 2, OUTLINE)
+    fill(a.x, a.y, a.w, a.h, '#8A6FD6')
+    fill(a.x + 3, a.y + 3, a.w - 6, 9, '#1B2433')
+    dot(a.x + 8, a.y + 17, 2, '#E5484D')
+    dot(a.x + 17, a.y + 17, 2, '#F2C94C')
+    // The pool table: wooden rim, green cloth, pockets, balls set up
+    const p = t.pool
+    slab(g, p.x - 2, p.y - 2, p.w + 4, p.h + 4, 5, OUTLINE)
+    slab(g, p.x, p.y, p.w, p.h, 4, '#6E4B32')
+    fill(p.x + 5, p.y + 5, p.w - 10, p.h - 10, '#1F7A4D')
+    for (const [px, py] of [[p.x + 5, p.y + 5], [p.x + p.w / 2, p.y + 4], [p.x + p.w - 5, p.y + 5], [p.x + 5, p.y + p.h - 5], [p.x + p.w / 2, p.y + p.h - 4], [p.x + p.w - 5, p.y + p.h - 5]]) dot(px, py, 2.2, '#111418')
+    ;['#F2C94C', '#E5484D', '#3E7CC9', '#8A6FD6', '#E07A4F', '#111418'].forEach((c, i) => dot(p.x + 52 + [0, 4, 4, 8, 8, 8][i], p.y + 19 + [0, -2.5, 2.5, -5, 0, 5][i], 2, c))
+    dot(p.x + 20, p.y + 19, 2, '#FFFFFF')
+    // The jukebox, glowing
+    const j = t.jukebox
+    slab(g, j.x - 1, j.y - 1, j.w + 2, j.h + 2, 6, OUTLINE)
+    slab(g, j.x, j.y, j.w, j.h, 5, '#D6A23C')
+    fill(j.x + 4, j.y + 4, j.w - 8, 7, '#FF8CC2')
+    fill(j.x + 4, j.y + 13, j.w - 8, 3, '#2B2F36')
+    // The bar along the north wall: bottles on a shelf, a counter
+    const b = t.bar
+    fill(b.x, b.y - 2, b.w, 4, '#3B2A20')
+    ;['#2E9E8F', '#D6A23C', '#E5484D', '#7FB4F0', '#56A86B', '#E07A4F', '#8A6FD6'].forEach((c, i) => fill(b.x + 6 + i * 11, b.y - 2, 4, 4, c))
+    slab(g, b.x - 1, b.y + 1, b.w + 2, b.h, 3, OUTLINE)
+    slab(g, b.x, b.y + 2, b.w, b.h - 2, 2, '#8B5E3C')
+    fill(b.x, b.y + 2, b.w, 3, '#B98F5E')
+    for (const x of [-94, -62]) {
+      dot(x, 428, 5.5, OUTLINE)
+      dot(x, 428, 4.3, '#C8643B')
+    }
+    // The sofa along the south wall, cushions in two colours
+    const f = t.sofa
+    fill(f.x, f.y, f.w, f.h, OUTLINE)
+    fill(f.x + 1, f.y + 6, f.w - 2, f.h - 7, '#8A6FD6')
+    fill(f.x + 1, f.y + 1, f.w - 2, 6, '#6A52AE')
+    fill(f.x + 6, f.y + 8, 22, 6, '#A48BE6')
+    fill(f.x + 34, f.y + 8, 22, 6, '#A48BE6')
+    // The guitar corner: an amp by the stool
+    fill(-164, 484, 14, 14, OUTLINE)
+    fill(-163, 485, 12, 12, '#2B2F36')
+    dot(-157, 491, 3.5, '#5B6672')
+    // The neon sign on the north wall
+    slab(g, -172, 386, 62, 13, 3, '#2B1F33')
+    g.font = `800 8px ${FONT}`
+    g.textAlign = 'center'
+    g.shadowColor = '#FF5FA2'
+    g.shadowBlur = 8
+    g.fillStyle = '#FF8CC2'
+    g.fillText('LOUNGE', -141, 396)
+    g.shadowBlur = 0
+    // Plants in the corners
+    bigPlant(g, fill, -455, 404)
+    bigPlant(g, fill, -22, 488)
+  },
+
+  // The reception stands from the start, bare; bought, it is furnished.
+  reception: (g, fill, dot) => {
+    // Polished stone tiles
+    fill(486, 176, 160, 140, '#E6E2DA')
+    for (let c = 0; c < 14; c++) fill(486 + c * 12, 176, 1, 140, '#D8D3C9')
+    for (let r = 0; r < 12; r++) fill(486, 176 + r * 12, 160, 1, '#D8D3C9')
+    if (!owns('reception')) {
+      // Empty: a few boxes and a ladder, waiting for the fitters
+      fill(600, 186, 18, 14, '#B98F5E')
+      fill(604, 196, 14, 10, '#C9A273')
+      fill(500, 290, 4, 22, '#8B5E3C')
+      fill(512, 290, 4, 22, '#8B5E3C')
+      for (let k = 0; k < 4; k++) fill(500, 293 + k * 5, 16, 1.5, '#8B5E3C')
+      return
+    }
+    // A runner from the door up to the counter
+    slab(g, 544, 238, 16, 78, 2, '#7A2E3B')
+    fill(546, 240, 12, 74, '#9C3D4C')
+    // The logo on the north wall, lit from below
+    slab(g, 520, 178, 92, 14, 3, '#20262E')
+    g.font = `800 8px ${FONT}`
+    g.textAlign = 'center'
+    g.shadowColor = '#E3875E'
+    g.shadowBlur = 6
+    g.fillStyle = '#F2A07A'
+    g.fillText('CLAUDE & CO', 566, 188)
+    g.shadowBlur = 0
+    // The waiting corner in the west: a rug, an L-shaped sofa, a low table
+    slab(g, 490, 270, 56, 42, 6, '#C9B79C')
+    fill(492, 280, 40, 30, OUTLINE)
+    fill(493, 281, 10, 28, '#2F5F9C')
+    fill(493, 299, 38, 10, '#2F5F9C')
+    fill(495, 283, 6, 24, '#4F7FA8')
+    fill(503, 301, 26, 6, '#4F7FA8')
+    slab(g, 510, 284, 18, 12, 2, OUTLINE)
+    slab(g, 511, 285, 16, 10, 2, '#E9EEF2')
+    // By the east wall: a sofa, a table with magazines, a water cooler
+    fill(624, 246, 18, 56, OUTLINE)
+    fill(625, 247, 16, 54, '#2E7D74')
+    fill(632, 249, 8, 50, '#3AA597')
+    slab(g, 598, 262, 18, 26, 3, OUTLINE)
+    slab(g, 599, 263, 16, 24, 2, '#B98F5E')
+    fill(602, 266, 8, 6, '#E5484D')
+    fill(604, 276, 8, 6, '#3E7CC9')
+    // Big plants in the corners, a clock on the wall
+    bigPlant(g, fill, 496, 196)
+    bigPlant(g, fill, 636, 196)
+    bigPlant(g, fill, 636, 308)
+    dot(500, 180, 4.5, OUTLINE)
+    dot(500, 180, 3.6, '#FFFFFF')
   },
 }
 
@@ -414,7 +573,7 @@ export const drawBuilding = (project, hour) => {
   }
   // Doors, the front door's mat, and windows in the side walls
   for (const d of PLAN.doors) if (isOpenDoor(d)) fill(d.x, d.y, d.w, d.h, d.colour)
-  if (PLAN.doormat) fill(...PLAN.doormat, '#6E5A44')
+  fill(...doormat(), '#6E5A44')
   for (const w of sideWindows()) {
     fill(w.x, w.y, 6, w.h, sky)
     fill(w.x + 1, w.y + w.h / 2 - 1, 4, 2, WALL_TOP)
