@@ -1,0 +1,73 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="680" height="560" viewBox="0 0 680 560" font-family="Segoe UI, system-ui, -apple-system, sans-serif">
+  <title>Ny grundplan for Agent-kontor (forslag 3)</title>
+  <desc>To rækker rum om en hovedgang. Teamrummene i vestenden vokser mod vest, loungen og toilettet i østenden vokser mod øst, køkkenet vokser inde i bygningen. Claude sidder midt i huset over receptionen, med have mellem huset og vejen.</desc>
+  <rect width="680" height="560" fill="#FFFFFF"/>
+  <g font-size="14" font-weight="500" text-anchor="middle" dominant-baseline="central">
+    <!-- Extensions west: team room 2 (north) and team room 1 (south) -->
+    <g fill="none" stroke="#1D9E75" stroke-dasharray="5 4">
+      <rect x="20" y="44" width="86" height="68" rx="4"/><rect x="20" y="118" width="86" height="68" rx="4"/>
+      <rect x="20" y="226" width="86" height="72" rx="4"/><rect x="20" y="306" width="86" height="72" rx="4"/>
+    </g>
+    <!-- Extensions east and in the building: lounge, kitchen, toilet -->
+    <g fill="none" stroke="#D85A30" stroke-dasharray="5 4">
+      <rect x="494" y="44" width="72" height="142" rx="4"/><rect x="574" y="44" width="86" height="142" rx="4"/>
+      <rect x="444" y="226" width="42" height="152" rx="4"/>
+    </g>
+    <g fill="none" stroke="#7F77DD" stroke-dasharray="5 4">
+      <rect x="574" y="226" width="86" height="72" rx="4"/><rect x="574" y="306" width="86" height="72" rx="4"/>
+    </g>
+    <g font-size="12" font-weight="400" fill="#5F5E5A">
+      <text x="63" y="78">Trin 2</text><text x="63" y="152">Trin 3</text>
+      <text x="63" y="262">Trin 2</text><text x="63" y="342">Trin 3</text>
+      <text x="530" y="115">Trin 2</text><text x="617" y="115">Trin 3</text>
+      <text x="465" y="302">Trin 2</text>
+      <text x="617" y="262">Trin 2</text><text x="617" y="342">Trin 3</text>
+    </g>
+    <!-- Work rooms -->
+    <g fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5">
+      <rect x="110" y="40" width="90" height="150" rx="4"/><rect x="200" y="40" width="100" height="150" rx="4"/>
+      <rect x="300" y="40" width="120" height="150" rx="4"/><rect x="110" y="222" width="90" height="160" rx="4"/>
+      <rect x="290" y="222" width="90" height="160" rx="4"/>
+    </g>
+    <g fill="#085041">
+      <text x="155" y="105">Teamrum 2</text><text x="250" y="105">Claude</text><text x="360" y="115">Mødelokale</text>
+      <text x="155" y="292">Teamrum 1</text><text x="335" y="292">Stillerum</text>
+    </g>
+    <g fill="#0F6E56" font-size="12" font-weight="400">
+      <text x="155" y="125">Trin 1</text><text x="250" y="125">Midt i huset</text>
+      <text x="155" y="312">Trin 1</text><text x="335" y="312">4 borde</text>
+    </g>
+    <!-- Rooms for breaks -->
+    <g fill="#FAECE7" stroke="#993C1D" stroke-width="0.5">
+      <rect x="420" y="40" width="70" height="150" rx="4"/><rect x="380" y="222" width="60" height="160" rx="4"/>
+    </g>
+    <g fill="#712B13"><text x="455" y="105">Lounge</text><text x="410" y="292">Køkken</text></g>
+    <g fill="#993C1D" font-size="12" font-weight="400"><text x="455" y="125">Trin 1</text><text x="410" y="312">Trin 1</text></g>
+    <!-- Service: reception and toilet -->
+    <g fill="#EEEDFE" stroke="#534AB7" stroke-width="0.5">
+      <rect x="200" y="222" width="90" height="160" rx="4"/><rect x="490" y="222" width="80" height="160" rx="4"/>
+    </g>
+    <g fill="#3C3489"><text x="245" y="292">Reception</text><text x="530" y="292">Toilet</text></g>
+    <g fill="#534AB7" font-size="12" font-weight="400"><text x="245" y="312">Indgang</text><text x="530" y="312">Trin 1</text></g>
+    <!-- The corridor, the path, the garden and the road -->
+    <rect x="110" y="190" width="460" height="32" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/>
+    <text x="340" y="206" font-size="12" font-weight="400" fill="#444441">Hovedgang</text>
+    <rect x="235" y="382" width="20" height="70" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/>
+    <path d="M245 446V390M240 395L245 389L250 395" fill="none" stroke="#5F5E5A" stroke-width="1.5" stroke-linecap="round"/>
+    <g fill="#EAF3DE" stroke="#3B6D11" stroke-width="0.5">
+      <rect x="20" y="392" width="205" height="52" rx="4"/><rect x="265" y="392" width="395" height="52" rx="4"/>
+    </g>
+    <g fill="#27500A" font-size="12" font-weight="400">
+      <text x="122" y="418">Have og bænk</text><text x="462" y="418">Have, sø og plæne til hjælperne med fri</text>
+    </g>
+    <rect x="20" y="452" width="640" height="34" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/>
+    <text x="340" y="469" font-size="12" font-weight="400" fill="#444441">Vej</text>
+  </g>
+  <!-- Legend -->
+  <g font-size="12" fill="#444441" dominant-baseline="central">
+    <rect x="40" y="508" width="14" height="14" rx="2" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/><text x="60" y="515">Arbejde</text>
+    <rect x="130" y="508" width="14" height="14" rx="2" fill="#FAECE7" stroke="#993C1D" stroke-width="0.5"/><text x="150" y="515">Pause</text>
+    <rect x="210" y="508" width="14" height="14" rx="2" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.5"/><text x="230" y="515">Service</text>
+    <rect x="300" y="508" width="14" height="14" rx="2" fill="none" stroke="#888780" stroke-dasharray="3 2"/><text x="320" y="515">Udvidelse, købes som trin 2 og 3</text>
+  </g>
+</svg>
