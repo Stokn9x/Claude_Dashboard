@@ -487,15 +487,39 @@ const isOlder = (a: string, b: string) => {
 // A server from before an update keeps its old code in memory. It is asked
 // to step down, with the token that only the office's own pages and the
 // processes on this computer can read, and the new one takes its place.
+const waitUntilGone = async ($: $) => {
+  for (let i = 0; i < 10 && (await runningVersion($)) !== null; i++) await new Promise<void>(done => $.clock.after(200, done))
+}
+
+// A server from before 0.13.1 has no /api/quit and would stay. It is stopped
+// by its process instead: the one listening on the office's port, and only
+// if its command line is this server's script.
+const stopByPort = async ($: $) => {
+  const isWindows = (await $.env.get('OS')) === 'Windows_NT'
+  const argv = isWindows
+    ? [
+        'powershell.exe',
+        '-NoProfile',
+        '-NonInteractive',
+        '-Command',
+        `$p = (Get-NetTCPConnection -LocalPort ${PORT} -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1).OwningProcess; if ($p) { $c = (Get-CimInstance Win32_Process -Filter "ProcessId=$p").CommandLine; if ($c -match 'server[\\\\/]server\\.mjs') { Stop-Process -Id $p -Force } }`,
+      ]
+    : ['sh', '-c', `for p in $(lsof -ti tcp:${PORT} -sTCP:LISTEN); do ps -o command= -p "$p" | grep -q 'server/server.mjs' && kill "$p"; done`]
+  await $.process.run(argv, { timeoutMs: 10_000 }).catch(() => null)
+}
+
 const retireOldServer = async ($: $) => {
   try {
     const state = await $.http.fetch(`${ADDRESS}/api/state`)
     const { token } = JSON.parse(state.text) as { token?: string }
     if (token) await $.http.fetch(`${ADDRESS}/api/quit`, { method: 'POST', headers: { 'x-kontor-token': token } })
   } catch {
-    // Already gone, or going.
+    // Already gone, going, or too old to know /api/quit.
   }
-  for (let i = 0; i < 10 && (await runningVersion($)) !== null; i++) await new Promise<void>(done => $.clock.after(200, done))
+  await waitUntilGone($)
+  if ((await runningVersion($)) === null) return
+  await stopByPort($)
+  await waitUntilGone($)
 }
 
 const startServer = async ($: $) => {

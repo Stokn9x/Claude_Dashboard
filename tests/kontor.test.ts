@@ -505,3 +505,44 @@ test('an older server from before an update is asked to step down, and the new o
   expect(calls).not.toContain('POST /api/quit')
   expect(calls).not.toContain('start')
 })
+
+test('a server too old to know /api/quit is stopped by its process, and the new one started', async ($, on) => {
+  const clock = engine(on)
+  let version: string | null = '0.10.0'
+  const calls: string[] = []
+  on('env.get', (_, e) => ({ value: e.name === 'OS' ? 'Windows_NT' : undefined }) as never)
+  on('fs.read', (_, e) => ({ value: e.path.split(String.fromCharCode(92)).join('/').endsWith('.claude-plugin/plugin.json') ? JSON.stringify({ version: '0.16.1' }) : '' }) as never)
+  on('http.fetch', (_, e) => {
+    const path = new URL(e.url).pathname
+    calls.push(`${e.init?.method ?? 'GET'} ${path}`)
+    if (version === null) throw new Error('ECONNREFUSED')
+    if (path === '/api/quit') return { value: { status: 404, ok: false, headers: {}, text: 'Ikke fundet' } } as never
+    if (path === '/api/state') return { value: { status: 200, ok: true, headers: {}, text: JSON.stringify({ token: 'old' }) } } as never
+    return { value: { status: 200, ok: true, headers: {}, text: JSON.stringify({ ok: true, app: 'agent-kontor', version }) } } as never
+  })
+  let script = ''
+  on('process.run', (_, e) => {
+    if (e.argv[0] === 'powershell.exe') {
+      calls.push('stop by port')
+      script = e.argv.join(' ')
+      version = null
+    }
+    if (e.argv.includes('--detach')) {
+      calls.push('start')
+      version = '0.16.1'
+    }
+    return { value: { exitCode: 0, stdout: '', stderr: '' } } as never
+  })
+
+  await $.session.start(start())
+  // It is given two seconds to step down by itself, on the engine's clock.
+  const opening = $.command.run({ command: 'kontor', args: '' } as never)
+  for (let i = 0; i < 30; i++) await clock.advance(200)
+  await opening
+  expect(calls).toContain('POST /api/quit')
+  expect(calls).toContain('stop by port')
+  // Only the process that runs this server's script is stopped.
+  expect(script).toContain('4747')
+  expect(script).toMatch(/server.*server.*mjs/)
+  expect(calls.indexOf('start')).toBeGreaterThan(calls.indexOf('stop by port'))
+})

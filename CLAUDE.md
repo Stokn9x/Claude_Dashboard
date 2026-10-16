@@ -80,5 +80,6 @@ Commit messages end with `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com
 - **The balance is slow on purpose:** the office should take weeks of work. `tests/economy.check.mjs` reads rates and prices from the server, so changing them does not break it.
 - **A helper's life:** arriving → working → delivering → idle (off work, `WALKS.idle`, three minutes) → leaving. Called on while idle, it goes back to `arriving` with `from: 'idle'`; a stuck one skips idle. Idle and leaving helpers hold no seat. What an idle helper does is the page's (`idle.js`); the walks between idle spots are remembered in the page only, so a reload can skip one.
 - **Only Edit and Write earn lines.** Changes made through Bash (sed, Python scripts) are not counted; tests count by command (`npm test`, `node --test`, …).
+- **Servers older than 0.13.1 have no `/api/quit`.** The mod then stops the process listening on 4747, but only if its command line runs `server/server.mjs` (`stopByPort`).
 - **One plane only.** The office grows across the grounds, never upwards: no floors, lifts or stairs (the user's decision).
 - **Deleting is refused by the auto-mode classifier.** Move things aside (e.g. to `~/.claude/dev-mods-arkiv`) instead.
