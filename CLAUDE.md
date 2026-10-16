@@ -2,7 +2,7 @@
 
 A Claude Code mod that shows Claude and its subagents as pixel people in an office, drawn on a page in the browser, plus a small game: the work earns kroner, which buy desks, rooms and furniture. Everything stays on this computer.
 
-Talk to the user in Danish. All text the user sees (page, panel, button, README, UDVIDELSER.md, SPIL.md) is Danish; code comments are English, in full sentences.
+Talk to the user in Danish. The page is dark only (the user's wish); there is no light theme. All text the user sees (page, panel, button, README, UDVIDELSER.md, SPIL.md) is Danish; code comments are English, in full sentences.
 
 ## How it fits together
 
@@ -46,7 +46,7 @@ Preview against a temporary home folder, never the user's real `~/.claude`:
 
 1. A `.claude/launch.json` in the parent folder (`Desktop/Claude mod`) that runs `agent-kontor/server/server.mjs` with `USERPROFILE` set to a scratch folder and `AGENT_KONTOR_PORT` 4748.
 2. A small script that writes fake v2 status files (helpers with `seat`, `phase`, `since`, `activity`, `earned`, `walks`) into that folder every 500 ms, and a `spil.json` there if the test needs owned rooms or money.
-3. `preview_start`, then look at the page **at full size** (the user asked for this). `?tid=21:30` shows another time of day; overriding `Date.now` in the page jumps to a break or a meeting.
+3. `preview_start`, then look at the page **at full size** (the user asked for this). `resize_window` to e.g. 1280×800 lays the page out at that size, but the screenshot shows it small in a corner: use it for the layout, and the pane's own size (zoomed crops) for details. `?tid=21:30` shows another time of day; overriding `Date.now` in the page jumps to a break or a meeting.
 4. Afterwards stop the server and the writer, and delete the `launch.json`.
 
 ### After a release

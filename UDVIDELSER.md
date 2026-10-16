@@ -26,6 +26,7 @@ Status: ✅ lavet · 🟡 delvist · ⬜ ikke lavet · ➖ ikke længere relevan
 | 0.10.0 | Spillets fase 2: køb køkken, toilet, sofahjørne, bordtennisbord og mødelokale; ledige grunde med skilte, byggeri med stillads og konfetti; toilet og mødelokale er nye rum under projektrummet |
 | 0.11.0 | Spillets fase 3: kaffepauser, toiletbesøg, bordtennis og møder hos Claude; drama og banter i køkkenet ud fra dagens rigtige tal; trivsel der ganger indtjeningen; projektrummet er blevet et stillerum med fire skriveborde mere; CLAUDE.md |
 | 0.11.1 | Fejlrettelser: ingen går gennem væggene (døre forbinder rummene i rutegitteret, og der er fri vej ud af Claudes kontor), nyt toilet med døren ud til et frit område, ingen fliser i væggene; langsommere indtjening og højere priser, så kontoret bygges over uger |
+| 0.12.0 | En lækrere side rundt om kontoret: topbjælke med ikon, trivsel, saldo og forbindelsesprik; kort med pixel-portræt og statuspille i listen; venteboks med "Gå til"; butik med ikoner og fremdrift; kun mørkt tema |
 
 ## 🔧 Fejl og ting der driller
 
@@ -91,7 +92,7 @@ Status: ✅ lavet · 🟡 delvist · ⬜ ikke lavet · ➖ ikke længere relevan
 
 | # | Hvad | Str. | Status |
 |---|---|---|---|
-| 46 | **En lækrere side rundt om kontoret.** I dag er det en rå overskrift og en tekstliste på mørk baggrund. Idéer: en topbjælke med navn, saldo som et rigtigt mærke og forbindelsesstatus som en lille prik; listen over hvem der laver hvad som kort med pixel-portræt, navn, opgave og en farvet statuspille; en ramme om kontoret, der passer til pixel-stilen; en pænere tom tilstand, når ingen sessioner kører; bedre lyst og mørkt tema; og de knapper, spillet får brug for (butik, vis hele). | M | ⬜ |
+| 46 | **En lækrere side rundt om kontoret:** topbjælke med ikon, faner, trivsel, saldo og en forbindelsesprik; listen som kort med pixel-portræt, statuspille og opgave, dem der venter øverst; venteboks med "Gå til"; butik med ikoner og en bjælke mod prisen; en pæn tom tilstand; kun mørkt tema. | M | ✅ |
 
 ## 🎮 Spillet
 

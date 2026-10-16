@@ -2105,11 +2105,12 @@ requestAnimationFrame(draw)
 const tabs = document.getElementById('tabs')
 const people = document.getElementById('people')
 const alertBox = document.getElementById('alert')
-const statusLine = document.getElementById('status')
+const conn = document.getElementById('conn')
+const lostBanner = document.getElementById('lost')
 const saldo = document.getElementById('saldo')
+const saldoValue = document.getElementById('saldo-value')
 const moodChip = document.getElementById('mood')
 moodChip.addEventListener('click', () => showPanel('shop'))
-alertBox.addEventListener('click', lookAtWaiting)
 
 const el = (tagName, props = {}, children = []) => {
   const node = Object.assign(document.createElement(tagName), props)
@@ -2118,29 +2119,97 @@ const el = (tagName, props = {}, children = []) => {
 }
 const dot = state => el('span', { className: 'dot', style: `background:${stateColor[state] ?? '#8A94A0'}` })
 
+// What a state is called on its pill
+const PILL = { reading: 'Læser', editing: 'Skriver', running: 'Kører', browsing: 'Nettet', waiting: 'Venter på dig', working: 'Arbejder', idle: 'Pause' }
+const pill = (state, detail) => {
+  const colour = stateColor[state] ?? '#8A94A0'
+  const text = state === 'working' && detail === 'Tænker' ? 'Tænker' : PILL[state] ?? state
+  return el('span', { className: 'pill', style: `color:${colour};background:color-mix(in srgb, ${colour} 16%, transparent)` }, [text])
+}
+
+// A pixel portrait, head and shoulders, drawn once per look and kept.
+const portraits = new Map()
+const portraitOf = (key, look) => {
+  if (!portraits.has(key)) {
+    const size = 3
+    const c = document.createElement('canvas')
+    c.width = 12 * size
+    c.height = 12 * size
+    const g = c.getContext('2d')
+    const colour = { o: OUTLINE, h: look.hair, H: look.hairLight, s: look.skin, e: OUTLINE, t: look.shirt, T: look.shirtShade }
+    BODY.forEach((row, r) => {
+      ;[...row].forEach((ch, x) => {
+        if (!colour[ch]) return
+        g.fillStyle = colour[ch]
+        g.fillRect((x + 1) * size, (r + 2) * size, size, size)
+      })
+    })
+    portraits.set(key, c.toDataURL())
+  }
+  return portraits.get(key)
+}
+
+// The tabs and the list are rebuilt only when what they show changes: the
+// state arrives several times a second, and a button rebuilt under the
+// pointer would swallow the click.
+let tabsKey = ''
+let peopleKey = ''
+let alertKey = ''
+
 const renderPage = () => {
   renderShop()
   const s = focused()
-  saldo.hidden = typeof state.game?.kroner !== 'number'
-  if (!saldo.hidden) saldo.textContent = kr(state.game.kroner)
-  const mood = state.game?.wellbeing
+  const g = state.game
+  saldo.hidden = typeof g?.kroner !== 'number'
+  if (!saldo.hidden) saldoValue.textContent = kr(g.kroner)
+  const mood = g?.wellbeing
   moodChip.hidden = !mood
   if (mood) {
     moodChip.textContent = `${moodFace(mood.score)} ${mood.score}`
-    moodChip.title = `Trivsel ${mood.score} af 100: arbejdet tjener ${String(mood.multiplier).replace('.', ',')} gange så meget`
+    moodChip.title = `Trivsel ${mood.score} af 100: arbejdet tjener ${String(mood.multiplier).replace('.', ',')} gange så meget. Klik for at se hvorfor.`
   }
-  tabs.replaceChildren(
-    ...state.sessions.map(x =>
-      el('button', { className: 'tab', type: 'button', onclick: () => choose(x.key), ariaPressed: String(x === s) }, [dot(x.main.state), x.project || 'Session']),
-    ),
-  )
+
+  const nextTabs = JSON.stringify([state.sessions.map(x => [x.key, x.project, x.main.state]), s?.key])
+  if (nextTabs !== tabsKey) {
+    tabsKey = nextTabs
+    tabs.replaceChildren(
+      ...state.sessions.map(x =>
+        el('button', { className: 'tab', type: 'button', onclick: () => choose(x.key), ariaPressed: String(x === s), title: x.main.detail }, [dot(x.main.state), x.project || 'Session']),
+      ),
+    )
+  }
+
+  // Waiting for you, in any session: a banner with a way there
+  const waiting = [s, ...state.sessions.filter(x => x !== s)].filter(x => x && x.main.state === 'waiting')
+  const waitingSubs = (s?.subs ?? []).filter(x => x.activity.state === 'waiting')
+  const nextAlert = JSON.stringify([waiting.map(x => [x.key, x.main.detail]), waitingSubs.map(x => [x.id, x.activity.detail])])
+  if (nextAlert !== alertKey) {
+    alertKey = nextAlert
+    // The heading says it already; the details need not say it again
+    const what = detail => detail.replace(/^Venter på dig:\s*/, '')
+    const lines = [...waiting.map(x => `Claude i ${x.project}: ${what(x.main.detail)}`), ...waitingSubs.map(x => `${x.name}: ${what(x.activity.detail)}`)]
+    alertBox.hidden = lines.length === 0
+    alertBox.className = 'waiting'
+    alertBox.replaceChildren(
+      el('strong', {}, [lines.length === 1 ? 'Venter på dig' : `${lines.length} venter på dig`]),
+      el('p', {}, [lines.join(' · ')]),
+      el('button', { type: 'button', onclick: lookAtWaiting }, ['Gå til']),
+    )
+  }
+
   if (!s) {
-    people.replaceChildren(el('li', { className: 'empty' }, ['Ingen Claude-sessioner kører lige nu. Start en session med Agent-kontor installeret, så sætter Claude sig her.']))
-    alertBox.textContent = ''
+    if (peopleKey !== 'empty') {
+      peopleKey = 'empty'
+      people.replaceChildren(
+        el('li', { className: 'empty' }, [
+          el('span', { className: 'big' }, ['🏢']),
+          el('strong', {}, ['Kontoret er tomt']),
+          el('span', {}, ['Når en Claude-session med Agent-kontor kører, sætter Claude sig her, og hjælperne kommer ind ad døren.']),
+        ]),
+      )
+    }
     return
   }
-  const waiting = [s, ...state.sessions.filter(x => x !== s)].filter(x => x.main.state === 'waiting')
-  alertBox.textContent = waiting.map(x => `Claude i ${x.project} venter på dig: ${x.main.detail}`).join(' · ')
 
   const stats = s.stats ?? {}
   const facts = [
@@ -2148,11 +2217,37 @@ const renderPage = () => {
     typeof stats.costUsd === 'number' ? `$${stats.costUsd.toFixed(2)}` : null,
     typeof stats.fiveHour === 'number' ? `${Math.round(stats.fiveHour)} % af 5-timers-grænsen` : null,
   ].filter(Boolean)
-  const row = (name, what, stateName, note) =>
-    el('li', {}, [dot(stateName), el('span', { className: 'name' }, [name]), el('span', { className: 'what', style: `color:${stateColor[stateName]}` }, [what]), ...(note ? [el('span', { className: 'note' }, [note])] : [])])
+  // Those waiting for you first, then the rest as they came in
+  const subs = [...(s.subs ?? [])].sort((a, b) => (b.activity.state === 'waiting') - (a.activity.state === 'waiting') || a.seat - b.seat)
+  const onFloor = desks().length
+  const nextPeople = JSON.stringify([s.key, s.main, facts, subs.map(x => [x.id, x.name, x.task, x.phase, x.activity, x.seat >= onFloor])])
+  if (nextPeople === peopleKey) return
+  peopleKey = nextPeople
+
+  const person = ({ key, name, look, state: stateName, detail, note, isClaude }) =>
+    el('li', { className: `person${isClaude ? ' is-claude' : ''}${stateName === 'waiting' ? ' is-waiting' : ''}` }, [
+      el('img', { src: portraitOf(key, look), alt: '' }),
+      el('span', { className: 'name' }, [name]),
+      pill(stateName, detail),
+      // The pill says it waits; the line says what for
+      el('span', { className: 'what' }, [detail.replace(/^Venter på dig:\s*/, '')]),
+      ...(note ? [el('span', { className: 'note' }, [note])] : []),
+    ])
+  const phaseLabel = sub =>
+    sub.phase === 'arriving' ? 'På vej ind' : sub.phase === 'delivering' ? (sub.outcome === 'failed' ? 'Gik i stå' : 'Afleverer') : sub.phase === 'leaving' ? 'Går hjem' : sub.seat >= onFloor ? 'Sidder på gulvet' : null
   people.replaceChildren(
-    row('Claude', s.main.detail, s.main.state, facts.join(', ') || null),
-    ...(s.subs ?? []).map(sub => row(sub.name, sub.activity.detail, sub.activity.state, sub.task)),
+    person({ key: 'claude', name: 'Claude', look: claudeLook, state: s.main.state, detail: s.main.detail, note: facts.join(' · ') || null, isClaude: true }),
+    ...(subs.length ? [el('li', { className: 'section-label' }, [`Hjælpere · ${subs.length}`])] : []),
+    ...subs.map(sub =>
+      person({
+        key: sub.id,
+        name: sub.name,
+        look: lookFor(sub.id),
+        state: sub.activity.state,
+        detail: sub.activity.detail,
+        note: [sub.task, phaseLabel(sub)].filter(Boolean).join(' · '),
+      }),
+    ),
   )
 }
 
@@ -2351,6 +2446,7 @@ const RATE_TEXT = { added: 'linje tilføjet', removed: 'linje fjernet', delivere
 let shopParts = null
 
 const SHOP_ORDER = ['desk', 'kitchen', 'toilet', 'lounge', 'pingpong', 'meeting']
+const ICONS = { desk: '🪑', kitchen: '☕', toilet: '🚻', lounge: '🛋️', pingpong: '🏓', meeting: '📊' }
 const moodFace = score => (score < 35 ? '😟' : score < 60 ? '🙂' : '😄')
 
 const buildShop = g => {
@@ -2361,14 +2457,18 @@ const buildShop = g => {
     const button = el('button', { className: 'buy', type: 'button', onclick: () => buyItem(item) }, [''])
     const missing = el('p', { className: 'hint' }, [''])
     const done = el('p', { className: 'owned' }, [''])
+    const fill = el('span', {}, [])
+    const progress = el('span', { className: 'progress' }, [fill])
     const li = el('li', { className: 'item' }, [
+      el('span', { className: 'icon', ariaHidden: 'true' }, [ICONS[item] ?? '📦']),
       el('div', { className: 'item-head' }, [el('strong', {}, [ITEMS[item].name]), count]),
       el('p', { className: 'hint' }, [ITEMS[item].about]),
+      progress,
       button,
       missing,
       done,
     ])
-    return { item, li, count, button, missing, done }
+    return { item, li, count, button, missing, done, progress, fill }
   })
   const rates = Object.entries(g.rates ?? {}).map(([k, v]) => el('li', {}, [el('span', { className: 'rate' }, [`${String(v).replace('.', ',')} kr`]), RATE_TEXT[k] ?? k]))
   const moodScore = el('strong', {}, [''])
@@ -2376,7 +2476,7 @@ const buildShop = g => {
   const moodNote = el('p', { className: 'hint' }, [''])
   const moodParts = el('ul', { className: 'mood-parts' }, [])
   shop.replaceChildren(
-    el('div', { className: 'shop-saldo' }, [el('span', { className: 'hint' }, ['Saldo']), saldoValue]),
+    el('div', { className: 'shop-saldo' }, [el('span', { className: 'coin', ariaHidden: 'true' }, []), saldoValue, el('span', { className: 'hint' }, ['til at bygge for'])]),
     message,
     el('section', { className: 'mood-box' }, [
       el('div', { className: 'item-head' }, [el('strong', {}, ['Trivsel']), moodScore]),
@@ -2434,6 +2534,9 @@ const renderShop = () => {
     row.missing.hidden = !isForSale || canAfford
     row.missing.textContent = isForSale ? `Mangler ${kr(Math.max(0, price - g.kroner))}` : ''
     row.done.hidden = isForSale
+    row.li.classList.toggle('is-owned', !isForSale)
+    row.progress.hidden = !isForSale || canAfford
+    row.fill.style.width = isForSale ? `${Math.min(100, (100 * g.kroner) / price)}%` : '0%'
     row.done.textContent = isDesk ? 'Alle skriveborde er købt. Flere pladser kommer med flere rum.' : 'Ejet ✓'
   }
 }
@@ -2468,15 +2571,19 @@ const receive = next => {
 const connect = () => {
   const events = new EventSource('/api/events')
   events.onopen = () => {
-    statusLine.textContent = 'Live'
-    statusLine.classList.remove('lost')
+    conn.className = 'conn live'
+    conn.title = 'Forbundet til kontoret'
+    conn.ariaLabel = 'Forbundet'
+    lostBanner.hidden = true
   }
   events.onmessage = e => receive(JSON.parse(e.data))
   // The browser tries again by itself every two seconds; a session that has
   // the office open starts the server again within a minute.
   events.onerror = () => {
-    statusLine.textContent = 'Forbindelsen er tabt. Prøver igen… Er Claude lukket, så tryk på 🏢 Åbn kontor i Claude.'
-    statusLine.classList.add('lost')
+    conn.className = 'conn lost'
+    conn.title = 'Forbindelsen er tabt'
+    conn.ariaLabel = 'Forbindelsen er tabt'
+    lostBanner.hidden = false
   }
 }
 connect()
