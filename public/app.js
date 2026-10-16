@@ -191,6 +191,7 @@ const standing = (x, y, look, facing, isWalking, t) => {
   // Down a pixel as a foot lands: the bob of a step, body over the waist.
   const sink = isWalking && i % 2 === 0 ? P : 0
   const top = y - (body.length + 4) * P
+  shadow(x, y + 1, 8, 2.6)
   ctx.save()
   if (facing === 'left') {
     ctx.translate(x * 2, 0)
@@ -214,7 +215,18 @@ const sitting = (x, y, look, handUp, t) => {
   }
 }
 
+// A soft shadow on the floor, under whoever or whatever stands there.
+const shadow = (x, y, rx, ry, alpha = 0.2) => {
+  ctx.globalAlpha = alpha
+  ctx.beginPath()
+  ctx.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2)
+  ctx.fillStyle = '#000000'
+  ctx.fill()
+  ctx.globalAlpha = 1
+}
+
 const chair = (cx, dy) => {
+  shadow(cx + 2, dy + 4, 22, 5, 0.14)
   rounded(cx - 21, dy - 18, 42, 22, 5, OUTLINE)
   rounded(cx - 19, dy - 16, 38, 18, 4, '#465566')
   rounded(cx - 17, dy - 14, 34, 3, 1.5, '#5A6B7E')
@@ -414,6 +426,92 @@ const clock = date => {
   hand(date.getSeconds() / 60, r * 0.85, 0.4, '#E5484D')
 }
 
+// ── Light ────────────────────────────────────────────────────────────────
+// The time of day, in hours (14.5 is half past two). ?tid=21:30 in the
+// address shows the office at that time instead, to see the evening by day.
+const timeOfDay = () => {
+  const asked = new URLSearchParams(location.search).get('tid')
+  if (asked) {
+    const [h, m = '0'] = asked.split(':')
+    if (!Number.isNaN(Number(h))) return Number(h) + Number(m) / 60
+  }
+  const d = new Date()
+  return d.getHours() + d.getMinutes() / 60
+}
+
+// How dark it is: none in the working day, deepening through the evening.
+const NIGHT = 0.55
+const darknessAt = h => {
+  if (h >= 8 && h <= 17) return 0
+  if (h > 17 && h < 20) return ((h - 17) / 3) * NIGHT
+  if (h >= 6 && h < 8) return ((8 - h) / 2) * NIGHT
+  return NIGHT
+}
+
+const TOP_WINDOWS = [30, 120, 290, 390]
+// The team room's windows in the side walls: x, y, height.
+const SIDE_WINDOWS = [[0, 284, 40], [W - 6, 300, 40]]
+
+// Sunlight through the windows, falling at an angle that follows the sun:
+// from the east in the morning, from the west in the afternoon.
+const daylight = h => {
+  const strength = 1 - darknessAt(h) / NIGHT
+  if (strength <= 0) return
+  const warm = h < 10 || h > 15
+  const colour = warm ? '255, 196, 110' : '255, 232, 160'
+  const slant = (12 - h) * 5
+  const beam = (points, x0, y0, x1, y1) => {
+    const g = ctx.createLinearGradient(x0, y0, x1, y1)
+    g.addColorStop(0, `rgba(${colour}, ${0.6 * strength})`)
+    g.addColorStop(1, `rgba(${colour}, 0)`)
+    ctx.fillStyle = g
+    ctx.beginPath()
+    points.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)))
+    ctx.closePath()
+    ctx.fill()
+  }
+  for (const x of TOP_WINDOWS) {
+    beam([[x, 16], [x + 56, 16], [x + 64 + slant, 92], [x - 8 + slant, 92]], 0, 16, 0, 92)
+  }
+  const [[lx, ly, lh], [rx, ry, rh]] = SIDE_WINDOWS
+  // The low sun reaches in through one side or the other.
+  const fromLeft = h < 12 ? 1 : 0.35
+  const fromRight = h >= 12 ? 1 : 0.35
+  ctx.globalAlpha = fromLeft
+  beam([[lx + 6, ly], [lx + 6, ly + lh], [lx + 90, ly + lh + 18], [lx + 90, ly - 18]], lx + 6, 0, lx + 90, 0)
+  ctx.globalAlpha = fromRight
+  beam([[rx, ry], [rx, ry + rh], [rx - 84, ry + rh + 18], [rx - 84, ry - 18]], rx, 0, rx - 84, 0)
+  ctx.globalAlpha = 1
+}
+
+// The evening: the room darkens, and what gives light glows: the lamps, the
+// pendant over the kitchen table, the ceiling lights and every screen in use.
+const evening = (h, screens) => {
+  const dark = darknessAt(h)
+  if (dark <= 0) return
+  ctx.fillStyle = `rgba(12, 18, 42, ${dark})`
+  ctx.fillRect(0, 0, W, H)
+  const k = dark / NIGHT
+  const glow = (x, y, r, colour, alpha) => {
+    const g = ctx.createRadialGradient(x, y, 0, x, y, r)
+    g.addColorStop(0, `rgba(${colour}, ${alpha * k})`)
+    g.addColorStop(1, `rgba(${colour}, 0)`)
+    ctx.fillStyle = g
+    ctx.fillRect(x - r, y - r, r * 2, r * 2)
+  }
+  ctx.globalCompositeOperation = 'lighter'
+  const lamp = '255, 196, 120'
+  glow(130, 366, 54, lamp, 0.42)
+  glow(176, 120, 44, lamp, 0.4)
+  glow(368, 92, 64, lamp, 0.34)
+  glow(276, 91, 30, lamp, 0.22)
+  for (const [x, y] of [[166, 200], [314, 200], [166, 300], [314, 300], [92, 440], [240, 440], [388, 440]]) glow(x, y, 66, '255, 228, 180', 0.16)
+  for (const [x, y] of screens) glow(x, y, 26, '130, 180, 255', 0.3)
+  ctx.globalCompositeOperation = 'source-over'
+  // The bulbs themselves
+  for (const [x, y] of [[130, 366], [176, 120]]) circle(x, y, 1.8, '#FFF3C4')
+}
+
 // ── The building, drawn once per light ───────────────────────────────────
 const WALL = '#3E4852'
 const WALL_TOP = '#5A6672'
@@ -486,6 +584,10 @@ const drawBuilding = (project, hour) => {
   fill(214, 378, 48, 6, '#C3CCD6')
   fill(0, H - 6, W, 6, WALL)
   fill(W - 6, 236, 6, 40, '#8C6B4A')
+  for (const [x, y, h] of SIDE_WINDOWS) {
+    fill(x, y, 6, h, sky)
+    fill(x + 1, y + h / 2 - 1, 4, 2, WALL_TOP)
+  }
   fill(W - 18, 242, 12, 28, '#6E5A44')
   // Name plate on the top wall
   g.fillStyle = '#20262E'
@@ -724,7 +826,8 @@ const draw = () => {
   const t = performance.now()
   const s = focused()
   const frameHits = []
-  const hour = new Date().getHours()
+  const timeNow = timeOfDay()
+  const hour = Math.floor(timeNow)
   drawBuilding(s?.project ?? '', hour)
   ctx.setTransform(1, 0, 0, 1, 0, 0)
   ctx.imageSmoothingEnabled = false
@@ -736,13 +839,17 @@ const draw = () => {
   const isOut = main.state === 'idle'
   const subs = s?.subs ?? []
 
+  daylight(timeNow)
   board(s?.stats)
   clock(new Date())
+  // Screens in use, which glow in the dark
+  const glowing = []
 
   // Claude
   chair(MAIN.cx, MAIN.dy)
   if (!isOut) sitting(MAIN.cx, MAIN.dy + 4, claudeLook, main.state === 'waiting', t)
   desk(MAIN.cx, MAIN.dy, 128, isOut ? null : main.state, t, 2)
+  if (!isOut) glowing.push([MAIN.cx + 46, MAIN.dy + 8], [MAIN.cx - 46, MAIN.dy + 8])
   if (!isOut) {
     hands(MAIN.cx, MAIN.dy, claudeLook, main.state !== 'waiting', t)
     tag(MAIN.cx, MAIN.dy + 30, 'Claude', '#C8643B')
@@ -780,6 +887,7 @@ const draw = () => {
     if (sub) sitting(cx, dy + 4, lookFor(sub.id), sub.activity.state === 'waiting', t)
     desk(cx, dy, 84, sub ? sub.activity.state : null, t)
     if (sub) deskThingsFor(sub.id, cx, dy)
+    if (sub) glowing.push([cx + 24, dy + 8])
     if (sub) {
       hands(cx, dy, lookFor(sub.id), sub.activity.state !== 'waiting', t + seat * 37)
       tag(cx, dy + 30, sub.name, '#4A5868')
@@ -816,6 +924,8 @@ const draw = () => {
     chair(72 + i * 112, 440)
     desk(72 + i * 112, 440, 80, null, t)
   }
+
+  evening(timeNow, glowing)
 
   // Speech, on top of everyone
   const thanking = walkers.find(w => w.pose.handover)

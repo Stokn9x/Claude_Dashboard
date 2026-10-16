@@ -19,6 +19,7 @@ Status: ✅ lavet · 🟡 delvist · ⬜ ikke lavet · ➖ ikke længere relevan
 | 0.7.5 | Ventende hjælpere får et skrivebord, ingen hænger fast efter en genindlæsning, tavle med dagens tal og vægur |
 | 0.7.6 | Klik på en figur for at se detaljer om den |
 | 0.7.7 | Hyggeligere kontor: tæpper, reol, sofahjørne og bordtennis i teamrummet, bistrobord og snackautomat i køkkenet, lænestol hos Claude, egne ting på hver hjælpers skrivebord |
+| 0.7.8 | Lys og dybde: skygger under figurerne, sollys fra vinduerne efter tidspunktet, mørke aftener med lamper og lysende skærme |
 
 ## 🔧 Fejl og ting der driller
 
@@ -58,7 +59,7 @@ Status: ✅ lavet · 🟡 delvist · ⬜ ikke lavet · ➖ ikke længere relevan
 | 19 | **Liv i pauserne:** Claude går rundt, vander planter og spiller bordtennis med hjælperne. | L | ⬜ |
 | 20 | **Grænser som rekvisitter:** kaffekanden tømmes, efterhånden som 5-timers-grænsen bruges, og en plante visner, når konteksten fyldes. | M | ⬜ |
 | 21 | **Tavle og ur på væggen:** tavlen viser dagens linjer og pris, uret det rigtige klokkeslæt. | S | ✅ |
-| 22 | **Dag, nat og vejr:** Vinduerne skifter allerede farve efter tidspunktet; mangler mørkere lys om aftenen, tændte lamper og regn på ruderne. | M | 🟡 |
+| 22 | **Dag, nat og vejr:** Lyset følger nu tidspunktet (se punkt 41); mangler regn på ruderne og vejr. | M | 🟡 |
 | 23 | **Kontorhund eller -kat,** der vandrer rundt og lægger sig under et skrivebord. | M | ⬜ |
 | 24 | **Timelapse af dagen:** afspil sessionens forløb i 60× fart. Serveren kan gemme forløbet. | L | ⬜ |
 | 25 | **Indret selv:** vælg tema og flyt rundt på møblerne. | L | ⬜ |
@@ -75,7 +76,7 @@ Status: ✅ lavet · 🟡 delvist · ⬜ ikke lavet · ➖ ikke længere relevan
 | 35 | **Et større kontor:** flere skriveborde, flere rum, mødelokale. Siden skalerer selv; grundplanen (`W`, `H`, pladser og ruter) skal ændres ens i `public/app.js` og `hooks/register.tsx`, som timer gåturene. | M | ⬜ |
 | 39 | **Liv i teamrummet og køkkenet:** tæpper under skrivebordene, reol, sofahjørne med lampe, bordtennisbord, bistrobord, snackautomat, damp fra kaffemaskinen i pausen. | M | ✅ |
 | 40 | **Egne ting på skrivebordet:** hver hjælper har altid de samme to ting (kop, plante, papirer, badeand, høretelefoner, billede eller snack). | S | ✅ |
-| 41 | **Lys og dybde:** skygger under figurerne, lys fra vinduerne efter tidspunktet, lamper om aftenen. | M | ⬜ |
+| 41 | **Lys og dybde:** skygger under figurer og stole, sollys fra vinduerne der følger solen, aftenmørke med lamper, loftslys og lysende skærme. Se en anden tid med `?tid=21:30` i adressen. | M | ✅ |
 | 42 | **Projektrummet står tit tomt:** bliv til mødelokale eller skrump, når der ikke er andre sessioner. | M | ⬜ |
 | 43 | **Mere levende figurer:** lidt større, blinker, tænkeboble med "…" i stedet for "Tænker". | M | ⬜ |
 | 34 | **Del kontoret med teamet igen,** fx via Supabase, nu hvor tegningen ikke længere ligger i panelet. | L | ⬜ |
