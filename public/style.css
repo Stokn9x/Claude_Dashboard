@@ -1,0 +1,182 @@
+/* ── Tokens ─────────────────────────────────────────────────────────── */
+/* Dark only: the panels float over the office on dark glass. */
+:root {
+  color-scheme: dark;
+  --bg: #11151A;
+  --surface: #191F26;
+  --surface-2: #20272F;
+  --glass: rgba(20, 25, 31, 0.86);
+  --ink: #E7ECF0;
+  --soft: #9AA5B0;
+  --faint: #6C7782;
+  --line: #2A323B;
+  --accent: #3B8FE0;
+  --good: #2E9E8F;
+  --warn: #D6A23C;
+  --alert: #E5484D;
+  --claude: #C8643B;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 10px 30px rgba(0, 0, 0, 0.35);
+  --radius: 14px;
+  --gap: 12px;
+  --side: 330px;
+  --top: 64px;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; overflow: hidden; background: #7FAE63; color: var(--ink); font: 14px/1.45 'Segoe UI Variable Text', 'Segoe UI', system-ui, -apple-system, sans-serif; }
+button { font: inherit; color: inherit; }
+[hidden] { display: none !important; }
+
+/* The office, under everything */
+canvas#office { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; image-rendering: pixelated; touch-action: none; cursor: grab; }
+
+/* Anything floating over the office */
+.hud { background: var(--glass); border: 1px solid rgba(255, 255, 255, 0.07); border-radius: 999px; box-shadow: var(--shadow); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+
+/* ── Header ─────────────────────────────────────────────────────────── */
+/* Two floating bars at the top; the strip between them lets clicks
+   through to the office. */
+header { position: fixed; top: var(--gap); left: var(--gap); right: var(--gap); display: flex; align-items: flex-start; justify-content: space-between; gap: var(--gap); pointer-events: none; z-index: 3; }
+header > * { pointer-events: auto; }
+.topbar { display: flex; align-items: center; gap: 14px; padding: 6px 8px 6px 14px; min-width: 0; max-width: calc(100% - 260px); }
+.brand { display: flex; align-items: center; gap: 9px; flex: none; }
+.brand svg { width: 24px; height: 24px; image-rendering: pixelated; }
+.brand h1 { font-size: 15px; margin: 0; letter-spacing: -0.01em; white-space: nowrap; }
+.tabs { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; min-width: 0; }
+.tabs::-webkit-scrollbar { display: none; }
+.tab { border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 4px 12px 4px 10px; cursor: pointer; display: flex; align-items: center; gap: 7px; font-size: 13px; white-space: nowrap; transition: border-color 0.15s, background 0.15s; }
+.tab:hover { border-color: var(--faint); }
+.tab[aria-pressed="true"] { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, var(--surface)); font-weight: 600; }
+.dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex: none; }
+.chips { display: flex; align-items: center; gap: 8px; padding: 6px 12px 6px 6px; flex: none; }
+.chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; border-radius: 999px; background: var(--surface); border: 1px solid var(--line); font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+button.chip { cursor: pointer; }
+.coin { width: 14px; height: 14px; border-radius: 50%; background: radial-gradient(circle at 35% 35%, #F6D77A, #D6A23C 60%, #A8781E); box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.15); }
+.conn { width: 10px; height: 10px; border-radius: 50%; margin-left: 4px; background: var(--faint); box-shadow: 0 0 0 3px color-mix(in srgb, var(--faint) 25%, transparent); }
+.conn.live { background: var(--good); box-shadow: 0 0 0 3px color-mix(in srgb, var(--good) 25%, transparent); }
+.conn.lost { background: var(--alert); box-shadow: 0 0 0 3px color-mix(in srgb, var(--alert) 25%, transparent); }
+
+/* Banners under the header: the lost connection in the middle, someone
+   waiting for you on the right, clear of the panel. */
+.lost-banner { position: fixed; top: var(--top); left: 50%; transform: translateX(-50%); width: min(560px, calc(100vw - 2 * var(--gap))); z-index: 3; padding: 8px 14px; border-radius: 12px; background: color-mix(in srgb, var(--alert) 16%, var(--surface)); color: #FFB4B6; border: 1px solid color-mix(in srgb, var(--alert) 45%, transparent); font-size: 13px; box-shadow: var(--shadow); }
+.waiting { position: fixed; top: var(--top); right: var(--gap); width: min(380px, calc(100vw - 2 * var(--gap))); z-index: 3; display: grid; grid-template-columns: 1fr auto; gap: 4px 10px; align-items: center; padding: 10px 12px; border-radius: 12px; background: color-mix(in srgb, var(--alert) 14%, var(--surface)); border: 1px solid color-mix(in srgb, var(--alert) 50%, transparent); box-shadow: var(--shadow); }
+.waiting strong { color: var(--alert); font-size: 13px; }
+.waiting p { margin: 0; grid-column: 1; font-size: 13px; }
+.waiting button { grid-row: 1 / span 2; grid-column: 2; border: 0; border-radius: 8px; padding: 6px 12px; background: var(--alert); color: #FFFFFF; font-weight: 600; cursor: pointer; }
+
+/* ── The panel, floating on the left ────────────────────────────────── */
+.side { position: fixed; top: var(--top); left: var(--gap); bottom: var(--gap); width: var(--side); z-index: 2; display: flex; flex-direction: column; gap: 10px; padding: 10px; border-radius: var(--radius); background: var(--glass); border: 1px solid rgba(255, 255, 255, 0.07); box-shadow: var(--shadow); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+.side-head { display: flex; gap: 6px; align-items: center; flex: none; }
+.side-body { overflow-y: auto; min-height: 0; flex: 1; display: grid; align-content: start; scrollbar-width: thin; }
+.panels { display: flex; gap: 4px; padding: 3px; border-radius: 10px; background: var(--surface-2); flex: 1; }
+.panels button { flex: 1; border: 0; background: none; color: var(--soft); font-size: 13px; padding: 6px 6px; border-radius: 7px; cursor: pointer; white-space: nowrap; }
+.panels button[aria-pressed="true"] { background: var(--surface); color: var(--ink); font-weight: 600; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12); }
+.fold { border: 0; background: var(--surface-2); color: var(--soft); border-radius: 8px; width: 30px; height: 32px; font-size: 18px; line-height: 1; cursor: pointer; flex: none; }
+.fold:hover { color: var(--ink); }
+.side-open { position: fixed; top: var(--top); left: var(--gap); z-index: 2; padding: 7px 14px; font-weight: 600; cursor: pointer; }
+
+/* Who is doing what */
+.people { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.person { display: grid; grid-template-columns: 36px 1fr auto; gap: 2px 10px; align-items: center; padding: 8px; border-radius: 10px; background: var(--surface-2); border: 1px solid transparent; }
+.person.is-claude { background: color-mix(in srgb, var(--claude) 10%, var(--surface-2)); }
+.person.is-waiting { border-color: color-mix(in srgb, var(--alert) 55%, transparent); }
+.person img { grid-row: 1 / span 3; width: 36px; height: 36px; border-radius: 9px; image-rendering: pixelated; background: var(--surface); }
+.person .name { font-weight: 600; font-size: 13px; }
+.person .what { grid-column: 2 / span 2; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.person .note { grid-column: 2 / span 2; color: var(--soft); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pill { justify-self: end; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
+.section-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--faint); margin: 4px 2px 0; }
+.empty { color: var(--soft); text-align: center; padding: 28px 12px; display: grid; gap: 6px; justify-items: center; }
+.empty .big { font-size: 34px; }
+.empty strong { color: var(--ink); }
+
+/* The details card, next to the figure it is about */
+.card {
+  position: fixed; left: 0; top: 0; width: 260px; padding: 12px 14px 14px; border-radius: 12px; z-index: 4;
+  background: var(--surface); color: var(--ink); border: 1px solid var(--line);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35); font-size: 13px;
+}
+.card-head { display: flex; align-items: center; gap: 8px; font-size: 14px; }
+.card-close { margin-left: auto; border: 0; background: none; color: var(--soft); font-size: 18px; line-height: 1; cursor: pointer; padding: 0 2px; }
+.card-task { color: var(--soft); margin-top: 2px; }
+.card-now { margin-top: 8px; font-weight: 600; }
+.card-note { color: var(--soft); }
+.card-facts { margin-top: 6px; color: var(--soft); font-size: 12px; }
+.card-label { margin-top: 10px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--faint); }
+.card-steps { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 2px; }
+.card-steps time { color: var(--soft); font-variant-numeric: tabular-nums; margin-right: 8px; }
+
+/* The bottom-right corner: back to the whole office, and the minimap */
+.corner { position: fixed; right: var(--gap); bottom: var(--gap); z-index: 2; display: grid; gap: 8px; justify-items: end; }
+.fit-all { padding: 6px 14px; font-size: 12px; font-weight: 600; cursor: pointer; }
+.minimap { display: block; border-radius: 10px; border: 2px solid rgba(255, 255, 255, 0.12); cursor: pointer; box-shadow: var(--shadow); }
+
+/* ── The shop ───────────────────────────────────────────────────────── */
+.shop { display: grid; gap: 10px; }
+.shop h3, .progress-panel h3 { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--faint); margin: 6px 2px 0; }
+.shop-saldo { display: flex; align-items: center; gap: 10px; padding: 4px 2px; }
+.shop-saldo .coin { width: 22px; height: 22px; }
+.shop-saldo strong { font-size: 24px; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
+.shop-message { margin: 0; padding: 8px 10px; border-radius: 8px; background: var(--surface-2); }
+.items, .rates { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.item { padding: 10px 12px; border-radius: 12px; background: var(--surface-2); display: grid; grid-template-columns: 32px 1fr; gap: 4px 10px; align-items: start; }
+.item.is-owned { opacity: 0.75; }
+.item > :not(.icon) { grid-column: 2; }
+.item .icon { grid-row: 1 / span 6; font-size: 22px; line-height: 32px; text-align: center; width: 32px; height: 32px; border-radius: 9px; background: var(--surface); }
+.item-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.item-count { color: var(--soft); font-size: 12px; }
+.hint { color: var(--soft); font-size: 12px; margin: 0; }
+.progress { display: block; height: 5px; border-radius: 3px; background: var(--line); overflow: hidden; }
+.progress > span { display: block; height: 100%; border-radius: 3px; background: var(--warn); transition: width 0.6s; }
+.owned { color: var(--good); font-size: 12px; font-weight: 600; margin: 0; }
+.buy { border: 0; border-radius: 8px; padding: 7px 10px; font-weight: 600; cursor: pointer; background: var(--good); color: #FFFFFF; }
+.buy:disabled { background: var(--line); color: var(--soft); cursor: default; }
+.mood-box { padding: 10px 12px; border-radius: 12px; background: var(--surface-2); display: grid; gap: 6px; }
+.mood-bar { display: block; height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; }
+.mood-fill { display: block; height: 100%; border-radius: 3px; transition: width 0.6s; }
+.mood-parts { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; font-size: 12px; }
+.mood-parts li { display: grid; grid-template-columns: 36px 1fr; }
+.plus { color: var(--good); font-weight: 600; }
+.minus { color: var(--alert); font-weight: 600; }
+.rates li { display: grid; grid-template-columns: 64px 1fr; font-size: 13px; }
+.rate { font-weight: 600; font-variant-numeric: tabular-nums; }
+
+/* ── Progress ───────────────────────────────────────────────────────── */
+.progress-panel { display: grid; gap: 10px; }
+.tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.tile { padding: 10px; border-radius: 12px; background: var(--surface-2); display: grid; gap: 2px; }
+.tile strong { font-size: 18px; font-variant-numeric: tabular-nums; }
+.tile span { font-size: 11px; color: var(--soft); }
+.bars { display: grid; grid-template-columns: repeat(14, 1fr); gap: 3px; height: 92px; align-items: end; padding: 8px; border-radius: 12px; background: var(--surface-2); }
+.bar { display: grid; grid-template-rows: 1fr auto; height: 100%; align-items: end; justify-items: center; gap: 2px; }
+.bar span { width: 100%; border-radius: 3px 3px 1px 1px; background: color-mix(in srgb, var(--accent) 55%, transparent); }
+.bar.is-today span { background: var(--accent); }
+.bar small { font-size: 9px; color: var(--faint); }
+.totals { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 4px 12px; font-size: 13px; }
+.totals strong { margin-right: 6px; font-variant-numeric: tabular-nums; }
+.achievements { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.achievement { padding: 8px 10px; border-radius: 12px; background: var(--surface-2); display: grid; grid-template-columns: 28px 1fr; gap: 2px 8px; align-items: start; }
+.achievement > :not(.medal) { grid-column: 2; }
+.achievement .medal { grid-row: 1 / span 4; font-size: 18px; line-height: 28px; text-align: center; }
+.achievement:not(.is-done) { opacity: 0.8; }
+.achievement:not(.is-done) .medal { filter: grayscale(1); opacity: 0.6; }
+
+/* Notices at the bottom, in the middle */
+.toasts { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); display: grid; gap: 8px; z-index: 5; }
+.toast { display: flex; gap: 10px; align-items: center; padding: 10px 14px; border-radius: 12px; background: var(--surface); border: 1px solid color-mix(in srgb, var(--warn) 50%, var(--line)); box-shadow: var(--shadow); animation: toast-in 0.3s ease-out; transition: opacity 0.5s, transform 0.5s; }
+.toast .medal { font-size: 22px; }
+.toast div { display: grid; }
+.toast span { color: var(--soft); font-size: 12px; }
+.toast.is-leaving { opacity: 0; transform: translateY(8px); }
+@keyframes toast-in { from { opacity: 0; transform: translateY(12px); } }
+
+/* ── Narrow windows: the panel becomes a sheet along the bottom ─────── */
+@media (max-width: 760px) {
+  :root { --gap: 8px; --top: 100px; }
+  header { flex-wrap: wrap; }
+  .topbar { max-width: none; flex: 1 1 100%; }
+  .chips { margin-left: auto; }
+  .side { top: auto; left: var(--gap); right: var(--gap); width: auto; height: 42vh; }
+  .waiting { left: var(--gap); width: auto; }
+  .side:not([hidden]) ~ .corner { bottom: calc(42vh + 2 * var(--gap)); }
+  .side-open { top: auto; bottom: var(--gap); }
+}

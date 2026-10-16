@@ -4,15 +4,16 @@ Et pixel-kontor set ovenfra, i din browser. Tryk på **🏢 Åbn kontor** over c
 
 - **Seks skriveborde i teamrummet.** Hver hjælper får et navn og sit eget udseende, og flere end seks venter ved døren.
 - **Talebobler med det, de laver lige nu:** "Læser api.ts", "Skriver README.md", "Kører npm test". Skærmen på skrivebordet viser det også: kode, terminal, en side tekst eller en browser.
-- **Venter på dig:** figuren rækker hånden op, boblen blinker rødt, og en stribe under kontoret siger hvad den venter på. Det sker kun, når en godkendelsesdialog faktisk vises for dig, ikke når Auto-tilstanden selv afgør det.
-- **Kamera:** træk for at flytte rundt, rul eller knib for at zoome, og dobbeltklik eller tryk **Vis hele** for hele kontoret. Når du har zoomet ind, viser et lille kort i hjørnet, hvor du er. Klik på den røde "venter på dig"-linje under kontoret for at hoppe hen til den, der venter.
+- **Venter på dig:** figuren rækker hånden op, boblen blinker rødt, og en rød boks øverst til højre siger, hvad den venter på. Det sker kun, når en godkendelsesdialog faktisk vises for dig, ikke når Auto-tilstanden selv afgør det.
+- **Hele vinduet:** kontoret ligger midt på en grund med græs, træer, en sø og en vej med biler og gadelygter, og fylder hele browservinduet. Listen, butikken og fremskridt svæver i et panel i venstre side, som kan foldes sammen med **‹**; på en telefon ligger panelet i bunden.
+- **Kamera:** træk for at flytte rundt, rul eller knib for at zoome, og dobbeltklik eller tryk **Vis hele kontoret** for at komme tilbage. Når du har flyttet dig, viser et lille kort i hjørnet, hvor du er. Tryk **Gå til** i den røde "venter på dig"-boks for at hoppe hen til den, der venter.
 - **Kroner og butik:** arbejdet tjener kroner, der vises øverst på siden og på Claudes tavle. Linjer, afleverede opgaver, grønne tests, commits og pull requests tæller. Kontoret starter småt: Claudes kontor og et teamrum med to skriveborde. Flere skriveborde, køkken, toilet, sofahjørne, bordtennisbord og mødelokale købes i fanen **Butik** eller ved at klikke på skiltet på stedet, hvorefter der bygges med stillads i ti sekunder. Uden køkken holder Claude pause ved skrivebordet. Når rummene er der, bliver de brugt: hvert tredje minut er der kaffepause (og snak i køkkenet), toiletbesøg og bordtennis, og hvert tiende minut holder Claude et kort møde. Trivslen øverst på siden stiger med rum og inventar og falder med hjælpere på gulvet, og den ganger indtjeningen med 0,8 til 1,2. Andre sessioner skifter du til med fanerne øverst. Butikken sælger også pynt og opgraderinger, og fanen **Fremskridt** viser dagens tal, de sidste 14 dage og dine præstationer, der hver giver en lille belønning. Hjælpere uden skrivebord sidder på gulvet med en laptop og brokker sig. Planen for resten står i [SPIL.md](SPIL.md).
 - **Lys efter tidspunktet:** sollys falder ind ad vinduerne om dagen, og om aftenen bliver der mørkt, så lamperne og skærmene lyser. Vil du se aftenen om dagen, så skriv `?tid=21:30` efter adressen.
 - **Pause:** Claude går ud i køkkenet med en kop kaffe, der damper, og småsnakker.
 - **Fejringer:** konfetti når testene er grønne (`npm test`, `pytest`, `jest`, `vitest`, `cargo test` …), en regnsky når de fejler, og balloner ved `git commit` og `gh pr create`.
 - **Tak:** når en hjælper afleverer, siger Claude tak ved navn.
 - **Alle dine sessioner** har en fane øverst på siden. Kontoret viser den, der arbejder, indtil du selv vælger en fane, og de andre sessioner sidder i projektrummet nederst.
-- Under kontoret står linjer kode, pris og hvor meget af 5-timers-grænsen, sessionen har brugt. Skriv `/kontor panel` for at se den samme liste som tekst i et panel i Claude.
+- I panelet står linjer kode, pris og hvor meget af 5-timers-grænsen, sessionen har brugt. Skriv `/kontor panel` for at se den samme liste som tekst i et panel i Claude.
 
 ## Sådan hænger det sammen
 

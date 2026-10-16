@@ -28,6 +28,7 @@ Status: ✅ lavet · 🟡 delvist · ⬜ ikke lavet · ➖ ikke længere relevan
 | 0.11.1 | Fejlrettelser: ingen går gennem væggene (døre forbinder rummene i rutegitteret, og der er fri vej ud af Claudes kontor), nyt toilet med døren ud til et frit område, ingen fliser i væggene; langsommere indtjening og højere priser, så kontoret bygges over uger |
 | 0.12.0 | En lækrere side rundt om kontoret: topbjælke med ikon, trivsel, saldo og forbindelsesprik; kort med pixel-portræt og statuspille i listen; venteboks med "Gå til"; butik med ikoner og fremdrift; kun mørkt tema |
 | 0.13.0 | Spillets fase 4: pynt og opgraderinger i butikken, 17 præstationer med belønning og notifikation, statistik i den nye fane Fremskridt |
+| 0.14.0 | Kontoret fylder hele vinduet: græs, træer, en sø, sti fra hoveddøren, hæk, fortov og en vej med biler og gadelygter rundt om; panelet svæver i venstre side og kan foldes sammen (på en telefon ligger det i bunden). Siden er delt op i små moduler i stedet for én fil på 2.800 linjer |
 | 0.13.1 | Fejl 47-51: en ældre server afløses efter en opdatering, en gulvsidder går hen til sit nye skrivebord, Claude tager imod afleveringer ved skrivebordet, skilte ligger under taleboblerne, og trivslen siger hvor gulvsidderne er |
 
 ## 🔧 Fejl og ting der driller
@@ -121,7 +122,7 @@ Fundet ved en gennemgang af koden og det, vi har set undervejs. **P1** er fejl, 
 
 | # | Hvad | Str. | Status |
 |---|---|---|---|
-| 52 | **Brede skærme udnyttes ikke:** kontoret er bundet af højden, og panelet er smalt, så der er tomt på begge sider (set på 2000 px). Automatisk skalering: bredere panel, større tegning og evt. en ekstra kolonne med Fremskridt. | M | ⬜ |
+| 52 | **Brede skærme udnyttes ikke:** kontoret er bundet af højden, og panelet er smalt, så der er tomt på begge sider (set på 2000 px). Løst i 0.14.0: kontoret fylder hele vinduet med græs omkring, og panelet svæver ovenpå. | M | ✅ |
 | 53 | **Ingen backup af spil.json.** Én dårlig skrivning eller fejl kan koste alle kroner. Serveren bør gemme en daglig kopi (de sidste 7). | S | ⬜ |
 | 54 | **`/kontor panel` i Claude kender ikke spillet:** ingen saldo, trivsel eller præstationer i tekstpanelet. | S | ⬜ |
 | 55 | **Siden har ingen automatiske tests.** Ruterne tjekkes kun med `kontorCheckRoutes()` i hånden; et lille script, der kører siden uden browser (eller i preview), ville fange fx akvariet, der lukkede døren. | M | ⬜ |
@@ -143,12 +144,14 @@ Fundet ved en gennemgang af koden og det, vi har set undervejs. **P1** er fejl, 
 | 66 | **Månedens medarbejder:** hjælpernes navne går igen, så de kan få deres egen statistik og en pokal. | M | ⬜ |
 | 67 | **Tv-tilstand** til en ekstra skærm: fuld skærm, ingen panel, kameraet følger det, der sker (punkt 31). | S | ⬜ |
 
+| 69 | **Aktivitetslog:** en lille liste nederst over det seneste, der er sket (ny opgave, aflevering, grønne tests), med tid og hvem. | S | ⬜ |
+| 70 | **Liv udenfor:** hjælpere kommer gående op ad stien fra fortovet og går samme vej hjem; en hjælper uden plads venter på bænken. | M | ⬜ |
 | 68 | **Gulvsidderne bytter plads, når et skrivebord købes,** fordi pladserne på gulvet tælles fra det første ledige skrivebord. De går pænt, men det ligner stoleleg. Hver gulvsidder bør beholde sin plads. | S | ⬜ |
 
 ### Forslag til rækkefølge
 
 1. **Fejlene 47-51** samlet i én runde: små, men de ses hver dag.
-2. **53 backup** og **52 automatisk skalering**: sikkerhed for kronerne og plads til det, der kommer.
+2. **53 backup**: sikkerhed for kronerne (52 er løst i 0.14.0).
 3. Derefter det sjove: **59 personlighed**, **62 daglig bonus** og **57 lyd**, og så **fase 5**.
 
 ## 🧹 Oprydning

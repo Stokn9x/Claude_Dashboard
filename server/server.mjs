@@ -15,7 +15,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-const VERSION = '0.13.1'
+const VERSION = '0.14.0'
 const HOST = '127.0.0.1'
 const PORT = Number(process.env.AGENT_KONTOR_PORT || 4747)
 const HERE = path.dirname(fileURLToPath(import.meta.url))
@@ -403,10 +403,14 @@ setInterval(() => {
 
 // ── HTTP ─────────────────────────────────────────────────────────────────
 
-const files = {
-  '/': ['index.html', 'text/html; charset=utf-8'],
-  '/index.html': ['index.html', 'text/html; charset=utf-8'],
-  '/app.js': ['app.js', 'text/javascript; charset=utf-8'],
+// The page, its stylesheet and its modules: only these names, so no path
+// from the address ever reaches outside the public folder.
+const MODULE = /^\/js\/[a-z]+\.js$/
+const fileFor = pathname => {
+  if (pathname === '/' || pathname === '/index.html') return ['index.html', 'text/html; charset=utf-8']
+  if (pathname === '/style.css') return ['style.css', 'text/css; charset=utf-8']
+  if (MODULE.test(pathname)) return [pathname.slice(1), 'text/javascript; charset=utf-8']
+  return null
 }
 
 // Only this computer's own page may talk to it: a page elsewhere that points
@@ -486,7 +490,7 @@ const server = http.createServer((req, res) => {
     return
   }
 
-  const file = files[url.pathname]
+  const file = fileFor(url.pathname)
   if (!file) {
     res.writeHead(404).end('Ikke fundet')
     return

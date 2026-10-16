@@ -417,15 +417,6 @@ const leaveOffice = async ($: $) => {
   if (dir && o.sessionKey) await $.fs.write(`${dir}/${o.sessionKey}.json`, JSON.stringify({ key: o.sessionKey, ended: true, earned: o.earned, updatedAt: 0 }))
 }
 
-const isServerUp = async ($: $) => {
-  try {
-    const res = await $.http.fetch(`${ADDRESS}/health`)
-    return res.ok && (JSON.parse(res.text) as { app?: string }).app === 'agent-kontor'
-  } catch {
-    return false
-  }
-}
-
 // One server for every session on the computer: the first "Åbn kontor" to
 // find none starts it, in the background, and it stops by itself when nobody
 // needs it.
@@ -447,6 +438,7 @@ const runningVersion = async ($: $) => {
     return null
   }
 }
+const isServerUp = async ($: $) => (await runningVersion($)) !== null
 
 // This mod's own version, from its plugin.json.
 let ownVersion: string | null = null

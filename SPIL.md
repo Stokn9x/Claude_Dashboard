@@ -104,7 +104,7 @@ Mod'en tager i dag tid på hver gåtur ud fra grundplanen, så de to skal være 
 - Mod'en holder kun styr på faserne og tiderne. Hvor folk sidder, og hvilken vej de går, bestemmer siden ud fra det, man har købt.
 - Skrivebordene fordeles af siden: de første hjælpere får de købte skriveborde, resten sætter sig på gulvet.
 
-Det er en god oprydning i sig selv. Grundplanen skal så kun ligge ét sted, i `public/app.js`, og ikke længere også i `hooks/register.tsx`.
+Det er en god oprydning i sig selv. Grundplanen skal så kun ligge ét sted, i siden (i dag `public/js/plan.js`), og ikke længere også i `hooks/register.tsx`.
 
 ### 4. Grundplan som data
 
