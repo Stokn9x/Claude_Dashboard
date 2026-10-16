@@ -31,7 +31,7 @@ The camera: the canvas covers the window; `view` is the world point in the middl
 
 - `SPIL.md` is the game's plan, phase by phase, with what is decided. Update its status line and phase table when a phase lands.
 - `UDVIDELSER.md` lists everything built and planned, with a version table at the top. Add a row for each release and set item statuses.
-- `GRUNDPLAN.md` (with `docs/grundplan.svg`) is the agreed redesign of the floor plan: a corridor, two rows of rooms, rooms that grow in steps. Update it as its open questions are settled, and when it is built.
+- `GRUNDPLAN.md` (with `docs/grundplan.svg`) is the agreed redesign of the floor plan: a corridor, two rows of rooms, rooms that grow in steps. Its open questions are settled; update it when it is built. It also changes how helpers walk (corridor first, fixed speed instead of fixed time).
 
 ## Developing
 

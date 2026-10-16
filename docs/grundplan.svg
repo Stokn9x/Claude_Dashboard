@@ -1,12 +1,12 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="680" height="560" viewBox="0 0 680 560" font-family="Segoe UI, system-ui, -apple-system, sans-serif">
-  <title>Ny grundplan for Agent-kontor (forslag 3)</title>
-  <desc>To rækker rum om en hovedgang. Teamrummene i vestenden vokser mod vest, loungen og toilettet i østenden vokser mod øst, køkkenet vokser inde i bygningen. Claude sidder midt i huset over receptionen, med have mellem huset og vejen.</desc>
-  <rect width="680" height="560" fill="#FFFFFF"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="770" height="560" viewBox="-90 0 770 560" font-family="Segoe UI, system-ui, -apple-system, sans-serif">
+  <title>Ny grundplan for Agent-kontor (forslag 4)</title>
+  <desc>To rækker rum om en hovedgang. Teamrummene i vestenden vokser mod vest i hele kolonner, loungen og toilettet i østenden vokser mod øst, køkkenet vokser inde i bygningen. Claude sidder midt i huset over receptionen, med have mellem huset og vejen.</desc>
+  <rect x="-90" width="770" height="560" fill="#FFFFFF"/>
   <g font-size="14" font-weight="500" text-anchor="middle" dominant-baseline="central">
     <!-- Extensions west: team room 2 (north) and team room 1 (south) -->
     <g fill="none" stroke="#1D9E75" stroke-dasharray="5 4">
-      <rect x="20" y="44" width="86" height="68" rx="4"/><rect x="20" y="118" width="86" height="68" rx="4"/>
-      <rect x="20" y="226" width="86" height="72" rx="4"/><rect x="20" y="306" width="86" height="72" rx="4"/>
+      <rect x="20" y="44" width="86" height="142" rx="4"/><rect x="-70" y="44" width="86" height="142" rx="4"/>
+      <rect x="20" y="226" width="86" height="152" rx="4"/><rect x="-70" y="226" width="86" height="152" rx="4"/>
     </g>
     <!-- Extensions east and in the building: lounge, kitchen, toilet -->
     <g fill="none" stroke="#D85A30" stroke-dasharray="5 4">
@@ -17,10 +17,10 @@
       <rect x="574" y="226" width="86" height="72" rx="4"/><rect x="574" y="306" width="86" height="72" rx="4"/>
     </g>
     <g font-size="12" font-weight="400" fill="#5F5E5A">
-      <text x="63" y="78">Trin 2</text><text x="63" y="152">Trin 3</text>
-      <text x="63" y="262">Trin 2</text><text x="63" y="342">Trin 3</text>
-      <text x="530" y="115">Trin 2</text><text x="617" y="115">Trin 3</text>
-      <text x="465" y="302">Trin 2</text>
+      <text x="63" y="115">Trin 2</text><text x="-27" y="115">Trin 3</text>
+      <text x="63" y="302">Trin 2</text><text x="-27" y="302">Trin 3</text>
+      <text x="530" y="105">Depot</text><text x="530" y="125">Trin 2</text><text x="617" y="115">Trin 3</text>
+      <text x="465" y="292">Depot</text><text x="465" y="312">Trin 2</text>
       <text x="617" y="262">Trin 2</text><text x="617" y="342">Trin 3</text>
     </g>
     <!-- Work rooms -->
@@ -55,13 +55,13 @@
     <rect x="235" y="382" width="20" height="70" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/>
     <path d="M245 446V390M240 395L245 389L250 395" fill="none" stroke="#5F5E5A" stroke-width="1.5" stroke-linecap="round"/>
     <g fill="#EAF3DE" stroke="#3B6D11" stroke-width="0.5">
-      <rect x="20" y="392" width="205" height="52" rx="4"/><rect x="265" y="392" width="395" height="52" rx="4"/>
+      <rect x="-70" y="392" width="295" height="52" rx="4"/><rect x="265" y="392" width="395" height="52" rx="4"/>
     </g>
     <g fill="#27500A" font-size="12" font-weight="400">
-      <text x="122" y="418">Have og bænk</text><text x="462" y="418">Have, sø og plæne til hjælperne med fri</text>
+      <text x="77" y="418">Have og bænk</text><text x="462" y="418">Have, sø og plæne til hjælperne med fri</text>
     </g>
-    <rect x="20" y="452" width="640" height="34" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/>
-    <text x="340" y="469" font-size="12" font-weight="400" fill="#444441">Vej</text>
+    <rect x="-70" y="452" width="730" height="34" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/>
+    <text x="295" y="469" font-size="12" font-weight="400" fill="#444441">Vej</text>
   </g>
   <!-- Legend -->
   <g font-size="12" fill="#444441" dominant-baseline="central">

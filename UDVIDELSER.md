@@ -156,7 +156,7 @@ Fundet ved en gennemgang af koden og det, vi har set undervejs. **P1** er fejl, 
 | 71 | **Færdige hjælpere hænger ud:** efter afleveringen holder de fri i tre minutter (bordtennis to og to, kaffe, sofaen eller en snak på græsset ved stien), går tilbage til et skrivebord, hvis Claude kalder på dem igen, og går ellers hjem. Lavet i 0.16.0. | M | ✅ |
 | 72 | **Linjer skrevet gennem shell-scripts tæller ikke.** Kun Edit og Write giver kroner; `sed`, Python-scripts og lignende kan mod'en ikke tælle sikkert. Måske ud fra `git diff --stat` ved commit. Lavet i 0.17.0: efter `git commit` tæller mod'en de linjer i committen, som Edit og Write ikke allerede har talt, højst 400 hver vej pr. commit. | S | ✅ |
 
-| 74 | **Ny grundplan med gange og rum, der vokser i trin:** en hovedgang, to rækker rum, receptionen midt på forsiden, have mod vejen, og teamrum, køkken, lounge og toilet, der starter små og udvides i trin. Planen og tegningen står i [GRUNDPLAN.md](GRUNDPLAN.md). | L | ⬜ |
+| 74 | **Ny grundplan med gange og rum, der vokser i trin:** en hovedgang, to rækker rum, receptionen midt på forsiden, have mod vejen, og teamrum, køkken, lounge og toilet, der starter små og udvides i trin; gåturene laves om, så hjælperne går på gangen med fast fart. Planen og tegningen står i [GRUNDPLAN.md](GRUNDPLAN.md); de åbne spørgsmål er afklaret. | L | ⬜ |
 
 ### Forslag til rækkefølge
 
