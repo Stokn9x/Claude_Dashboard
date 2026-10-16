@@ -4,9 +4,9 @@
 // what is owned changes. Rooms out of view are skipped, so a large office
 // costs no more than what is on screen.
 import { store, owns } from './store.js'
-import { OUTLINE, FONT, canvas } from './gfx.js'
+import { OUTLINE, FONT, canvas, readable } from './gfx.js'
 import { clip } from './util.js'
-import { MAIN, PLAN, ROOM_TYPES, WORLD, doormat, frameOf, isBuilt, isOpenDoor, lotOf, nextStepOf, rectOf, roomById, shiftOf, topWindowsOf, typeOf } from './plan.js'
+import { MAIN, PLAN, ROOM_NAMES, ROOM_TYPES, WORLD, doormat, frameOf, isBuilt, isOpenDoor, lotOf, nextStepOf, rectOf, roomById, shiftOf, topWindowsOf, typeOf } from './plan.js'
 import { applyView, onResize, visibleRect, visibleRooms, view } from './camera.js'
 import { isNightAt, sideWindows, skyAt } from './light.js'
 import { drawGrounds } from './outdoors.js'
@@ -61,7 +61,7 @@ const slab = (g, x, y, w, h, r, colour) => {
   g.fill()
 }
 
-// A rug under each desk, each its own colour
+// A rug under each desk, each its own colour, once the rugs are bought
 const rugs = (g, desks, colours, w, h) =>
   desks.forEach(({ cx, dy }, i) => {
     const [base, edge] = colours[i % colours.length]
@@ -147,7 +147,7 @@ const roomDrawers = {
   team2: (g, fill) => {
     // A warm grey carpet in squares, a rug under each desk
     carpet(fill, -260, 0, 430, 250, '#D3D0C8', '#C4C0B6')
-    rugs(g, ROOM_TYPES.team2.desks, [['#C9D6CF', '#BCCAC2'], ['#D8CCC0', '#CBBFB2'], ['#CCD0E0', '#BFC3D4'], ['#DCD3BE', '#CFC6B0'], ['#D3C8D9', '#C6BBCC'], ['#C4D6DA', '#B6C9CD']], 104, 64)
+    if (owns('rugs')) rugs(g, ROOM_TYPES.team2.desks, [['#C9D6CF', '#BCCAC2'], ['#D8CCC0', '#CBBFB2'], ['#CCD0E0', '#BFC3D4'], ['#DCD3BE', '#CFC6B0'], ['#D3C8D9', '#C6BBCC'], ['#C4D6DA', '#B6C9CD']], 104, 64)
     // A long bookcase on the far west wall, a whiteboard on the north wall
     bookcase(fill, -258, 70, SPINES)
     fill(-100, 2, 70, 14, OUTLINE)
@@ -162,7 +162,7 @@ const roomDrawers = {
   team: (g, fill) => {
     // Sage carpet, a rug under each desk
     carpet(fill, -260, 314, 430, 250, '#CBD9C7', '#BCCBB8')
-    rugs(g, ROOM_TYPES.team.desks, TEAM_RUGS, 104, 64)
+    if (owns('rugs')) rugs(g, ROOM_TYPES.team.desks, TEAM_RUGS, 104, 64)
     bookcase(fill, -258, 380, ['#D45D7A', '#3E7CC9', '#D6A23C', '#2E9E8F', '#8A6FD6', '#E07A4F', '#56A86B', '#D45D7A', '#3E7CC9', '#D6A23C'])
     // The printer
     fill(138, 540, 30, 18, OUTLINE)
@@ -188,11 +188,31 @@ const roomDrawers = {
     if (owns('plants')) for (const [x, y] of [[0, 556], [100, 338]]) bigPlant(g, fill, x, y)
   },
 
-  // The hall: grey floor in long tiles, a darker strip between the lanes
-  hall: (g, fill) => {
-    fill(-260, 262, 1346, 64, '#B9C1C8')
-    for (let x = -260; x < 1086; x += 48) fill(x, 262, 1, 64, '#AEB6BE')
-    fill(-260, 293, 1346, 2, '#A7B0B8')
+  // The hall: warm stone along the walls, a long runner under both lanes,
+  // round lamps in the ceiling down the middle (they glow in the evening),
+  // and a plant at each end of it as it is now.
+  hall: (g, fill, dot, r) => {
+    const x0 = -260
+    const w = 1346
+    fill(x0, 262, w, 64, '#CBC5B8')
+    for (let x = x0; x < x0 + w; x += 32) fill(x, 262, 1, 64, '#BEB7A9')
+    fill(x0, 268, w, 1, '#BEB7A9')
+    fill(x0, 319, w, 1, '#BEB7A9')
+    fill(x0, 271, w, 46, '#4E5F73')
+    fill(x0, 273.5, w, 1.5, '#7C8FA6')
+    fill(x0, 313, w, 1.5, '#7C8FA6')
+    for (let x = x0 + 24; x < x0 + w; x += 48) {
+      fill(x - 1, 292, 2, 4, '#62758C')
+      fill(x - 2.5, 293.5, 5, 1, '#62758C')
+    }
+    for (const [x, y] of ROOM_TYPES.hall.lights) {
+      dot(x, y, 4.5, '#D8D0BE', '#6B7B8E')
+      dot(x, y, 2, '#FFF6DE')
+    }
+    // (none by the toilet's door in the south-east corner)
+    plant(fill, dot, r.x + 16, 270, true)
+    plant(fill, dot, r.x + 16, 304, true)
+    plant(fill, dot, r.x + r.w - 16, 270, true)
   },
 
   // The reception stands from the start, bare; bought, it is furnished.
@@ -279,14 +299,10 @@ const roomDrawers = {
   },
 
   quiet: (g, fill) => {
-    // A soft blue carpet, a rug under each desk, a sign on the floor
+    // A soft blue carpet, a rug under each desk
     fill(424, 314, 280, 250, '#D6DCE6')
     for (let r = 0; r < 11; r++) fill(424, 314 + r * 24, 280, 1, '#C7CED9')
-    rugs(g, ROOM_TYPES.quiet.desks, [['#C9D3E3', '#BCC6D8'], ['#D3CFE3', '#C6C1D8'], ['#CFDDD8', '#C1D1CB'], ['#E0D6CB', '#D4C8BB']], 100, 62)
-    g.font = `700 8.5px ${FONT}`
-    g.fillStyle = '#5B6672'
-    g.textAlign = 'left'
-    g.fillText('Stillerum', 560, 556)
+    if (owns('rugs')) rugs(g, ROOM_TYPES.quiet.desks, [['#C9D3E3', '#BCC6D8'], ['#D3CFE3', '#C6C1D8'], ['#CFDDD8', '#C1D1CB'], ['#E0D6CB', '#D4C8BB']], 100, 62)
     // The aquarium along the top wall; its fish swim in the frame
     if (owns('aquarium')) {
       const [x, y, w, h] = ROOM_TYPES.quiet.aquarium
@@ -491,17 +507,72 @@ const roomDrawers = {
   },
 }
 
-// A plot not yet bought: rough ground, a few tufts, and a fence of stakes
-// and rope. Its sign, with the price, is drawn on top each frame.
+// A plot not yet bought: levelled earth with a few tufts, pegged out with
+// stakes and a rope round it. Its sign, with the price, is drawn on top each
+// frame.
 const drawLot = (g, fill, { x, y, w, h }) => {
-  fill(x, y, w, h, '#A9C08A')
-  for (let i = 0; i < 14; i++) fill(x + ((i * 53) % (w - 10)) + 4, y + ((i * 37) % (h - 10)) + 4, 6, 3, i % 2 ? '#93AB75' : '#B9A27A')
-  g.setLineDash([4, 3])
-  g.strokeStyle = '#F6F1E4'
-  g.lineWidth = 1.2
-  g.strokeRect(x + 4, y + 4, w - 8, h - 8)
-  g.setLineDash([])
-  for (const [px, py] of [[x + 4, y + 4], [x + w - 4, y + 4], [x + 4, y + h - 4], [x + w - 4, y + h - 4]]) fill(px - 1.5, py - 1.5, 3, 3, '#8B5E3C')
+  fill(x, y, w, h, '#8FA572')
+  fill(x + 6, y + 6, w - 12, h - 12, '#A3B184')
+  for (let i = 0; i < 18; i++) fill(x + ((i * 53) % (w - 16)) + 8, y + ((i * 37) % (h - 16)) + 8, 6, 3, i % 3 ? '#93A775' : '#B9A27A')
+  // The rope, and a stake every forty units or so along it
+  g.strokeStyle = '#E8DCC0'
+  g.lineWidth = 1
+  g.strokeRect(x + 5.5, y + 5.5, w - 11, h - 11)
+  const stake = (px, py) => {
+    fill(px - 2, py - 2, 4, 4, '#5E4330')
+    fill(px - 1, py - 1, 2, 2, '#8B5E3C')
+  }
+  for (const [ax, bx] of [[x + 6, x + w - 6]]) {
+    const n = Math.max(1, Math.round((bx - ax) / 40))
+    for (let i = 0; i <= n; i++) {
+      stake(ax + ((bx - ax) * i) / n, y + 6)
+      stake(ax + ((bx - ax) * i) / n, y + h - 6)
+    }
+  }
+  const n = Math.max(1, Math.round((h - 12) / 40))
+  for (let i = 1; i < n; i++) {
+    stake(x + 6, y + 6 + ((h - 12) * i) / n)
+    stake(x + w - 6, y + 6 + ((h - 12) * i) / n)
+  }
+}
+
+// A room's sign on the hall wall, beside its door, on the side with more
+// wall to spare: the icon and the name, white on slate, readable at any zoom.
+const doorSign = (g, door, room) => {
+  const [icon, name] = ROOM_NAMES[room.id] ?? []
+  if (!name) return
+  const size = readable(8, 11)
+  g.font = `700 ${size}px ${FONT}`
+  const textW = g.measureText(name).width
+  const pad = size * 0.6
+  const iconW = size * 1.35
+  const w = pad + iconW + textW + pad
+  const h = size * 1.65
+  const r = rectOf(room)
+  const isRight = r.x + r.w - (door.x + door.w) >= door.x - r.x
+  const x = isRight ? door.x + door.w + 4 : door.x - 4 - w
+  const y = door.y + door.h / 2 - h / 2
+  g.globalAlpha = 0.3
+  g.fillStyle = '#000000'
+  g.beginPath()
+  g.roundRect(x + 1, y + 1.5, w, h, h / 3)
+  g.fill()
+  g.globalAlpha = 1
+  g.fillStyle = '#1C232C'
+  g.strokeStyle = '#5A6672'
+  g.lineWidth = Math.max(0.8, size * 0.08)
+  g.beginPath()
+  g.roundRect(x, y, w, h, h / 3)
+  g.fill()
+  g.stroke()
+  g.textBaseline = 'middle'
+  g.textAlign = 'left'
+  g.font = `${size * 0.95}px ${FONT}`
+  g.fillText(icon, x + pad, y + h / 2 + size * 0.05)
+  g.font = `700 ${size}px ${FONT}`
+  g.fillStyle = '#E9EEF2'
+  g.fillText(name, x + pad + iconW, y + h / 2 + size * 0.05)
+  g.textBaseline = 'alphabetic'
 }
 
 // The next step of a room that grows out on the grounds, as a lot. A step
@@ -605,6 +676,11 @@ export const drawBuilding = (project, hour) => {
       fill(d.x + 3, d.y + 1, d.w - 6, d.h - 2, '#6E5A44')
       fill(d.x + d.w - 8, d.y + d.h / 2 - 1, 2, 2, '#D6A23C')
     }
+  }
+  // Every built room's sign on the hall, beside its door
+  for (const d of PLAN.doors) {
+    const id = (d.between ?? []).find(x => x !== 'hall')
+    if (isOpenDoor(d) && id && (d.between ?? []).includes('hall')) doorSign(g, d, roomById(id))
   }
   fill(...doormat(), '#6E5A44')
   for (const w of sideWindows()) {

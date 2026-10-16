@@ -63,18 +63,45 @@ export const shadow = (x, y, rx, ry, alpha = 0.2) => {
   ctx.globalAlpha = 1
 }
 
-// A name or a price on a small rounded plate.
-export const tag = (cx, y, text, colour) => {
-  ctx.font = `700 7.5px ${FONT}`
-  const w = Math.round(ctx.measureText(text).width + 10)
-  ctx.globalAlpha = 0.9
-  rounded(cx - w / 2, y, w, 11, 5.5, colour)
-  ctx.globalAlpha = 1
-  label(text, cx, y + 8, 7.5, '#FFFFFF')
+// ── Words that can be read ───────────────────────────────────────────────
+// Names, bubbles and signs are drawn in world units, so they shrink with the
+// camera. Down to the whole office in view they stay at least a few screen
+// pixels high; further out they shrink with it, so they never bury the
+// house. The scene tells us how many pixels a world unit is, each frame, and
+// how many it is with the whole office in view.
+const PPU_FLOOR = 0.75
+let unitsPerPixel = 1
+export const setPixelsPerUnit = (ppu, homePpu) => {
+  unitsPerPixel = 1 / Math.max(ppu, homePpu, PPU_FLOOR)
+}
+// The size, in world units, of text meant to be `size` units high and never
+// less than `min` pixels on the screen.
+export const readable = (size, min) => Math.max(size, min * unitsPerPixel)
+// Draws `paint` around (x, y), scaled up just enough for its text of `size`
+// units to show at least `min` pixels high.
+export const legibly = (x, y, size, min, paint) => {
+  const k = readable(size, min) / size
+  if (k === 1) return paint(x, y)
+  ctx.save()
+  ctx.translate(x, y)
+  ctx.scale(k, k)
+  paint(0, 0)
+  ctx.restore()
 }
 
+// A name or a price on a small rounded plate.
+export const tag = (cx, y, text, colour) =>
+  legibly(cx, y, 7.5, 11, (cx, y) => {
+    ctx.font = `700 7.5px ${FONT}`
+    const w = Math.round(ctx.measureText(text).width + 10)
+    ctx.globalAlpha = 0.9
+    rounded(cx - w / 2, y, w, 11, 5.5, colour)
+    ctx.globalAlpha = 1
+    label(text, cx, y + 8, 7.5, '#FFFFFF')
+  })
+
 // A speech bubble whose tail points down at (cx, bottom).
-export const bubble = (cx, bottom, text, isAlert, t, max = 30) => {
+export const bubble = (cx, bottom, text, isAlert, t, max = 30) => legibly(cx, bottom, 8.5, 12, (cx, bottom) => {
   const words = clip(text, max)
   ctx.font = `600 8.5px ${FONT}`
   const w = Math.round(ctx.measureText(words).width + 14)
@@ -95,7 +122,7 @@ export const bubble = (cx, bottom, text, isAlert, t, max = 30) => {
   rect(cx - 2.5, y + 12, 5, 2, fill)
   label(words, cx, y + 10, 8.5, isAlert ? '#FFFFFF' : OUTLINE, 600)
   ctx.globalAlpha = 1
-}
+})
 
 // Thinking, with nothing to say yet: a cloud with three dots that bob in
 // turn, and two small puffs trailing down to the head.
@@ -116,6 +143,6 @@ const thought = (cx, bottom, t) => {
 // What someone says: a thought cloud while they are only thinking, the
 // words otherwise, red while they wait for you.
 export const say = (cx, bottom, activity, t) => {
-  if (activity.detail === 'Tænker' && activity.state !== 'waiting') thought(cx, bottom, t)
+  if (activity.detail === 'Tænker' && activity.state !== 'waiting') legibly(cx, bottom, 8.5, 12, (cx, bottom) => thought(cx, bottom, t))
   else bubble(cx, bottom, activity.detail, activity.state === 'waiting', t)
 }

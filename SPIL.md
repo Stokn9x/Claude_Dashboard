@@ -48,6 +48,7 @@ En travl time (ca. 2.000 linjer, ti opgaver, et par tests og commits) giver omkr
 | Lounge | 9.000 kr | Pool, bar, spil, dart og sofa til hjælperne med fri (0.18.0) |
 | Teamrum 2 | 15.000 kr | Plads til skrivebord nr. 11-16 til 10.000-15.000 kr (0.18.0) |
 | Planter overalt | 600 kr | +3 trivsel |
+| Tæpper | 800 kr | +3 trivsel; tæpper under skrivebordene i teamrummene og stillerummet (0.20.0) |
 | Kunst på væggene | 900 kr | +3 trivsel |
 | Neonskilt | 1.200 kr | +2 trivsel; lyser om aftenen |
 | Espressomaskine | 1.500 kr | +3 trivsel; damper hele dagen |

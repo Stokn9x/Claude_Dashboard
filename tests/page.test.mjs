@@ -19,7 +19,7 @@ const util = await import(js('util'))
 
 const { PLAN, WORLD, GROUNDS, CHAINS, typeOf, frameOf, fullFrameOf, rectOf, deskSlots, desks, placeOf } = plan
 const STEPS = Object.values(CHAINS).flat()
-const ALL_ROOMS = ['claude', 'team', ...STEPS, 'pingpong', 'meeting', 'plants', 'art', 'neon', 'espresso', 'aquarium', 'chairs', 'screens', 'reception']
+const ALL_ROOMS = ['claude', 'team', ...STEPS, 'pingpong', 'meeting', 'plants', 'rugs', 'art', 'neon', 'espresso', 'aquarium', 'chairs', 'screens', 'reception']
 const owning = (rooms, deskCount) => {
   store.state = { sessions: [], game: { owned: { rooms, desks: deskCount }, kroner: 0, next: {} } }
 }

@@ -175,7 +175,8 @@ export const ROOM_TYPES = {
     // of the tables and machines
     standing: [[736, 382, 'right'], [786, 382, 'left'], [878, 382, 'right'], [916, 382, 'left'], [960, 476, 'left']].map(([x, y, facing]) => ({ x, y, facing })),
     machine: { x: 730, y: 318 },
-    clock: { x: 792, y: 308, r: 5 },
+    // On the back wall: the wall on the hall has the room's sign
+    clock: { x: 792, y: 567, r: 5 },
     plants: [[728, 552], [964, 552]],
     lights: [[760, 440, 40, 0.3], [900, 450, 64, 0.34]],
     blocks: [[718, 316, 62, 18], [748, 414, 24, 52], [940, 316, 28, 34], [942, 362, 32, 30], [866, 416, 68, 68]],
@@ -429,6 +430,19 @@ export const placeOf = seat => {
 
 // What can be bought, by its id: rooms and their steps, the ping-pong
 // table in the lounge, decor.
+// Each room's sign by its door on the hall: an icon and a name.
+export const ROOM_NAMES = {
+  team: ['👥', 'Teamrum 1'],
+  team2: ['👥', 'Teamrum 2'],
+  claude: ['✨', 'Claude'],
+  meeting: ['📊', 'Mødelokale'],
+  lounge: ['🛋️', 'Lounge'],
+  reception: ['🛎️', 'Reception'],
+  quiet: ['🤫', 'Stillerum'],
+  kitchen: ['☕', 'Køkken'],
+  toilet: ['🚻', 'Toilet'],
+}
+
 export const ITEMS = {
   desk: { name: 'Skrivebord', icon: '🪑', about: 'Hjælpere uden skrivebord sidder i receptionen med en laptop og brokker sig.' },
   'team1-2': { name: 'Teamrum 1, trin 2', icon: '🏗️', about: 'Teamrum 1 vokser mod vest med plads til tre skriveborde mere.' },
@@ -448,6 +462,7 @@ export const ITEMS = {
   meeting: { name: 'Mødelokale', icon: '📊', about: 'Et mødelokale ved siden af Claude med et langt bord og en skærm på væggen.' },
   reception: { name: 'Reception', icon: '🛎️', about: 'Indretning af receptionen bag hoveddøren: skranke, sofa, logo og Bodil, der byder hjælperne velkommen og siger farvel.' },
   plants: { name: 'Planter overalt', icon: '🪴', about: 'Store planter i teamrummet, stillerummet og hos Claude.' },
+  rugs: { name: 'Tæpper', icon: '🧶', about: 'Bløde tæpper under skrivebordene i teamrummene og stillerummet.' },
   art: { name: 'Kunst på væggene', icon: '🖼️', about: 'Malerier på væggene i teamrummet og hos Claude.' },
   neon: { name: 'Neonskilt', icon: '💡', about: 'Et lyserødt "SHIP IT" i teamrummet, der lyser om aftenen.' },
   espresso: { name: 'Espressomaskine', icon: '☕', about: 'En rigtig espressomaskine i køkkenet. Den damper hele dagen.' },

@@ -4,7 +4,7 @@
 // meetings, signs for what is for sale, building work and celebrations, and
 // what everyone says, on top.
 import { store, focused, owns } from './store.js'
-import { OUTLINE, bubble, canvas, circle, ctx, dashed, label, rect, rounded, say, shadow, tag } from './gfx.js'
+import { FONT, OUTLINE, bubble, canvas, circle, ctx, dashed, label, legibly, readable, rect, rounded, say, setPixelsPerUnit, shadow, tag } from './gfx.js'
 import { hashOf, kr } from './util.js'
 import { ITEMS, MAIN, MAIN_SPOT, PLAN, ROOM_TYPES, at, coffeeSpot, deskSlots, desks, firstRoom, isBuilt, lotOf, nextStepOf, placeOf, rectOf, shiftOf, stepArea, typeOf } from './plan.js'
 import { HOMEWARD_MS, WALKS, homewardPose, outAt, poseOf, route, walkAt, walkMs } from './routes.js'
@@ -15,7 +15,7 @@ import { daylight, evening, timeOfDay } from './light.js'
 import { chatFor, grumbleAt } from './voices.js'
 import { IDLE_WALK_MS, idlePlan } from './idle.js'
 import { GROUNDS, handoffFor } from './plan.js'
-import { applyView, drawMinimap, isInView, stepGlide, visibleRect } from './camera.js'
+import { applyView, drawMinimap, isInView, pixelsPerUnit, stepGlide, view, visibleRect } from './camera.js'
 import { background, drawBuilding } from './building.js'
 import { drawLife } from './outdoors.js'
 
@@ -194,17 +194,66 @@ const drawSaleOutlines = (sales, hits) => {
   }
 }
 
+// A lot's sign, in the colours of the panel beside the office: the room's
+// icon and name, the price, and either a call to build or how much is
+// missing, with a bar towards the price. Its box, in world units, for the
+// click.
+const SIGN_TEXT = 9
+const lotSign = (sale, kroner, t) => {
+  const item = ITEMS[sale.item]
+  const missing = Math.max(0, sale.price - kroner)
+  const k = readable(SIGN_TEXT, 12) / SIGN_TEXT
+  let box = null
+  legibly(sale.x, sale.y, SIGN_TEXT, 12, (cx, cy) => {
+    ctx.font = `700 9px ${FONT}`
+    const nameW = ctx.measureText(item.name).width + 20
+    ctx.font = `800 11px ${FONT}`
+    const priceW = ctx.measureText(kr(sale.price)).width
+    const w = Math.round(Math.max(112, nameW + 22, priceW + 30))
+    const h = 58
+    const x = cx - w / 2
+    const y = cy - h / 2
+    // A soft shadow, the card, and a border that glows when it can be bought
+    ctx.globalAlpha = 0.35
+    rounded(x + 2, y + 3, w, h, 7, '#000000')
+    ctx.globalAlpha = 0.94
+    rounded(x, y, w, h, 7, '#1C232C', sale.canAfford ? '#2E9E8F' : '#3A4552', sale.canAfford ? 1.6 + 0.6 * Math.sin(t / 260) : 1.2)
+    ctx.globalAlpha = 1
+    ctx.font = `12px ${FONT}`
+    ctx.textAlign = 'left'
+    ctx.textBaseline = 'alphabetic'
+    ctx.fillText(item.icon, x + 9, y + 18)
+    label(item.name, x + 29, y + 16, 9, '#E9EEF2', 700, 'left')
+    label(kr(sale.price), x + 10, y + 33, 11, sale.canAfford ? '#F2C14E' : '#C9D1D9', 800, 'left')
+    if (sale.canAfford) {
+      rounded(x + 9, y + 39, w - 18, 13, 6.5, '#2E9E8F')
+      label('Klik for at bygge', cx, y + 48.5, 7.5, '#FFFFFF', 700)
+    } else {
+      rounded(x + 10, y + 40, w - 20, 4, 2, '#2A333E')
+      rounded(x + 10, y + 40, (w - 20) * Math.min(1, kroner / sale.price), 4, 2, '#D6A23C')
+      label(`Mangler ${kr(missing)}`, x + 10, y + 53, 7, '#8A94A0', 600, 'left')
+    }
+    box = { x0: sale.x - (w / 2) * k, y0: sale.y - (h / 2) * k, x1: sale.x + (w / 2) * k, y1: sale.y + (h / 2) * k }
+  })
+  return box
+}
+
 // The signs with the prices, drawn above everyone so they are never hidden.
 const drawSaleSigns = (sales, hits, t) => {
+  const kroner = store.state.game?.kroner ?? 0
   for (const sale of sales) {
     const bob = sale.canAfford ? Math.sin(t / 300 + sale.x) : 0
     if (sale.isDesk) {
       tag(sale.x, sale.y - 32 + bob, sale.canAfford ? `Køb skrivebord: ${kr(sale.price)}` : `Skrivebord: ${kr(sale.price)}`, sale.canAfford ? '#2E9E8F' : '#5B6672')
       continue
     }
-    tag(sale.x, sale.y - 6 + bob, `${ITEMS[sale.item].name}: ${kr(sale.price)}`, sale.canAfford ? '#2E9E8F' : '#5B6672')
-    if (!sale.isFurniture) label(sale.canAfford ? 'Klik for at bygge' : 'Ledig grund', sale.x, sale.y + 14, 6.5, sale.canAfford ? '#21776B' : '#4E6A3A', 600)
-    hits.push({ kind: 'shop', id: sale.item, x0: sale.x - 46, y0: sale.y - 12, x1: sale.x + 46, y1: sale.y + 18 })
+    if (sale.isFurniture) {
+      tag(sale.x, sale.y - 6 + bob, `${ITEMS[sale.item].name}: ${kr(sale.price)}`, sale.canAfford ? '#2E9E8F' : '#5B6672')
+      hits.push({ kind: 'shop', id: sale.item, x0: sale.x - 46, y0: sale.y - 12, x1: sale.x + 46, y1: sale.y + 18 })
+      continue
+    }
+    const box = lotSign(sale, kroner, t)
+    if (box) hits.push({ kind: 'shop', id: sale.item, ...box })
   }
 }
 
@@ -576,6 +625,7 @@ export const draw = () => {
   const glowing = []
   const timeNow = timeOfDay()
   stepGlide()
+  setPixelsPerUnit(pixelsPerUnit(), pixelsPerUnit() / view.zoom)
   drawBuilding(s?.project ?? '', Math.floor(timeNow))
   ctx.setTransform(1, 0, 0, 1, 0, 0)
   ctx.imageSmoothingEnabled = false
