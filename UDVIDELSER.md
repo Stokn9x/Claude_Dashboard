@@ -83,6 +83,12 @@ Status: ✅ lavet · 🟡 delvist · ⬜ ikke lavet · ➖ ikke længere relevan
 | 43 | **Mere levende figurer:** lidt større, blinker hver på sit tidspunkt, ånder når de sidder, og en tænkeboble med … i stedet for "Tænker". | M | ✅ |
 | 34 | **Del kontoret med teamet igen,** fx via Supabase, nu hvor tegningen ikke længere ligger i panelet. | L | ⬜ |
 
+## 🎨 Siden rundt om kontoret
+
+| # | Hvad | Str. | Status |
+|---|---|---|---|
+| 46 | **En lækrere side rundt om kontoret.** I dag er det en rå overskrift og en tekstliste på mørk baggrund. Idéer: en topbjælke med navn, saldo som et rigtigt mærke og forbindelsesstatus som en lille prik; listen over hvem der laver hvad som kort med pixel-portræt, navn, opgave og en farvet statuspille; en ramme om kontoret, der passer til pixel-stilen; en pænere tom tilstand, når ingen sessioner kører; bedre lyst og mørkt tema; og de knapper, spillet får brug for (butik, vis hele). | M | ⬜ |
+
 ## 🎮 Spillet
 
 | # | Hvad | Str. | Status |
