@@ -435,3 +435,38 @@ test('each helper keeps its own count of tools, lines and latest steps for its c
   expect(stats.tools).toBe(1)
   expect(stats.recent[0]?.detail).toBe('Sender en hjælper afsted')
 })
+
+test('an older server from before an update is asked to step down, and the new one started', async ($, on) => {
+  engine(on)
+  let version: string | null = '0.1.0'
+  const calls: string[] = []
+  on('env.get', (_, e) => ({ value: e.name === 'OS' ? 'Windows_NT' : undefined }) as never)
+  on('fs.read', (_, e) => ({ value: e.path.split(String.fromCharCode(92)).join('/').endsWith('.claude-plugin/plugin.json') ? JSON.stringify({ version: '0.14.0' }) : '' }) as never)
+  on('http.fetch', (_, e) => {
+    const path = new URL(e.url).pathname
+    calls.push(`${e.init?.method ?? 'GET'} ${path}`)
+    if (path === '/api/quit') version = null
+    if (version === null) throw new Error('ECONNREFUSED')
+    if (path === '/api/state') return { value: { status: 200, ok: true, headers: {}, text: JSON.stringify({ token: 'secret' }) } } as never
+    return { value: { status: 200, ok: true, headers: {}, text: JSON.stringify({ ok: true, app: 'agent-kontor', version }) } } as never
+  })
+  on('process.run', (_, e) => {
+    if (e.argv.includes('--detach')) {
+      calls.push('start')
+      version = '0.14.0'
+    }
+    return { value: { exitCode: 0, stdout: '', stderr: '' } } as never
+  })
+
+  await $.session.start(start())
+  await $.command.run({ command: 'kontor', args: '' } as never)
+  expect(calls).toContain('POST /api/quit')
+  expect(calls.indexOf('start')).toBeGreaterThan(calls.indexOf('POST /api/quit'))
+
+  // A newer server is left alone by an older mod.
+  calls.length = 0
+  version = '0.20.0'
+  await $.command.run({ command: 'kontor', args: '' } as never)
+  expect(calls).not.toContain('POST /api/quit')
+  expect(calls).not.toContain('start')
+})

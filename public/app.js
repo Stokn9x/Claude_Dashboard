@@ -1778,6 +1778,11 @@ let isChosen = focusKey !== null
 
 const focused = () => state.sessions.find(s => s.key === focusKey) ?? state.sessions[0] ?? null
 
+// Where each helper last had its place, and the walks to a new one
+const lastPlaces = new Map()
+const moves = new Map()
+const MOVE_MS = 2500
+
 // Where each figure stood in the last frame, for clicks: { kind, id, x0, y0, x1, y1 }
 // in world units, later entries drawn on top.
 let hits = []
@@ -1800,9 +1805,12 @@ const draw = () => {
 
   const main = s?.main ?? { state: 'idle', detail: 'Ingen session' }
   const kitchenSpot = coffeeSpot()
-  // On a break Claude goes to the kitchen; with no kitchen it stays put.
-  const isOut = main.state === 'idle' && !!kitchenSpot
   const subs = s?.subs ?? []
+  // A helper on its way with a result finds Claude at the desk, not an
+  // empty chair: Claude leaves the kitchen or the meeting to take it.
+  const isReceiving = subs.some(x => x.phase === 'delivering')
+  // On a break Claude goes to the kitchen; with no kitchen it stays put.
+  const isOut = main.state === 'idle' && !!kitchenSpot && !isReceiving
   const walks = { ...WALKS, ...(s?.walks ?? {}) }
   const list = desks()
 
@@ -1849,8 +1857,25 @@ const draw = () => {
     const pose = e && sub.phase === 'working' && sub.activity.state !== 'waiting' ? errandPose(home, e, now) : null
     if (pose) onErrand.set(sub.id, pose)
   }
+  // A helper whose place changed while at work (a new desk was bought for
+  // it) gets up and walks there, rather than appearing at the desk.
+  for (const sub of subs) {
+    if (sub.phase !== 'working') {
+      lastPlaces.delete(sub.id)
+      continue
+    }
+    const spot = placeOf(sub.seat).spot
+    const before = lastPlaces.get(sub.id)
+    if (before && (before.x !== spot.x || before.y !== spot.y)) moves.set(sub.id, { from: before, to: spot, start: now })
+    lastPlaces.set(sub.id, spot)
+    const move = moves.get(sub.id)
+    if (!move) continue
+    const k = (now - move.start) / MOVE_MS
+    if (k >= 1) moves.delete(sub.id)
+    else if (!onErrand.has(sub.id)) onErrand.set(sub.id, walkAt(route(move.from, move.to), k))
+  }
   // Claude at the head of the meeting table
-  const claudeMeeting = meeting?.withClaude ? errandPose({ x: MAIN.cx, y: MAIN.dy - 6 }, { kind: 'meeting', start: meeting.start, stay: STAY.meeting, dest: meeting.head }, now) : null
+  const claudeMeeting = meeting?.withClaude && !isReceiving ? errandPose({ x: MAIN.cx, y: MAIN.dy - 6 }, { kind: 'meeting', start: meeting.start, stay: STAY.meeting, dest: meeting.head }, now) : null
 
   // Claude
   const isAtDesk = !isOut && !claudeMeeting
@@ -1976,6 +2001,27 @@ const draw = () => {
 
   evening(timeNow, glowing)
 
+  // Signs over what is for sale, and building work: above the people, under
+  // what they say
+  if (typeof nextPrice === 'number' && list.length < slots.length) {
+    const { cx, dy } = slots[list.length]
+    forSaleSign(cx, dy, nextPrice, (state.game?.kroner ?? 0) >= nextPrice, t)
+  }
+  // Signs on everything else for sale: lots, and furniture spots
+  for (const sale of forSaleNow()) {
+    const canAfford = (state.game?.kroner ?? 0) >= sale.price
+    if (sale.isFurniture) {
+      ctx.setLineDash([3, 3])
+      rounded(sale.x - 34, sale.y - 14, 68, 28, 4, 'rgba(255,255,255,0.18)', canAfford ? '#2E9E8F' : '#8A94A0', 1.2)
+      ctx.setLineDash([])
+    }
+    const bob = canAfford ? Math.sin(t / 300 + sale.x) * 1 : 0
+    tag(sale.x, sale.y - 6 + bob, `${ITEMS[sale.item].name}: ${kr(sale.price)}`, canAfford ? '#2E9E8F' : '#5B6672')
+    if (!sale.isFurniture) label(canAfford ? 'Klik for at bygge' : 'Ledig grund', sale.x, sale.y + 14, 6.5, canAfford ? '#21776B' : '#4E6A3A', 600)
+    frameHits.push({ kind: 'shop', id: sale.item, x0: sale.x - 46, y0: sale.y - 12, x1: sale.x + 46, y1: sale.y + 18 })
+  }
+  construction(now, t)
+
   // Speech, on top of everyone
   const thanking = walkers.find(w => w.pose.handover)
   if (isOut) {
@@ -2002,24 +2048,6 @@ const draw = () => {
       if (grumble) bubble(spot.x, spot.y - 44, grumble, false, t)
     }
   }
-  if (typeof nextPrice === 'number' && list.length < slots.length) {
-    const { cx, dy } = slots[list.length]
-    forSaleSign(cx, dy, nextPrice, (state.game?.kroner ?? 0) >= nextPrice, t)
-  }
-  // Signs on everything else for sale: lots, and furniture spots
-  for (const sale of forSaleNow()) {
-    const canAfford = (state.game?.kroner ?? 0) >= sale.price
-    if (sale.isFurniture) {
-      ctx.setLineDash([3, 3])
-      rounded(sale.x - 34, sale.y - 14, 68, 28, 4, 'rgba(255,255,255,0.18)', canAfford ? '#2E9E8F' : '#8A94A0', 1.2)
-      ctx.setLineDash([])
-    }
-    const bob = canAfford ? Math.sin(t / 300 + sale.x) * 1 : 0
-    tag(sale.x, sale.y - 6 + bob, `${ITEMS[sale.item].name}: ${kr(sale.price)}`, canAfford ? '#2E9E8F' : '#5B6672')
-    if (!sale.isFurniture) label(canAfford ? 'Klik for at bygge' : 'Ledig grund', sale.x, sale.y + 14, 6.5, canAfford ? '#21776B' : '#4E6A3A', 600)
-    frameHits.push({ kind: 'shop', id: sale.item, x0: sale.x - 46, y0: sale.y - 12, x1: sale.x + 46, y1: sale.y + 18 })
-  }
-  construction(now, t)
   // On a break: banter in the kitchen, ping and pong, status at the meeting
   const onFloorIds = new Set(subs.filter(x => x.seat >= list.length).map(x => x.id))
   const inKitchen = walkers.filter(w => w.pose.isThere && w.pose.errand.kind === 'coffee').map(w => w.sub)
@@ -2636,7 +2664,9 @@ const renderShop = () => {
         ...mood.parts.map(part =>
           el('li', {}, [
             el('span', { className: part.points < 0 ? 'minus' : 'plus' }, [`${part.points > 0 ? '+' : ''}${part.points}`]),
-            part.what === 'floor' ? `${part.count} på gulvet` : ITEMS[part.what]?.name ?? part.what,
+            part.what === 'floor'
+              ? `${part.count} på gulvet${part.project && part.project !== focused()?.project ? ` i ${part.project}` : ''}`
+              : ITEMS[part.what]?.name ?? part.what,
           ]),
         ),
       )

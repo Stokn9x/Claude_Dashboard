@@ -437,8 +437,64 @@ const ensureServer = ($: $) => {
   return starting
 }
 
+// Which version of the server answers, or null when none does.
+const runningVersion = async ($: $) => {
+  try {
+    const res = await $.http.fetch(`${ADDRESS}/health`)
+    const health = JSON.parse(res.text) as { app?: string; version?: string }
+    return res.ok && health.app === 'agent-kontor' ? (health.version ?? '') : null
+  } catch {
+    return null
+  }
+}
+
+// This mod's own version, from its plugin.json.
+let ownVersion: string | null = null
+const myVersion = async ($: $) => {
+  if (ownVersion === null) {
+    try {
+      const text = await $.fs.read(`${slashed($.plugin.root)}/.claude-plugin/plugin.json`)
+      ownVersion = (JSON.parse(String(text)) as { version?: string }).version ?? ''
+    } catch {
+      ownVersion = ''
+    }
+  }
+  return ownVersion
+}
+
+// 0.13.1 is older than 0.14.0; anything that is not a version is never older.
+const isOlder = (a: string, b: string) => {
+  const pa = a.split('.').map(Number)
+  const pb = b.split('.').map(Number)
+  if (!a || !b || [...pa, ...pb].some(Number.isNaN)) return false
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    if ((pa[i] ?? 0) !== (pb[i] ?? 0)) return (pa[i] ?? 0) < (pb[i] ?? 0)
+  }
+  return false
+}
+
+// A server from before an update keeps its old code in memory. It is asked
+// to step down, with the token that only the office's own pages and the
+// processes on this computer can read, and the new one takes its place.
+const retireOldServer = async ($: $) => {
+  try {
+    const state = await $.http.fetch(`${ADDRESS}/api/state`)
+    const { token } = JSON.parse(state.text) as { token?: string }
+    if (token) await $.http.fetch(`${ADDRESS}/api/quit`, { method: 'POST', headers: { 'x-kontor-token': token } })
+  } catch {
+    // Already gone, or going.
+  }
+  for (let i = 0; i < 10 && (await runningVersion($)) !== null; i++) await new Promise<void>(done => $.clock.after(200, done))
+}
+
 const startServer = async ($: $) => {
-  if (await isServerUp($)) return true
+  const running = await runningVersion($)
+  if (running !== null) {
+    // Only an older server is replaced: a session still on an older mod
+    // must not keep stopping a newer one.
+    if (!isOlder(running, await myVersion($))) return true
+    await retireOldServer($)
+  }
   const run = await $.process.run(['node', `${slashed($.plugin.root)}/server/server.mjs`, '--detach'], { timeoutMs: 10_000 }).catch(() => null)
   if (!run || run.exitCode !== 0) return false
   for (let i = 0; i < 10; i++) {

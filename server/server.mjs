@@ -15,7 +15,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-const VERSION = '0.13.0'
+const VERSION = '0.13.1'
 const HOST = '127.0.0.1'
 const PORT = Number(process.env.AGENT_KONTOR_PORT || 4747)
 const HERE = path.dirname(fileURLToPath(import.meta.url))
@@ -96,21 +96,30 @@ const WELLBEING = {
   perFloorSitter: -8,
 }
 const LIFTS = ['kitchen', 'toilet', 'lounge', 'pingpong', 'meeting', 'plants', 'art', 'neon', 'espresso', 'aquarium', 'chairs', 'screens']
-// Helpers on the floor right now: the most any session has beyond the desks.
+// Helpers on the floor right now: the most any session has beyond the
+// desks, and which session that is (the page names it when it is not the
+// one in view).
 let floorNow = 0
+let floorWhere = ''
 
 const wellbeing = () => {
   const parts = [{ what: 'Grundniveau', points: WELLBEING.base }]
   for (const item of LIFTS) {
     if (game.owned.rooms.includes(item)) parts.push({ what: item, points: WELLBEING[item] })
   }
-  if (floorNow > 0) parts.push({ what: 'floor', count: floorNow, points: floorNow * WELLBEING.perFloorSitter })
+  if (floorNow > 0) parts.push({ what: 'floor', count: floorNow, project: floorWhere, points: floorNow * WELLBEING.perFloorSitter })
   const score = Math.max(0, Math.min(100, parts.reduce((sum, p) => sum + p.points, 0)))
   return { score, multiplier: 0.8 + (0.4 * score) / 100, parts }
 }
 
-const floorSittersIn = sessions =>
-  Math.max(0, ...sessions.map(s => (s.subs ?? []).filter(sub => sub.phase === 'arriving' || sub.phase === 'working').length - game.owned.desks))
+const floorSittersIn = sessions => {
+  let most = { count: 0, project: '' }
+  for (const s of sessions) {
+    const count = (s.subs ?? []).filter(sub => sub.phase === 'arriving' || sub.phase === 'working').length - game.owned.desks
+    if (count > most.count) most = { count, project: s.project ?? '' }
+  }
+  return most
+}
 
 const credit = (status, now) => {
   const earned = status.earned
@@ -349,7 +358,7 @@ const send = (res, text) => {
 
 const publish = (isForced = false) => {
   sessionsNow = readSessions()
-  floorNow = floorSittersIn(sessionsNow)
+  ;({ count: floorNow, project: floorWhere } = floorSittersIn(sessionsNow))
   checkAchievements(Date.now())
   pruneCredited(Date.now())
   pruneDays()
@@ -439,6 +448,16 @@ const server = http.createServer((req, res) => {
     return
   }
   if (req.method === 'POST' && url.pathname === '/api/buy') return handleBuy(req, res)
+  // A newer mod asks an older server to step down: it saves and stops, and
+  // the mod starts the new one.
+  if (req.method === 'POST' && url.pathname === '/api/quit') {
+    if (req.headers['x-kontor-token'] !== TOKEN) return res.writeHead(403).end()
+    res.writeHead(200, { 'content-type': 'application/json' }).end('{"ok":true}')
+    saveGame()
+    for (const listener of listeners) listener.end()
+    setTimeout(() => process.exit(0), 100)
+    return
+  }
   if (req.method !== 'GET') {
     res.writeHead(403).end()
     return

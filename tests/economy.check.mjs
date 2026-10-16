@@ -142,6 +142,12 @@ check('100.000 lines not yet', achieved['lines-100k'], false)
 const g0 = await game()
 check('plants are for sale', typeof g0.next.plants, 'number')
 
+// Stepping down for a newer server: only with the token
+check('quit without the token is refused', (await fetch(`http://127.0.0.1:${PORT}/api/quit`, { method: 'POST' })).status, 403)
+check('quit with the token works', (await fetch(`http://127.0.0.1:${PORT}/api/quit`, { method: 'POST', headers: { 'x-kontor-token': token } })).status, 200)
+await sleep(500)
+check('and the server is gone', await fetch(`http://127.0.0.1:${PORT}/health`).then(() => 'up', () => 'gone'), 'gone')
+
 child.kill()
 fs.rmSync(home, { recursive: true, force: true })
 process.exitCode = failures ? 1 : 0
