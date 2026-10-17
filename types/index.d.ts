@@ -115,6 +115,11 @@ export type Office = {
   // Where each agent comes from: yours, the project's, the organisation's,
   // a plugin's (or somewhere else, as the engine words it).
   agentSources: Record<string, AgentSource>
+  // The language chosen on the office page (the server's prefs.json), for
+  // the mod's own words: the button, the panel, its messages. Null until
+  // chosen: Danish. What it writes for the page stays Danish; the page
+  // turns it into English itself.
+  lang: 'da' | 'en' | null
 }
 
 export type AgentSource = 'user' | 'project' | 'org' | 'plugin' | 'other'

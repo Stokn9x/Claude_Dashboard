@@ -8,6 +8,7 @@ import { el, kr } from './util.js'
 import { CHAINS, ITEMS } from './plan.js'
 import { eventsBetween } from './activity.js'
 import { addEvents } from './feed.js'
+import { L } from './i18n.js'
 
 const shop = document.getElementById('shop')
 let shopMessage = ''
@@ -21,14 +22,21 @@ export const onBought = fn => {
 
 // A row is one thing, or a room that grows: then it offers the next step.
 const GROUPS = [
-  ['Pladser og rum', ['desk', CHAINS.team, CHAINS.kitchen, CHAINS.lounge, CHAINS.toilet, 'meeting', 'reception', 'pingpong']],
-  ['Pynt og opgraderinger', ['plants', 'rugs', 'cat', 'art', 'neon', 'espresso', 'aquarium', 'chairs', 'screens']],
+  [L('Pladser og rum', 'Seats and rooms'), ['desk', CHAINS.team, CHAINS.kitchen, CHAINS.lounge, CHAINS.toilet, 'meeting', 'reception', 'pingpong']],
+  [L('Pynt og opgraderinger', 'Decor and upgrades'), ['plants', 'rugs', 'cat', 'art', 'neon', 'espresso', 'aquarium', 'chairs', 'screens']],
 ]
 // A chain's step now: the first not bought, or its last once all are.
 const stepNow = (steps, g) => steps.find(item => !g.owned.rooms.includes(item)) ?? steps[steps.length - 1]
-const RATE_TEXT = { added: 'linje tilføjet', removed: 'linje fjernet', delivered: 'opgave afleveret af en hjælper', tests: 'grønne tests (højst hvert 10. minut)', commits: 'commit', prs: 'pull request' }
+const RATE_TEXT = {
+  added: L('linje tilføjet', 'line added'),
+  removed: L('linje fjernet', 'line removed'),
+  delivered: L('opgave afleveret af en hjælper', 'task handed over by a helper'),
+  tests: L('grønne tests (højst hvert 10. minut)', 'green tests (at most every 10 minutes)'),
+  commits: 'commit',
+  prs: 'pull request',
+}
 export const moodFace = score => (score < 35 ? '😟' : score < 60 ? '🙂' : '😄')
-const decimal = n => String(n).replace('.', ',')
+const decimal = n => L(String(n).replace('.', ','), String(n))
 
 export const buyItem = async item => {
   if (isBuying || !store.state.token) return
@@ -43,9 +51,9 @@ export const buyItem = async item => {
       addEvents(eventsBetween(store.state, { ...store.state, game: answer.game }))
       store.state.game = answer.game
     }
-    shopMessage = res.ok ? (item === 'desk' ? 'Købt! Den næste hjælper uden plads sætter sig ved det.' : `Købt! ${ITEMS[item]?.name ?? 'Det'} bliver bygget nu.`) : answer.error ?? 'Det gik ikke'
+    shopMessage = res.ok ? (item === 'desk' ? L('Købt! Den næste hjælper uden plads sætter sig ved det.', 'Bought! The next helper without a seat will sit there.') : L(`Købt! ${ITEMS[item]?.name ?? 'Det'} bliver bygget nu.`, `Bought! ${ITEMS[item]?.name ?? 'It'} is being built now.`)) : answer.error ?? L('Det gik ikke', 'That did not work')
   } catch {
-    shopMessage = 'Kontoret svarer ikke lige nu'
+    shopMessage = L('Kontoret svarer ikke lige nu', 'The office is not answering right now')
   }
   isBuying = false
   afterBuy()
@@ -76,11 +84,11 @@ const buildShop = g => {
   const moodNote = el('p', { className: 'hint' }, [''])
   const moodParts = el('ul', { className: 'mood-parts' }, [])
   shop.replaceChildren(
-    el('div', { className: 'shop-saldo' }, [el('span', { className: 'coin', ariaHidden: 'true' }, []), saldoValue, el('span', { className: 'hint' }, ['til at bygge for'])]),
+    el('div', { className: 'shop-saldo' }, [el('span', { className: 'coin', ariaHidden: 'true' }, []), saldoValue, el('span', { className: 'hint' }, [L('til at bygge for', 'to build with')])]),
     message,
-    el('section', { className: 'mood-box' }, [el('div', { className: 'item-head' }, [el('strong', {}, ['Trivsel']), moodScore]), el('span', { className: 'mood-bar' }, [moodBar]), moodNote, moodParts]),
+    el('section', { className: 'mood-box' }, [el('div', { className: 'item-head' }, [el('strong', {}, [L('Trivsel', 'Wellbeing')]), moodScore]), el('span', { className: 'mood-bar' }, [moodBar]), moodNote, moodParts]),
     ...GROUPS.flatMap(([title, items]) => [el('h3', {}, [title]), el('ul', { className: 'items' }, rows.filter(r => items.includes(r.entry)).map(r => r.li))]),
-    el('h3', {}, ['Sådan tjener du kroner']),
+    el('h3', {}, [L('Sådan tjener du kroner', 'How you earn kroner')]),
     el('ul', { className: 'rates' }, rates),
   )
   return { saldoValue, message, rows, moodScore, moodBar, moodNote, moodParts }
@@ -90,7 +98,10 @@ const renderMood = (p, mood) => {
   p.moodScore.textContent = `${moodFace(mood.score)} ${mood.score}`
   p.moodBar.style.width = `${mood.score}%`
   p.moodBar.style.background = mood.score < 35 ? '#E5484D' : mood.score < 60 ? '#D6A23C' : '#2E9E8F'
-  p.moodNote.textContent = `Arbejdet tjener ${decimal(mood.multiplier)} gange så meget. Rum og inventar hæver trivslen, hjælpere på gulvet sænker den.`
+  p.moodNote.textContent = L(
+    `Arbejdet tjener ${decimal(mood.multiplier)} gange så meget. Rum og inventar hæver trivslen, hjælpere på gulvet sænker den.`,
+    `Work earns ${decimal(mood.multiplier)} times as much. Rooms and furnishings raise wellbeing; helpers on the floor lower it.`,
+  )
   const key = JSON.stringify(mood.parts)
   if (p.moodParts.dataset.key === key) return
   p.moodParts.dataset.key = key
@@ -98,7 +109,7 @@ const renderMood = (p, mood) => {
     ...mood.parts.map(part =>
       el('li', {}, [
         el('span', { className: part.points < 0 ? 'minus' : 'plus' }, [`${part.points > 0 ? '+' : ''}${part.points}`]),
-        part.what === 'floor' ? `${part.count} på gulvet${part.project && part.project !== focused()?.project ? ` i ${part.project}` : ''}` : ITEMS[part.what]?.name ?? part.what,
+        part.what === 'floor' ? L(`${part.count} på gulvet`, `${part.count} on the floor`) + (part.project && part.project !== focused()?.project ? ` ${L('i', 'in')} ${part.project}` : '') : ITEMS[part.what]?.name ?? part.what,
       ]),
     ),
   )
@@ -108,7 +119,7 @@ export const renderShop = () => {
   const g = store.state.game
   if (!g) {
     parts = null
-    shop.replaceChildren(el('p', { className: 'empty' }, ['Butikken åbner, når kontoret er forbundet.']))
+    shop.replaceChildren(el('p', { className: 'empty' }, [L('Butikken åbner, når kontoret er forbundet.', 'The shop opens once the office is connected.')]))
     return
   }
   parts ??= buildShop(g)
@@ -131,24 +142,24 @@ export const renderShop = () => {
     const canAfford = isForSale && g.kroner >= price
     const isDesk = row.item === 'desk'
     const stepsOwned = row.steps.filter(step => g.owned.rooms.includes(step)).length
-    row.count.textContent = isDesk ? `${g.owned.desks} af ${g.maxDesks}` : row.steps.length > 1 ? `${stepsOwned} af ${row.steps.length}` : ''
+    row.count.textContent = isDesk ? L(`${g.owned.desks} af ${g.maxDesks}`, `${g.owned.desks} of ${g.maxDesks}`) : row.steps.length > 1 ? L(`${stepsOwned} af ${row.steps.length}`, `${stepsOwned} of ${row.steps.length}`) : ''
     row.button.hidden = !isForSale
     row.button.disabled = !canAfford || isBuying
-    row.button.textContent = isBuying ? 'Køber…' : isForSale ? `${isDesk ? `Køb nr. ${g.owned.desks + 1}` : 'Køb'} for ${kr(price)}` : ''
+    row.button.textContent = isBuying ? L('Køber…', 'Buying…') : isForSale ? L(`${isDesk ? `Køb nr. ${g.owned.desks + 1}` : 'Køb'} for ${kr(price)}`, `${isDesk ? `Buy no. ${g.owned.desks + 1}` : 'Buy'} for ${kr(price)}`) : ''
     row.missing.hidden = !isForSale || canAfford
-    row.missing.textContent = isForSale ? `Mangler ${kr(Math.max(0, price - g.kroner))}` : ''
+    row.missing.textContent = isForSale ? L(`Mangler ${kr(Math.max(0, price - g.kroner))}`, `${kr(Math.max(0, price - g.kroner))} to go`) : ''
     row.done.hidden = isForSale
     const isOwned = isDesk || g.owned.rooms.includes(row.item)
     const needs = ITEMS[row.item].needs
     row.done.textContent = !isOwned && needs
-      ? `Kan købes, når ${ITEMS[needs].name.toLowerCase()}n er bygget.`
+      ? L(`Kan købes, når ${ITEMS[needs].name.toLowerCase()}n er bygget.`, `Can be bought once the ${ITEMS[needs].name.toLowerCase()} is built.`)
       : isDesk
       ? g.owned.desks >= 22
-        ? 'Alle 22 skriveborde er købt.'
-        : `Alle ${g.maxDesks} skriveborde er købt. Udvid et teamrum for tre mere.`
+        ? L('Alle 22 skriveborde er købt.', 'All 22 desks are bought.')
+        : L(`Alle ${g.maxDesks} skriveborde er købt. Udvid et teamrum for tre mere.`, `All ${g.maxDesks} desks are bought. Expand a team room for three more.`)
       : row.steps.length > 1 && stepsOwned === row.steps.length
-        ? 'Fuldt udbygget ✓'
-        : 'Ejet ✓'
+        ? L('Fuldt udbygget ✓', 'Fully built ✓')
+        : L('Ejet ✓', 'Owned ✓')
     row.li.classList.toggle('is-owned', !isForSale && isOwned)
     row.progress.hidden = !isForSale || canAfford
     row.fill.style.width = isForSale ? `${Math.min(100, (100 * g.kroner) / price)}%` : '0%'

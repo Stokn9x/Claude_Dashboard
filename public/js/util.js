@@ -1,4 +1,5 @@
 // Small helpers every part of the page uses.
+import { L, locale } from './i18n.js'
 
 export const hashOf = id => {
   let h = 0
@@ -16,7 +17,7 @@ export const stir = (h, salt) => {
   return (x ^ (x >>> 16)) >>> 0
 }
 
-export const number = n => Math.floor(n).toLocaleString('da-DK')
+export const number = n => Math.floor(n).toLocaleString(locale())
 export const kr = n => `${number(n)} kr`
 export const clip = (text, max) => (text.length > max ? `${text.slice(0, max - 1)}…` : text)
 
@@ -32,14 +33,14 @@ export const el = (tagName, props = {}, children = []) => {
 
 // localStorage can be missing or throw (a private window, blocked storage);
 // the page works without it.
-export const remembered = key => {
+export function remembered(key) {
   try {
     return localStorage.getItem(`agent-kontor:${key}`)
   } catch {
     return null
   }
 }
-export const remember = (key, value) => {
+export function remember(key, value) {
   try {
     localStorage.setItem(`agent-kontor:${key}`, value)
   } catch {}
@@ -51,9 +52,10 @@ export const modelFamily = model => {
   const m = String(model ?? '')
   return /opus/i.test(m) ? 'Opus' : /sonnet/i.test(m) ? 'Sonnet' : /haiku/i.test(m) ? 'Haiku' : /fable/i.test(m) ? 'Fable' : null
 }
-// An agent type in Danish, for the card; one we do not know by its own name.
-const TYPE_TEXT = { Explore: 'Udforsker', Plan: 'Planlægger', 'general-purpose': 'Generalist' }
-export const typeText = type => (type ? TYPE_TEXT[type] ?? type : null)
+// An agent type in the page's language, for the card; one we do not know by
+// its own name.
+const typeTexts = () => ({ Explore: L('Udforsker', 'Explorer'), Plan: L('Planlægger', 'Planner'), 'general-purpose': 'Generalist' })
+export const typeText = type => (type ? typeTexts()[type] ?? type : null)
 
 // A regular (one of your own agents) by the name it was given on the page,
 // over its agent's own; `agentName` keeps the own one for the card.

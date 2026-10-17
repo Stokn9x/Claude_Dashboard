@@ -4,6 +4,7 @@
 // turned on (the browser asks first), a notice pops up too, but only when
 // the office's tab is hidden: in view, the page shows it already.
 import { remember, remembered } from './util.js'
+import { L } from './i18n.js'
 
 const TITLE = 'Agent-kontor'
 const button = document.getElementById('notify')
@@ -20,10 +21,16 @@ const render = () => {
   button.ariaPressed = String(isActive)
   button.title =
     Notification.permission === 'denied'
-      ? 'Browseren har blokeret beskeder fra kontoret. Det kan ændres i browserens indstillinger for siden.'
+      ? L('Browseren har blokeret beskeder fra kontoret. Det kan ændres i browserens indstillinger for siden.', 'The browser has blocked notifications from the office. You can change that in the browser’s settings for the page.')
       : isActive
-        ? 'Du får en besked, når nogen venter på dig, eller Claude er færdig med en lang opgave, og fanen er skjult. Klik for at slå det fra.'
-        : 'Få en besked, når nogen venter på dig, eller Claude er færdig med en lang opgave, og fanen er skjult.'
+        ? L(
+            'Du får en besked, når nogen venter på dig, eller Claude er færdig med en lang opgave, og fanen er skjult. Klik for at slå det fra.',
+            'You get a notification when someone is waiting for you, or Claude has finished a long task, while the tab is hidden. Click to turn it off.',
+          )
+        : L(
+            'Få en besked, når nogen venter på dig, eller Claude er færdig med en lang opgave, og fanen er skjult.',
+            'Get a notification when someone is waiting for you, or Claude has finished a long task, while the tab is hidden.',
+          )
 }
 
 button.addEventListener('click', async () => {
@@ -47,7 +54,7 @@ document.addEventListener('visibilitychange', () => {
 
 // A notice for each new wait, and for Claude done with a long turn, while
 // the tab is hidden.
-const HEADS = { waiting: 'Claude venter på dig', done: 'Claude er færdig' }
+const HEADS = { waiting: L('Claude venter på dig', 'Claude is waiting for you'), done: L('Claude er færdig', 'Claude is done') }
 export const notifyFor = events => {
   if (!document.hidden) return
   const done = events.find(x => x.kind === 'done')
@@ -69,7 +76,7 @@ export const notifyFor = events => {
 // The tab's title: a red dot and the count while anyone waits for you.
 export const titleFor = state => {
   const waiting = (state.sessions ?? []).reduce((n, s) => n + (s.main?.state === 'waiting' ? 1 : 0) + (s.subs ?? []).filter(x => x.activity?.state === 'waiting').length, 0)
-  document.title = waiting ? `🔴 ${waiting === 1 ? 'Venter på dig' : `${waiting} venter på dig`} · ${TITLE}` : doneUnseen ? `✅ Færdig · ${TITLE}` : TITLE
+  document.title = waiting ? `🔴 ${waiting === 1 ? L('Venter på dig', 'Waiting for you') : L(`${waiting} venter på dig`, `${waiting} waiting for you`)} · ${TITLE}` : doneUnseen ? `✅ ${L('Færdig', 'Done')} · ${TITLE}` : TITLE
 }
 
 render()

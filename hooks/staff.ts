@@ -88,3 +88,21 @@ export async function readCrew($: $) {
   const o = await readOffice($)
   if (JSON.stringify([removed, added]) !== JSON.stringify([o.removed, o.added])) await update($, office, x => ({ ...x, removed, added }))
 }
+
+// The language chosen on the office page, kept by the server beside crew.json.
+export async function readPrefs($: $) {
+  const home = (await $.env.get('USERPROFILE')) ?? (await $.env.get('HOME'))
+  if (!home) return
+  const text = await $.fs.read(`${slashed(home)}/.claude/agent-kontor/prefs.json`).catch(() => null)
+  let lang: 'da' | 'en' | null = null
+  if (typeof text === 'string') {
+    try {
+      const saved = (JSON.parse(text) as { lang?: unknown }).lang
+      lang = saved === 'da' || saved === 'en' ? saved : null
+    } catch {
+      return
+    }
+  }
+  const o = await readOffice($)
+  if (lang !== o.lang) await update($, office, x => ({ ...x, lang }))
+}

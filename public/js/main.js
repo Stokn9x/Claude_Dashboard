@@ -14,7 +14,7 @@ import { playFor } from './sound.js'
 import { notifyFor, titleFor } from './notify.js'
 import { settle } from './routes.js'
 import { crewNamed } from './util.js'
-import { inLanguage, keepLang, lang, translateStatic } from './i18n.js'
+import { L, inLanguage, keepLang, lang, translateStatic } from './i18n.js'
 import { saveLang } from './settings.js'
 import './tip.js'
 import './tv.js'
@@ -76,11 +76,11 @@ const setConnection = (className, text) => {
 
 const connect = () => {
   const events = new EventSource('/api/events')
-  events.onopen = () => setConnection('live', 'Forbundet til kontoret')
+  events.onopen = () => setConnection('live', L('Forbundet til kontoret', 'Connected to the office'))
   events.onmessage = e => receive(JSON.parse(e.data))
   // The browser tries again by itself every two seconds; a session that has
   // the office open starts the server again within a minute.
-  events.onerror = () => setConnection('lost', 'Forbindelsen er tabt')
+  events.onerror = () => setConnection('lost', L('Forbindelsen er tabt', 'Connection lost'))
 }
 
 // The next frame is asked for first, so one frame that throws (say, drawn

@@ -474,3 +474,26 @@ test('a regular between jobs on the floor costs no wellbeing; one at work does',
     await stop(child)
   }
 })
+
+test('the language is chosen on the page, kept in prefs.json, and the server speaks it', async () => {
+  const home = newHome()
+  const child = await start(home)
+  const prefsFile = path.join(home, '.claude', 'agent-kontor', 'prefs.json')
+  try {
+    const { game, token } = JSON.parse((await get('/api/state')).body)
+    assert.deepEqual(game.prefs, { lang: null })
+    assert.equal(game.achievements.find(a => a.id === 'kitchen').name, 'Kaffekultur')
+    const post = body => fetch(`http://127.0.0.1:${PORT}/api/prefs`, { method: 'POST', headers: { origin: `http://127.0.0.1:${PORT}`, 'x-kontor-token': token }, body: JSON.stringify(body) })
+    assert.equal((await post({ lang: 'fr' })).status, 400)
+    assert.equal((await post({ lang: 'en' })).status, 200)
+    const after = JSON.parse((await get('/api/state')).body).game
+    assert.deepEqual(after.prefs, { lang: 'en' })
+    assert.equal(after.achievements.find(a => a.id === 'kitchen').name, 'Coffee culture')
+    assert.equal(after.wellbeing.parts[0].what, 'Base level')
+    assert.deepEqual(JSON.parse(fs.readFileSync(prefsFile, 'utf8')), { lang: 'en' })
+    const poor = await fetch(`http://127.0.0.1:${PORT}/api/buy`, { method: 'POST', headers: { origin: `http://127.0.0.1:${PORT}`, 'x-kontor-token': token }, body: '{"item":"desk"}' })
+    assert.match((await poor.json()).error, /^It costs \d+ kr, and you have 0 kr$/)
+  } finally {
+    await stop(child)
+  }
+})

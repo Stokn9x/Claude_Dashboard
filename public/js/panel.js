@@ -14,7 +14,7 @@ import { WALKS } from './routes.js'
 import { renderShop, moodFace } from './shop.js'
 import { renderProgress, announce } from './progress.js'
 import { offSince } from './idle.js'
-import { modText } from './i18n.js'
+import { L, locale, modText } from './i18n.js'
 
 const tabs = document.getElementById('tabs')
 const people = document.getElementById('people')
@@ -31,13 +31,21 @@ const sections = { people, shop: document.getElementById('shop'), progress: docu
 const dot = state => el('span', { className: 'dot', style: `background:${stateColor[state] ?? '#8A94A0'}` })
 
 // What a state is called on its pill
-const PILL = { reading: 'Læser', editing: 'Skriver', running: 'Kører', browsing: 'Nettet', waiting: 'Venter på dig', working: 'Arbejder', idle: 'Pause' }
+const PILL = {
+  reading: L('Læser', 'Reading'),
+  editing: L('Skriver', 'Writing'),
+  running: L('Kører', 'Running'),
+  browsing: L('Nettet', 'Web'),
+  waiting: L('Venter på dig', 'Waiting for you'),
+  working: L('Arbejder', 'Working'),
+  idle: L('Pause', 'Break'),
+}
 const pill = (state, detail) => {
   const colour = stateColor[state] ?? '#8A94A0'
   // A teammate between its turns, or a regular between jobs, is ready for
   // work, not on a break.
   const isReady = state === 'idle' && (detail === modText('Venter på en besked') || detail === modText('Klar til en opgave'))
-  const text = state === 'working' && detail === modText('Tænker') ? modText('Tænker') : isReady ? 'Ledig' : PILL[state] ?? state
+  const text = state === 'working' && detail === modText('Tænker') ? modText('Tænker') : isReady ? L('Ledig', 'Ready') : PILL[state] ?? state
   return el('span', { className: 'pill', style: `color:${colour};background:color-mix(in srgb, ${colour} 16%, transparent)` }, [text])
 }
 // The heading says it already; the details need not say it again
@@ -97,7 +105,10 @@ const renderChips = () => {
   moodChip.hidden = !mood
   if (mood) {
     moodChip.textContent = `${moodFace(mood.score)} ${mood.score}`
-    moodChip.title = `Trivsel ${mood.score} af 100: arbejdet tjener ${String(mood.multiplier).replace('.', ',')} gange så meget. Klik for at se hvorfor.`
+    moodChip.title = L(
+      `Trivsel ${mood.score} af 100: arbejdet tjener ${String(mood.multiplier).replace('.', ',')} gange så meget. Klik for at se hvorfor.`,
+      `Wellbeing ${mood.score} of 100: work earns ${mood.multiplier} times as much. Click to see why.`,
+    )
   }
 }
 
@@ -109,7 +120,7 @@ const byStart = (a, b) => (a.startedAt ?? 0) - (b.startedAt ?? 0) || (a.key < b.
 const tabName = (x, sessions) => {
   const name = x.project || 'Session'
   if (sessions.filter(y => (y.project || 'Session') === name).length < 2 || !x.startedAt) return name
-  return `${name} · ${new Date(x.startedAt).toLocaleTimeString('da-DK', { hour: '2-digit', minute: '2-digit' })}`
+  return `${name} · ${new Date(x.startedAt).toLocaleTimeString(locale(),{ hour: '2-digit', minute: '2-digit' })}`
 }
 // Many sessions, or a narrow window: the tabs fold into the one in view and
 // a button with them all in a list. Built once; its text follows the count.
@@ -132,7 +143,7 @@ const pickerItems = () => {
   )
 }
 const openPicker = () => {
-  picker = el('div', { className: 'session-list', role: 'dialog', ariaLabel: 'Alle sessioner' }, pickerItems())
+  picker = el('div', { className: 'session-list', role: 'dialog', ariaLabel: L('Alle sessioner', 'All sessions') }, pickerItems())
   const r = allButton.getBoundingClientRect()
   picker.style.left = `${Math.max(8, Math.min(r.left, window.innerWidth - 348))}px`
   picker.style.top = `${r.bottom + 8}px`
@@ -168,7 +179,8 @@ const renderTabs = s => {
   tabsKey = key
   const waitingElsewhere = sessions.some(x => x !== s && x.main.state === 'waiting')
   allButton.textContent = `▾ ${sessions.length}`
-  allButton.title = waitingElsewhere ? `Alle ${sessions.length} sessioner · en venter på dig` : `Alle ${sessions.length} sessioner`
+  const all = L(`Alle ${sessions.length} sessioner`, `All ${sessions.length} sessions`)
+  allButton.title = waitingElsewhere ? `${all} · ${L('en venter på dig', 'one is waiting for you')}` : all
   allButton.ariaLabel = allButton.title
   allButton.classList.toggle('is-waiting', waitingElsewhere)
   tabs.replaceChildren(
@@ -186,13 +198,13 @@ const renderAlert = s => {
   const key = JSON.stringify([waiting.map(x => [x.key, x.main.detail]), waitingSubs.map(x => [x.id, x.activity.detail])])
   if (key === alertKey) return
   alertKey = key
-  const lines = [...waiting.map(x => `Claude i ${x.project}: ${withoutWaiting(x.main.detail)}`), ...waitingSubs.map(x => `${x.name}: ${withoutWaiting(x.activity.detail)}`)]
+  const lines = [...waiting.map(x => `${L('Claude i', 'Claude in')} ${x.project}: ${withoutWaiting(x.main.detail)}`), ...waitingSubs.map(x => `${x.name}: ${withoutWaiting(x.activity.detail)}`)]
   const wasHidden = alertBox.hidden
   alertBox.hidden = lines.length === 0
   alertBox.replaceChildren(
-    el('strong', {}, [lines.length === 1 ? 'Venter på dig' : `${lines.length} venter på dig`]),
+    el('strong', {}, [lines.length === 1 ? L('Venter på dig', 'Waiting for you') : L(`${lines.length} venter på dig`, `${lines.length} are waiting for you`)]),
     el('p', {}, [lines.join(' · ')]),
-    el('button', { type: 'button', onclick: lookAtWaiting }, ['Gå til']),
+    el('button', { type: 'button', onclick: lookAtWaiting }, [L('Gå til', 'Go there')]),
   )
   // On a narrow screen the banner takes room from the office.
   if (wasHidden !== alertBox.hidden) fit()
@@ -201,34 +213,34 @@ const renderAlert = s => {
 // When a helper off work goes home, in words: "går hjem om 2 min".
 const homeIn = (sub, now = Date.now()) => {
   const minutes = Math.max(1, Math.ceil((sub.since + ({ ...WALKS, ...(focused()?.walks ?? {}) }).idle - now) / 60_000))
-  return `Går hjem om ${minutes} min`
+  return L(`Går hjem om ${minutes} min`, `Going home in ${minutes} min`)
 }
 
 export const phaseLabel = (sub, onFloorFrom) =>
   offSince(sub, Date.now(), { ...WALKS, ...(focused()?.walks ?? {}) }) !== null
-    ? 'Holder fri'
+    ? L('Holder fri', 'Off work')
     : sub.outcome === 'failed' && (sub.phase === 'delivering' || sub.phase === 'leaving')
-    ? 'Gik i stå'
+    ? L('Gik i stå', 'Got stuck')
     : sub.phase === 'idle'
       ? homeIn(sub)
       : sub.phase === 'arriving'
       ? sub.from === 'idle'
-        ? 'Tilbage på arbejde'
+        ? L('Tilbage på arbejde', 'Back at work')
         : sub.from === 'handover'
-          ? 'Tilbage til skrivebordet'
-          : 'På vej ind'
+          ? L('Tilbage til skrivebordet', 'Back to the desk')
+          : L('På vej ind', 'On the way in')
       : sub.phase === 'delivering'
-        ? 'Afleverer'
+        ? L('Afleverer', 'Handing over')
         : sub.phase === 'leaving'
-          ? 'Går hjem'
+          ? L('Går hjem', 'Going home')
           : sub.seat < 0
-            ? 'Venter ved døren'
+            ? L('Venter ved døren', 'Waiting at the door')
             : onFloorFrom !== undefined && sub.seat >= onFloorFrom
               ? placeOf(sub.seat).isOutside
-                ? 'Venter på bænken'
+                ? L('Venter på bænken', 'Waiting on the bench')
                 : sub.staff
-                  ? 'Mangler et skrivebord'
-                  : 'Sidder på gulvet'
+                  ? L('Mangler et skrivebord', 'Needs a desk')
+                  : L('Sidder på gulvet', 'Sitting on the floor')
               : null
 
 const person = ({ key, name, look, state, detail, note, isClaude }) =>
@@ -248,18 +260,18 @@ const renderPeople = s => {
     people.replaceChildren(
       el('li', { className: 'empty' }, [
         el('span', { className: 'big' }, ['🏢']),
-        el('strong', {}, ['Kontoret er tomt']),
-        el('span', {}, ['Når en Claude-session med Agent-kontor kører, sætter Claude sig her, og hjælperne kommer ind ad døren.']),
+        el('strong', {}, [L('Kontoret er tomt', 'The office is empty')]),
+        el('span', {}, [L('Når en Claude-session med Agent-kontor kører, sætter Claude sig her, og hjælperne kommer ind ad døren.', 'When a Claude session with Agent-kontor is running, Claude sits down here and the helpers come in through the door.')]),
       ]),
     )
     return
   }
   const stats = s.stats ?? {}
   const facts = [
-    stats.linesAdded || stats.linesRemoved ? `+${stats.linesAdded} −${stats.linesRemoved} linjer` : null,
+    stats.linesAdded || stats.linesRemoved ? L(`+${stats.linesAdded} −${stats.linesRemoved} linjer`, `+${stats.linesAdded} −${stats.linesRemoved} lines`) : null,
     typeof stats.costUsd === 'number' ? `$${stats.costUsd.toFixed(2)}` : null,
-    typeof stats.fiveHour === 'number' ? `${Math.round(stats.fiveHour)} % af 5-timers-grænsen` : null,
-    typeof stats.context === 'number' ? `kontekst ${Math.round(stats.context)} %` : null,
+    typeof stats.fiveHour === 'number' ? L(`${Math.round(stats.fiveHour)} % af 5-timers-grænsen`, `${Math.round(stats.fiveHour)}% of the 5-hour limit`) : null,
+    typeof stats.context === 'number' ? L(`kontekst ${Math.round(stats.context)} %`, `context ${Math.round(stats.context)}%`) : null,
   ].filter(Boolean)
   // Those waiting for you first, then the rest as they came in; your own
   // agents, the regulars, in a group of their own above the helpers.
@@ -274,8 +286,8 @@ const renderPeople = s => {
   const row = sub => person({ key: sub.id, name: sub.name, look: lookFor(sub.id), state: sub.activity.state, detail: sub.activity.detail, note: [sub.task, phaseLabel(sub, onFloorFrom)].filter(Boolean).join(' · ') })
   people.replaceChildren(
     person({ key: 'claude', name: 'Claude', look: claudeLook, state: s.main.state, detail: s.main.detail, note: facts.join(' · ') || null, isClaude: true }),
-    ...(regulars.length ? [el('li', { className: 'section-label' }, [`Faste · ${regulars.length}`]), ...regulars.map(row)] : []),
-    ...(helpers.length ? [el('li', { className: 'section-label' }, [`Hjælpere · ${helpers.length}`]), ...helpers.map(row)] : []),
+    ...(regulars.length ? [el('li', { className: 'section-label' }, [`${L('Faste', 'Regulars')} · ${regulars.length}`]), ...regulars.map(row)] : []),
+    ...(helpers.length ? [el('li', { className: 'section-label' }, [`${L('Hjælpere', 'Helpers')} · ${helpers.length}`]), ...helpers.map(row)] : []),
   )
 }
 

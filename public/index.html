@@ -9,7 +9,7 @@
 </head>
 <body>
   <!-- The office fills the window; everything else floats over it. -->
-  <canvas id="office" aria-label="Kontoret set ovenfra. Træk for at flytte, rul for at zoome, og klik på en figur for at se, hvad den laver."></canvas>
+  <canvas id="office" aria-label="Kontoret set ovenfra. Træk for at flytte, rul for at zoome, og klik på en figur for at se, hvad den laver." data-en-label="The office seen from above. Drag to move, scroll to zoom, and click a figure to see what it is doing."></canvas>
 
   <header>
     <div class="hud topbar">
@@ -17,31 +17,31 @@
         <svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="3" width="12" height="12" rx="1" fill="#2F3A4A"/><rect x="2" y="3" width="12" height="2" fill="#5A6672"/><rect x="4" y="6" width="3" height="3" fill="#A9D8F5"/><rect x="9" y="6" width="3" height="3" fill="#A9D8F5"/><rect x="4" y="10" width="3" height="3" fill="#A9D8F5"/><rect x="9" y="10" width="3" height="5" fill="#C8643B"/></svg>
         <h1>Agent-kontor</h1>
       </div>
-      <nav class="tabs" id="tabs" aria-label="Sessioner"></nav>
+      <nav class="tabs" id="tabs" aria-label="Sessioner" data-en-label="Sessions"></nav>
     </div>
     <div class="hud chips">
       <button class="chip" id="mood" type="button" hidden></button>
-      <span class="chip" id="saldo" title="Tjent ved arbejdet i alle dine sessioner" hidden><span class="coin" aria-hidden="true"></span><span id="saldo-value"></span></span>
-      <button class="chip icon-chip" id="settings" type="button" aria-label="Indstillinger" hidden></button>
-      <button class="chip icon-chip" id="help" type="button" aria-label="Rundvisning" hidden></button>
-      <button class="chip icon-chip" id="tv" type="button" aria-label="Tv-tilstand" aria-pressed="false" hidden></button>
-      <button class="chip icon-chip" id="sound" type="button" aria-label="Lyd"></button>
-      <button class="chip icon-chip" id="notify" type="button" aria-label="Beskeder" hidden></button>
-      <span class="conn" id="conn" title="Forbinder…" role="status" aria-label="Forbinder"></span>
+      <span class="chip" id="saldo" title="Tjent ved arbejdet i alle dine sessioner" data-en-title="Earned by the work in all your sessions" hidden><span class="coin" aria-hidden="true"></span><span id="saldo-value"></span></span>
+      <button class="chip icon-chip" id="settings" type="button" aria-label="Indstillinger" data-en-label="Settings" hidden></button>
+      <button class="chip icon-chip" id="help" type="button" aria-label="Rundvisning" data-en-label="Tour" hidden></button>
+      <button class="chip icon-chip" id="tv" type="button" aria-label="Tv-tilstand" data-en-label="TV mode" aria-pressed="false" hidden></button>
+      <button class="chip icon-chip" id="sound" type="button" aria-label="Lyd" data-en-label="Sound"></button>
+      <button class="chip icon-chip" id="notify" type="button" aria-label="Beskeder" data-en-label="Notifications" hidden></button>
+      <span class="conn" id="conn" title="Forbinder…" data-en-title="Connecting…" role="status" aria-label="Forbinder" data-en-label="Connecting"></span>
     </div>
   </header>
 
-  <div class="lost-banner" id="lost" role="alert" hidden>Forbindelsen til kontoret er tabt. Siden prøver igen af sig selv; er Claude lukket, så tryk på 🏢 Åbn kontor i Claude.</div>
+  <div class="lost-banner" id="lost" role="alert" data-en="The connection to the office is lost. The page keeps trying by itself; if Claude is closed, press 🏢 Open office in Claude." hidden>Forbindelsen til kontoret er tabt. Siden prøver igen af sig selv; er Claude lukket, så tryk på 🏢 Åbn kontor i Claude.</div>
   <div class="waiting" id="alert" role="status" hidden></div>
 
-  <aside class="side" id="side" aria-label="Panel">
+  <aside class="side" id="side" aria-label="Panel" data-en-label="Panel">
     <div class="side-head">
       <div class="panels" role="tablist">
-        <button type="button" data-panel="people" aria-pressed="true">Hvem laver hvad</button>
-        <button type="button" data-panel="shop" aria-pressed="false">Butik</button>
-        <button type="button" data-panel="progress" aria-pressed="false">Fremskridt</button>
+        <button type="button" data-panel="people" aria-pressed="true" data-en="Who’s doing what">Hvem laver hvad</button>
+        <button type="button" data-panel="shop" aria-pressed="false" data-en="Shop">Butik</button>
+        <button type="button" data-panel="progress" aria-pressed="false" data-en="Progress">Fremskridt</button>
       </div>
-      <button class="fold" id="side-toggle" type="button" title="Fold panelet sammen" aria-label="Fold panelet sammen">‹</button>
+      <button class="fold" id="side-toggle" type="button" title="Fold panelet sammen" data-en-title="Fold the panel away" aria-label="Fold panelet sammen" data-en-label="Fold the panel away">‹</button>
     </div>
     <div class="side-body">
       <ul class="people" id="people"></ul>
@@ -49,13 +49,13 @@
       <section class="progress-panel" id="progress" hidden></section>
     </div>
   </aside>
-  <button class="hud side-open" id="side-open" type="button" hidden>☰ Panel</button>
+  <button class="hud side-open" id="side-open" type="button" data-en="☰ Panel" hidden>☰ Panel</button>
 
-  <section class="feed" id="feed" aria-label="Aktivitet" aria-live="polite" hidden></section>
-  <div class="card" id="card" role="dialog" aria-label="Detaljer" hidden></div>
+  <section class="feed" id="feed" aria-label="Aktivitet" data-en-label="Activity" aria-live="polite" hidden></section>
+  <div class="card" id="card" role="dialog" aria-label="Detaljer" data-en-label="Details" hidden></div>
   <div class="corner">
-    <button class="hud fit-all" id="fit-all" type="button" hidden>Vis hele kontoret</button>
-    <canvas class="minimap" id="minimap" aria-label="Oversigt over kontoret" hidden></canvas>
+    <button class="hud fit-all" id="fit-all" type="button" data-en="Show the whole office" hidden>Vis hele kontoret</button>
+    <canvas class="minimap" id="minimap" aria-label="Oversigt over kontoret" data-en-label="Overview of the office" hidden></canvas>
   </div>
   <div class="toasts" id="toasts" aria-live="polite"></div>
   <script type="module" src="/js/main.js"></script>

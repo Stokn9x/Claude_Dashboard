@@ -1,14 +1,14 @@
 import { atom, update } from 'claude-code'
 import type { Register, RenderElement } from 'claude-code'
 import type { AgentState, Phase } from '../types'
-import { emptyOffice, thinking, pause, readOffice, quietly } from './office'
+import { emptyOffice, thinking, pause, readOffice, quietly, T } from './office'
 import type { $ } from './office'
 import { base, activityFor } from './activity'
 import { setMain, setActivity, noteTool, arrive, deliver, handIn, teammateWaits, wakes, TIDY_MS, tidy, sweepAgents, runDemo } from './helpers'
 import { LINES_PER_EDIT, earn, partiesFor, creditCommit, celebrate, countPatch, countLines } from './earnings'
 import type { Patch } from './earnings'
 import { ADDRESS, WRITE_MS, READ_MS, SERVER_CHECK_MS, whyNoServer, writeStatus, readOthers, readGame, leaveOffice, openOffice, keepServer } from './status'
-import { AGENTS_MS, findAgents, readCrew, isOf, isAtWork } from './staff'
+import { AGENTS_MS, findAgents, readCrew, readPrefs, isOf, isAtWork } from './staff'
 
 // The session's office in $.state: the engine wants the reference spelled
 // out in every file that reads or writes it, so each file makes its own.
@@ -35,12 +35,12 @@ const stateColor: Record<AgentState, string> = {
   waiting: '#E5484D',
   idle: '#8A94A0',
 }
-const phaseText: Record<Phase, string> = {
-  arriving: 'På vej ind',
-  working: '',
-  delivering: 'Afleverer',
-  idle: 'Holder fri',
-  leaving: 'Går igen',
+const phaseText: Record<Phase, [string, string]> = {
+  arriving: ['På vej ind', 'On the way in'],
+  working: ['', ''],
+  delivering: ['Afleverer', 'Handing over'],
+  idle: ['Holder fri', 'Off work'],
+  leaving: ['Går igen', 'Leaving'],
 }
 
 // ─── Hooks ──────────────────────────────────────────────────────────────
@@ -56,7 +56,14 @@ export const register: Register = on => {
   const spawned = new Map<string, { agentId: string; isBackground: boolean }>()
 
   on('session.start', async ($, e, next) => {
-    await $.command.register({ name: 'kontor', description: 'Åbn kontoret i browseren, se det fyldt med /kontor demo, eller listen med /kontor panel', argumentHint: '[demo|panel]' })
+    // The language chosen on the office page, for the mod's own words.
+    await quietly(readPrefs($))
+    const said = await readOffice($)
+    await $.command.register({
+      name: 'kontor',
+      description: T(said, 'Åbn kontoret i browseren, se det fyldt med /kontor demo, eller listen med /kontor panel', 'Open the office in the browser, see it full with /kontor demo, or the list with /kontor panel'),
+      argumentHint: '[demo|panel]',
+    })
     const now = await $.clock.now()
     const key = `s${Math.random().toString(36).slice(2, 10)}${Math.random().toString(36).slice(2, 6)}`
     await update($, office, o => ({ ...o, sessionKey: o.sessionKey || key, project: base(e.cwd) || 'Kontoret', startedAt: o.startedAt || now, main: pause, subs: [] }))
@@ -71,22 +78,24 @@ export const register: Register = on => {
     await quietly(readCrew($))
     $.clock.after(1500, () => void quietly(findAgents($)))
     $.clock.every(READ_MS, () => void quietly(readCrew($)))
+    $.clock.every(READ_MS, () => void quietly(readPrefs($)))
     $.clock.every(AGENTS_MS, () => void quietly(findAgents($)))
     return next(e)
   })
 
   on('command.run', { command: 'kontor' }, async ($, e) => {
     const arg = e.args.trim()
+    const o = await readOffice($)
     if (arg === 'panel') {
-      await $.ui.open({ id: PANE, title: '🏢 Kontor', focus: true })
-      return { text: 'Listen over hvem der laver hvad står i panelet.' }
+      await $.ui.open({ id: PANE, title: T(o, '🏢 Kontor', '🏢 Office'), focus: true })
+      return { text: T(o, 'Listen over hvem der laver hvad står i panelet.', 'The list of who does what is in the panel.') }
     }
-    const where = (await openOffice($)) ? `Kontoret er åbent i din browser på ${ADDRESS}.` : await whyNoServer($)
+    const where = (await openOffice($)) ? T(o, `Kontoret er åbent i din browser på ${ADDRESS}.`, `The office is open in your browser at ${ADDRESS}.`) : await whyNoServer($)
     if (arg === 'demo') {
       await runDemo($)
-      return { text: `${where} Seks hjælpere er på vej ind.` }
+      return { text: T(o, `${where} Seks hjælpere er på vej ind.`, `${where} Six helpers are on their way in.`) }
     }
-    return { text: `${where} Prøv /kontor demo for at se det fyldt.` }
+    return { text: T(o, `${where} Prøv /kontor demo for at se det fyldt.`, `${where} Try /kontor demo to see it full.`) }
   })
 
   on('session.end', async ($, e, next) => {
@@ -225,10 +234,14 @@ export const register: Register = on => {
       // Regulars between jobs are only sitting there.
       const helpers = o.subs.filter(isAtWork).length
       const note =
-        o.main.state === 'waiting' ? 'Claude venter på dig' : helpers ? `${helpers} ${helpers === 1 ? 'hjælper' : 'hjælpere'} i kontoret` : null
+        o.main.state === 'waiting'
+          ? T(o, 'Claude venter på dig', 'Claude is waiting for you')
+          : helpers
+            ? T(o, `${helpers} ${helpers === 1 ? 'hjælper' : 'hjælpere'} i kontoret`, `${helpers} ${helpers === 1 ? 'helper' : 'helpers'} in the office`)
+            : null
       return (
         <Box flexDirection="row" gap={1}>
-          <Button key="kontor" label="🏢 Åbn kontor" onPress={() => void quietly(openOrSay($))} />
+          <Button key="kontor" label={T(o, '🏢 Åbn kontor', '🏢 Open office')} onPress={() => void quietly(openOrSay($))} />
           {note ? <Text color={o.main.state === 'waiting' ? '#E5484D' : undefined} dimColor={o.main.state !== 'waiting'}>{note}</Text> : null}
         </Box>
       )
@@ -271,44 +284,50 @@ export const register: Register = on => {
         return row(
           `s-${s.id}`,
           s.name,
-          isBusy ? s.activity.detail : s.outcome === 'failed' ? `Gik i stå: ${s.task}` : `${phaseText[s.phase]}: ${s.task}`,
+          isBusy ? s.activity.detail : s.outcome === 'failed' ? T(o, `Gik i stå: ${s.task}`, `Got stuck: ${s.task}`) : `${T(o, ...phaseText[s.phase])}: ${s.task}`,
           isBusy ? s.activity.state : 'working',
-          s.phase === 'arriving' ? `${s.task} (på vej ind)` : s.phase === 'working' ? s.task : null,
+          s.phase === 'arriving' ? T(o, `${s.task} (på vej ind)`, `${s.task} (on the way in)`) : s.phase === 'working' ? s.task : null,
         )
       })
 
       return (
         <Box flexDirection="column" gap={1} paddingX={1} paddingY={1}>
           <Box flexDirection="column" paddingX={1}>
-            <Text bold>Kontoret tegnes i din browser</Text>
-            <Text dimColor wrap="wrap">{`Det ligger på ${ADDRESS}. Alle dine sessioner sidder i samme kontor.`}</Text>
+            <Text bold>{T(o, 'Kontoret tegnes i din browser', 'The office is drawn in your browser')}</Text>
+            <Text dimColor wrap="wrap">{T(o, `Det ligger på ${ADDRESS}. Alle dine sessioner sidder i samme kontor.`, `It is at ${ADDRESS}. All your sessions sit in the same office.`)}</Text>
           </Box>
           <Box flexDirection="row" gap={2} paddingX={1}>
-            <Button label="Åbn kontor" onPress={() => void quietly(openOrSay($))} />
-            <Button label="Kopiér adresse" onPress={press => void quietly($.ui.copy({ text: ADDRESS, surface: press.surface }))} />
+            <Button label={T(o, 'Åbn kontor', 'Open office')} onPress={() => void quietly(openOrSay($))} />
+            <Button label={T(o, 'Kopiér adresse', 'Copy address')} onPress={press => void quietly($.ui.copy({ text: ADDRESS, surface: press.surface }))} />
           </Box>
           {o.game ? (
             <Box paddingX={1}>
-              <Text wrap="wrap">{`💰 ${o.game.kroner.toLocaleString('da-DK')} kr · Trivsel ${o.game.wellbeing}${o.game.streak ? ` · 🔥 ${o.game.streak} ${o.game.streak === 1 ? 'dag' : 'dage'} i træk` : ''} · 🏅 ${o.game.unlocked} af ${o.game.achievements}`}</Text>
+              <Text wrap="wrap">
+                {T(
+                  o,
+                  `💰 ${o.game.kroner.toLocaleString('da-DK')} kr · Trivsel ${o.game.wellbeing}${o.game.streak ? ` · 🔥 ${o.game.streak} ${o.game.streak === 1 ? 'dag' : 'dage'} i træk` : ''} · 🏅 ${o.game.unlocked} af ${o.game.achievements}`,
+                  `💰 ${o.game.kroner.toLocaleString('en-GB')} kr · Wellbeing ${o.game.wellbeing}${o.game.streak ? ` · 🔥 ${o.game.streak} ${o.game.streak === 1 ? 'day' : 'days'} in a row` : ''} · 🏅 ${o.game.unlocked} of ${o.game.achievements}`,
+                )}
+              </Text>
             </Box>
           ) : null}
           {o.main.state === 'waiting' ? (
             <Box borderStyle="round" borderColor="#E5484D" paddingX={2}>
-              <Text color="#E5484D" wrap="wrap">{`Claude venter på dig: ${o.main.detail}`}</Text>
+              <Text color="#E5484D" wrap="wrap">{T(o, `Claude venter på dig: ${o.main.detail}`, `Claude is waiting for you: ${o.main.detail}`)}</Text>
             </Box>
           ) : null}
           <Box flexDirection="column" gap={1}>
             {row('main', 'Claude', o.main.detail, o.main.state, figures.length ? figures.join(', ') : null)}
             {subRows}
             {o.others.map(x =>
-              row(`o-${x.key}`, `Claude i ${x.project}`, x.main.detail, x.main.state, x.helpers ? `${x.helpers} ${x.helpers === 1 ? 'hjælper' : 'hjælpere'}` : null),
+              row(`o-${x.key}`, T(o, `Claude i ${x.project}`, `Claude in ${x.project}`), x.main.detail, x.main.state, x.helpers ? T(o, `${x.helpers} ${x.helpers === 1 ? 'hjælper' : 'hjælpere'}`, `${x.helpers} ${x.helpers === 1 ? 'helper' : 'helpers'}`) : null),
             )}
           </Box>
           <Box flexDirection="row" gap={1} paddingX={1}>
             <Text dimColor wrap="wrap">
               {o.subs.length === 0
-                ? 'Ingen hjælpere i kontoret. Når Claude sender subagenter afsted, sætter de sig i teamrummet. Prøv /kontor demo.'
-                : `${working} af ${o.subs.length} hjælpere arbejder`}
+                ? T(o, 'Ingen hjælpere i kontoret. Når Claude sender subagenter afsted, sætter de sig i teamrummet. Prøv /kontor demo.', 'No helpers in the office. When Claude sends subagents off, they sit down in the team room. Try /kontor demo.')
+                : T(o, `${working} af ${o.subs.length} hjælpere arbejder`, `${working} of ${o.subs.length} helpers are working`)}
             </Text>
           </Box>
         </Box>

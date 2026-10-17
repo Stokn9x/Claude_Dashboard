@@ -9,16 +9,17 @@ import { phaseLabel, showPanel, choose } from './panel.js'
 import { buyItem } from './shop.js'
 import { TEMPER_TEXT, temperOf } from './voices.js'
 import { changeCrew, crewOf, originOf, ownName, setOnStaff } from './crew.js'
+import { L, locale } from './i18n.js'
 
 const card = document.getElementById('card')
 
 const ago = (now, at) => {
   const minutes = Math.floor((now - at) / 60_000)
-  if (minutes < 1) return 'under et minut'
+  if (minutes < 1) return L('under et minut', 'under a minute')
   if (minutes < 60) return `${minutes} min`
-  return `${Math.floor(minutes / 60)} t ${minutes % 60} min`
+  return L(`${Math.floor(minutes / 60)} t ${minutes % 60} min`, `${Math.floor(minutes / 60)} h ${minutes % 60} min`)
 }
-const clockTime = at => new Date(at).toLocaleTimeString('da-DK', { hour: '2-digit', minute: '2-digit' })
+const clockTime = at => new Date(at).toLocaleTimeString(locale(), { hour: '2-digit', minute: '2-digit' })
 
 // Who the card is about, as the newest state says; null once they are gone.
 const subject = () => {
@@ -35,7 +36,7 @@ const subject = () => {
       tools: stats.tools,
       linesAdded: stats.linesAdded,
       linesRemoved: stats.linesRemoved,
-      note: [typeof stats.costUsd === 'number' ? `$${stats.costUsd.toFixed(2)} i denne session` : null, typeof stats.context === 'number' ? `konteksten er ${Math.round(stats.context)} % fuld` : null].filter(Boolean).join(' · ') || null,
+      note: [typeof stats.costUsd === 'number' ? L(`$${stats.costUsd.toFixed(2)} i denne session`, `$${stats.costUsd.toFixed(2)} this session`) : null, typeof stats.context === 'number' ? L(`konteksten er ${Math.round(stats.context)} % fuld`, `context is ${Math.round(stats.context)}% full`) : null].filter(Boolean).join(' · ') || null,
       recent: stats.recent,
     }
   }
@@ -49,7 +50,7 @@ const dot = state => el('span', { className: 'dot', style: `background:${stateCo
 // back), and off the staff (⚙ takes it on again).
 const crewControls = who => {
   const given = crewOf().names[who.staff] ?? ''
-  const input = el('input', { className: 'crew-name', type: 'text', maxLength: 24, value: given, placeholder: ownName(who.staff), ariaLabel: `Navn til ${ownName(who.staff)}` })
+  const input = el('input', { className: 'crew-name', type: 'text', maxLength: 24, value: given, placeholder: ownName(who.staff), ariaLabel: L(`Navn til ${ownName(who.staff)}`, `Name for ${ownName(who.staff)}`) })
   const save = async () => {
     if (input.value.trim() !== given) await changeCrew({ agent: who.staff, name: input.value })
     input.blur()
@@ -67,9 +68,9 @@ const crewControls = who => {
     if (await setOnStaff(who.staff, false)) select(null)
   }
   return [
-    el('div', { className: 'card-label' }, ['Navn']),
-    el('div', { className: 'crew-edit' }, [input, el('button', { type: 'button', className: 'crew-save', onclick: save }, ['Gem'])]),
-    el('button', { type: 'button', className: 'crew-remove', title: 'Går hjem, når den er færdig med sin opgave. Hent den tilbage under ⚙.', onclick: remove }, ['Fjern fra kontoret']),
+    el('div', { className: 'card-label' }, [L('Navn', 'Name')]),
+    el('div', { className: 'crew-edit' }, [input, el('button', { type: 'button', className: 'crew-save', onclick: save }, [L('Gem', 'Save')])]),
+    el('button', { type: 'button', className: 'crew-remove', title: L('Går hjem, når den er færdig med sin opgave. Hent den tilbage under ⚙.', 'Goes home once it has finished its task. Bring it back under ⚙.'), onclick: remove }, [L('Fjern fra kontoret', 'Remove from the office')]),
   ]
 }
 
@@ -86,26 +87,26 @@ export const renderCard = () => {
   // A regular between jobs: the counts were its last job's.
   const isReady = who.staff && !who.isOnJob
   const facts = [
-    who.startedAt && !isReady ? `I gang i ${ago(now, who.startedAt)}` : null,
-    typeof who.tools === 'number' && !isReady ? `${who.tools} ${who.tools === 1 ? 'værktøj' : 'værktøjer'}` : null,
-    (who.linesAdded || who.linesRemoved) && !isReady ? `+${who.linesAdded ?? 0} −${who.linesRemoved ?? 0} linjer` : null,
+    who.startedAt && !isReady ? L(`I gang i ${ago(now, who.startedAt)}`, `At it for ${ago(now, who.startedAt)}`) : null,
+    typeof who.tools === 'number' && !isReady ? L(`${who.tools} ${who.tools === 1 ? 'værktøj' : 'værktøjer'}`, `${who.tools} ${who.tools === 1 ? 'tool' : 'tools'}`) : null,
+    (who.linesAdded || who.linesRemoved) && !isReady ? L(`+${who.linesAdded ?? 0} −${who.linesRemoved ?? 0} linjer`, `+${who.linesAdded ?? 0} −${who.linesRemoved ?? 0} lines`) : null,
     who.temper ? `${who.temper} type` : null,
-    who.staff ? [`Fast medarbejder · ${ownName(who.staff)}${modelFamily(who.model) ? ` på ${modelFamily(who.model)}` : ''}`, originOf(who.staff)].filter(Boolean).join(' · ') : who.teammate ? `Holdkammerat «${who.teammate}»${modelFamily(who.model) ? ` på ${modelFamily(who.model)}` : ''}` : who.type || who.model ? [typeText(who.type), modelFamily(who.model)].filter(Boolean).join(' på ') : null,
+    who.staff ? [`${L('Fast medarbejder', 'Regular')} · ${ownName(who.staff)}${modelFamily(who.model) ? ` ${L('på', 'on')} ${modelFamily(who.model)}` : ''}`, originOf(who.staff)].filter(Boolean).join(' · ') : who.teammate ? `${L('Holdkammerat', 'Teammate')} «${who.teammate}»${modelFamily(who.model) ? ` ${L('på', 'on')} ${modelFamily(who.model)}` : ''}` : who.type || who.model ? [typeText(who.type), modelFamily(who.model)].filter(Boolean).join(L(' på ', ' on ')) : null,
   ].filter(Boolean)
   const steps = [...(who.recent ?? [])].reverse()
   card.replaceChildren(
     el('div', { className: 'card-head' }, [
       dot(who.activity.state),
       el('strong', {}, [who.name]),
-      el('button', { className: 'card-close', type: 'button', ariaLabel: 'Luk', onclick: () => select(null) }, ['×']),
+      el('button', { className: 'card-close', type: 'button', ariaLabel: L('Luk', 'Close'), onclick: () => select(null) }, ['×']),
     ]),
     ...(who.task ? [el('div', { className: 'card-task' }, [who.task])] : []),
     el('div', { className: 'card-now', style: `color:${stateColor[who.activity.state] ?? 'inherit'}` }, [who.activity.detail]),
     ...(who.note ? [el('div', { className: 'card-note' }, [who.note])] : []),
     ...(facts.length ? [el('div', { className: 'card-facts' }, [facts.join(' · ')])] : []),
-    ...(who.answer ? [el('div', { className: 'card-label' }, ['Svar']), el('p', { className: 'card-answer' }, [who.answer])] : []),
+    ...(who.answer ? [el('div', { className: 'card-label' }, [L('Svar', 'Answer')]), el('p', { className: 'card-answer' }, [who.answer])] : []),
     ...(steps.length
-      ? [el('div', { className: 'card-label' }, ['Seneste']), el('ol', { className: 'card-steps' }, steps.map(step => el('li', {}, [el('time', {}, [clockTime(step.at)]), step.detail])))]
+      ? [el('div', { className: 'card-label' }, [L('Seneste', 'Latest')]), el('ol', { className: 'card-steps' }, steps.map(step => el('li', {}, [el('time', {}, [clockTime(step.at)]), step.detail])))]
       : []),
     ...(who.staff ? crewControls(who) : []),
   )

@@ -11,6 +11,7 @@ import { FONT, OUTLINE, ctx, dashed, label, legibly, readable, rect, rounded, ta
 import { kr } from './util.js'
 import { ITEMS, PLAN, at, deskSlots, isBuilt, lotOf, nextStepOf, rectOf, stepArea, typeOf } from './plan.js'
 import { party } from './party.js'
+import { L } from './i18n.js'
 
 // What is for sale right now, and where its sign stands: a lot's centre (a
 // room, or the next step of one that grows), the spot a piece of furniture
@@ -86,11 +87,11 @@ const lotSign = (sale, kroner, t) => {
     label(kr(sale.price), x + 10, y + 33, 11, sale.canAfford ? '#F2C14E' : '#C9D1D9', 800, 'left')
     if (sale.canAfford) {
       rounded(x + 9, y + 39, w - 18, 13, 6.5, '#2E9E8F')
-      label('Klik for at bygge', cx, y + 48.5, 7.5, '#FFFFFF', 700)
+      label(L('Klik for at bygge', 'Click to build'), cx, y + 48.5, 7.5, '#FFFFFF', 700)
     } else {
       rounded(x + 10, y + 40, w - 20, 4, 2, '#2A333E')
       rounded(x + 10, y + 40, (w - 20) * Math.min(1, kroner / sale.price), 4, 2, '#D6A23C')
-      label(`Mangler ${kr(missing)}`, x + 10, y + 53, 7, '#8A94A0', 600, 'left')
+      label(L(`Mangler ${kr(missing)}`, `${kr(missing)} to go`), x + 10, y + 53, 7, '#8A94A0', 600, 'left')
     }
     box = { x0: sale.x - (w / 2) * k, y0: sale.y - (h / 2) * k, x1: sale.x + (w / 2) * k, y1: sale.y + (h / 2) * k }
   })
@@ -103,7 +104,7 @@ export const drawSaleSigns = (sales, hits, t) => {
   for (const sale of sales) {
     const bob = sale.canAfford ? Math.sin(t / 300 + sale.x) : 0
     if (sale.isDesk) {
-      tag(sale.x, sale.y - 32 + bob, sale.canAfford ? `Køb skrivebord: ${kr(sale.price)}` : `Skrivebord: ${kr(sale.price)}`, sale.canAfford ? '#2E9E8F' : '#5B6672')
+      tag(sale.x, sale.y - 32 + bob, sale.canAfford ? L(`Køb skrivebord: ${kr(sale.price)}`, `Buy desk: ${kr(sale.price)}`) : L(`Skrivebord: ${kr(sale.price)}`, `Desk: ${kr(sale.price)}`), sale.canAfford ? '#2E9E8F' : '#5B6672')
       continue
     }
     if (sale.isFurniture) {
@@ -141,11 +142,11 @@ export const construction = (now, t) => {
     const age = now - bought.at
     const area = areaOf(bought.item)
     if (!area || age < 0 || age > BUILD_MS + PARTY_AFTER_MS) continue
-    const name = ITEMS[bought.item]?.name ?? 'Nyt'
+    const name = ITEMS[bought.item]?.name ?? L('Nyt', 'New')
     const cx = area.x + area.w / 2
     const cy = area.y + area.h / 2
     if (age >= BUILD_MS) {
-      party({ kind: 'confetti', label: `${name} er klar!`, at: t - (age - BUILD_MS) }, { cx, dy: cy + 30 }, t)
+      party({ kind: 'confetti', label: L(`${name} er klar!`, `${name} is ready!`), at: t - (age - BUILD_MS) }, { cx, dy: cy + 30 }, t)
       continue
     }
     ctx.save()
@@ -164,7 +165,7 @@ export const construction = (now, t) => {
     }
     for (let y = area.y + 8; y < area.y + area.h; y += 18) rect(area.x, y, area.w, 2.5, '#8B5E3C')
     ctx.restore()
-    tag(cx, cy - 12, `Bygger ${name.toLowerCase()} …`, '#AD7F26')
+    tag(cx, cy - 12, L(`Bygger ${name.toLowerCase()} …`, `Building ${name.toLowerCase()} …`), '#AD7F26')
     rounded(cx - 30, cy + 2, 60, 6, 3, '#F6F1E4', OUTLINE, 1)
     rounded(cx - 29, cy + 3, 58 * Math.min(1, age / BUILD_MS), 4, 2, '#D6A23C')
     // A builder's hammer, going

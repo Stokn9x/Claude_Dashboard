@@ -47,6 +47,7 @@ export const emptyOffice: Office = {
   removed: [],
   added: [],
   agentSources: {},
+  lang: null,
 }
 const office = atom({ plugin: 'agent-kontor', key: 'office' } as const, emptyOffice)
 
@@ -61,6 +62,9 @@ export type $ = EngineInterface
 
 // The office must never get in Claude's way: anything that fails here is dropped.
 export const quietly = <T,>(work: Promise<T>) => work.then(() => undefined, () => undefined)
+
+// The mod's own words in the language chosen on the page.
+export const T = (o: Pick<Office, 'lang'>, da: string, en: string) => (o.lang === 'en' ? en : da)
 
 // Forward slashes only: the engine does not read a Windows path's backslashes
 // as separators.

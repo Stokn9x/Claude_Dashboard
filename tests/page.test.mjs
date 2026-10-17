@@ -710,3 +710,25 @@ test('a regular between jobs takes time off about every other stretch, never on 
   // A helper is never on a regular's time off.
   assert.equal(idle.offSince({ ...regular, staff: undefined }, offAt, walks), null)
 })
+
+test("in English the mod's Danish texts are turned over on arrival; the rest is kept as it is", async () => {
+  const i18n = await import(js('i18n'))
+  assert.equal(i18n.lang, 'da')
+  i18n.useLang('en')
+  try {
+    assert.equal(i18n.modText('Læser api.ts'), 'Reading api.ts')
+    assert.equal(i18n.modText('Afleverer: Kortlæg API’et'), 'Handing over: Map the API')
+    assert.equal(i18n.modText('Venter på dig: Venter på din godkendelse'), 'Waiting for you: Waiting for your approval')
+    assert.equal(i18n.modText('Gennemgå diffen'), 'Gennemgå diffen')
+    const state = { sessions: [{ key: 's', project: 'p', main: { state: 'working', detail: 'Tænker' }, party: { kind: 'confetti', label: 'Testene er grønne' }, subs: [{ id: 'a', task: 'En opgave', activity: { state: 'running', detail: 'Kører npm test' } }] }], game: null }
+    const english = i18n.inLanguage(state)
+    assert.equal(english.sessions[0].main.detail, 'Thinking')
+    assert.equal(english.sessions[0].party.label, 'Tests are green')
+    assert.deepEqual([english.sessions[0].subs[0].task, english.sessions[0].subs[0].activity.detail], ['A task', 'Running npm test'])
+    assert.equal(i18n.L('Butik', 'Shop'), 'Shop')
+    assert.equal(i18n.locale(), 'en-GB')
+  } finally {
+    i18n.useLang('da')
+  }
+  assert.equal(i18n.modText('Læser api.ts'), 'Læser api.ts')
+})

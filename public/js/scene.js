@@ -21,7 +21,7 @@ import { background, drawBuilding } from './building.js'
 import { drawLife } from './outdoors.js'
 import { party } from './party.js'
 import { forSaleNow, drawSaleOutlines, drawSaleSigns, construction } from './sales.js'
-import { modText } from './i18n.js'
+import { L, modText } from './i18n.js'
 
 // The longest a walk to a newly bought desk takes; most are shorter
 const MOVE_MS = 12_000
@@ -144,6 +144,7 @@ const fish = t => {
 // The receptionist behind the counter: greets helpers coming in by name,
 // says goodbye to those going home, answers the phone now and then.
 const RECEPTIONIST = { name: 'Bodil', look: lookFor('reception-bodil') }
+const RECEPTION_LINES = L(['Claude & Co, goddag!', 'Et øjeblik, jeg stiller om.', 'Kaffen er på 2. sal. Spøg.'], ['Claude & Co, good day!', 'Hold on, putting you through.', 'Coffee is on floor 2. Kidding.'])
 const receptionist = ({ subs, walkers, hits, t }, now, walks) => {
   const room = firstRoom('reception')
   if (!room || !owns('reception')) return null
@@ -161,11 +162,11 @@ const receptionist = ({ subs, walkers, hits, t }, now, walks) => {
   const arriving = walkers.find(w => w.sub.phase === 'arriving' && w.sub.from !== 'idle' && w.pose.isWalking)?.sub
   const leaving = walkers.find(w => w.pose.isHomeward || (w.sub.phase === 'leaving' && !w.pose.isIdle))
   const line = arriving
-    ? `Velkommen, ${arriving.name}!`
+    ? L(`Velkommen, ${arriving.name}!`, `Welcome, ${arriving.name}!`)
     : leaving
-      ? `Farvel, ${leaving.sub.name}!`
+      ? L(`Farvel, ${leaving.sub.name}!`, `Goodbye, ${leaving.sub.name}!`)
       : (t % 14_000) < 2600
-        ? ['Claude & Co, goddag!', 'Et øjeblik, jeg stiller om.', 'Kaffen er på 2. sal. Spøg.'][Math.floor(t / 14_000) % 3]
+        ? RECEPTION_LINES[Math.floor(t / 14_000) % 3]
         : null
   return line ? { x: cx, y: dy - 34, line } : null
 }
@@ -188,7 +189,7 @@ const hobbyScreens = (walkers, t) => {
 }
 
 // What they say now and then in the lounge, by pastime.
-const HOBBY_LINES = {
+const HOBBY_LINES = L({
   gaming: ['Én runde til!', 'Du snyder!', 'GG', 'Pause? Aldrig.'],
   darts: ["Bull's-eye!", 'Lige ved og næsten', 'Tredobbelt tyve!'],
   arcade: ['Ny highscore!', 'Game over …', 'Insert coin'],
@@ -196,7 +197,15 @@ const HOBBY_LINES = {
   bar: ['En limonade, tak', 'Skål!', 'Det har været en lang dag'],
   sofa: ['Ahh, endelig', 'Fem minutter mere …', 'Det her er livet'],
   guitar: ['♪ ♫ ♪', '♫ la la la ♫', '♪ Wonderwall ♪'],
-}
+}, {
+  gaming: ['One more round!', 'You’re cheating!', 'GG', 'A break? Never.'],
+  darts: ["Bull's-eye!", 'So close', 'Triple twenty!'],
+  arcade: ['New high score!', 'Game over …', 'Insert coin'],
+  pool: ['Eight ball, corner pocket', 'Nice shot!', 'Your turn', 'Chalk on the cue'],
+  bar: ['A lemonade, please', 'Cheers!', 'It’s been a long day'],
+  sofa: ['Ahh, at last', 'Five more minutes …', 'This is the life'],
+  guitar: ['♪ ♫ ♪', '♫ la la la ♫', '♪ Wonderwall ♪'],
+})
 
 const espresso = t => {
   const room = firstRoom('kitchen')
@@ -362,7 +371,7 @@ const drawCat = ({ catPose, t }) => {
     bowl(b.x, b.y)
   }
   cat(catPose.x, catPose.y, catPose.facing, catPose.kind, t)
-  if (catPose.kind === 'sit' && catPose.there > 2000 && t % 14_000 < 1600) bubble(catPose.x, catPose.y - 22, 'Miav', false, t, 10)
+  if (catPose.kind === 'sit' && catPose.there > 2000 && t % 14_000 < 1600) bubble(catPose.x, catPose.y - 22, L('Miav', 'Meow'), false, t, 10)
 }
 
 // What everyone says, on top of everything.
@@ -370,11 +379,15 @@ const drawSpeech = frame => {
   const { s, main, where, rest, catPose, meeting, meetingPose, pause, kitchenSpot, list, seatedAt, subs, walkers, players, floorSitters, t } = frame
   const thanking = walkers.find(w => w.pose.handover)
   if (where === 'walk') {
-    const lines = ['Frisk luft', 'Se, anden er her', 'Godt med en pause', 'Nu tænker jeg klart']
+    const lines = L(['Frisk luft', 'Se, anden er her', 'Godt med en pause', 'Nu tænker jeg klart'], ['Fresh air', 'Look, the duck’s here', 'A break does me good', 'Now I can think clearly'])
     if (t % 9000 < 6000) bubble(rest.spot.x, rest.spot.y - 52, lines[Math.floor(t / 9000) % lines.length], false, t)
   } else if (where === 'plants' || where === 'cat') {
     const isCatHere = catPose && !catPose.isWalking && catPose.place.name === 'corner'
-    const lines = where === 'plants' ? ['Lidt vand til jer', 'Så, så', 'I vokser jo'] : isCatHere ? ['Hvem er en god kat?', 'Hej, mis', 'Du spinder jo'] : ['Mis mis!']
+    const lines = where === 'plants'
+      ? L(['Lidt vand til jer', 'Så, så', 'I vokser jo'], ['A little water for you', 'There, there', 'Look at you grow'])
+      : isCatHere
+        ? L(['Hvem er en god kat?', 'Hej, mis', 'Du spinder jo'], ['Who’s a good cat?', 'Hi, kitty', 'You’re purring'])
+        : L(['Mis mis!'], ['Here, kitty!'])
     if (t % 9000 < 6000) bubble(rest.spot.x, rest.spot.y - 52, lines[Math.floor(t / 9000) % lines.length], false, t)
     // Stroked, the cat purrs: a heart rises
     if (isCatHere && where === 'cat') {
@@ -384,10 +397,14 @@ const drawSpeech = frame => {
       ctx.globalAlpha = 1
     }
   } else if (where === 'kitchen') {
-    const lines = ['Kaffepause', s?.stats?.linesAdded ? `${s.stats.linesAdded} linjer i dag` : 'Klar når du er', 'Godt arbejde, team', 'Hvad nu?']
+    const added = s?.stats?.linesAdded
+    const lines = L(
+      ['Kaffepause', added ? `${added} linjer i dag` : 'Klar når du er', 'Godt arbejde, team', 'Hvad nu?'],
+      ['Coffee break', added ? `${added} ${added === 1 ? 'line' : 'lines'} today` : 'Ready when you are', 'Good work, team', 'What’s next?'],
+    )
     bubble(kitchenSpot.x, kitchenSpot.y - 52, lines[Math.floor(t / 3000) % lines.length], false, t)
   } else if (thanking) {
-    bubble(MAIN.cx, MAIN.dy - 34, thanking.sub.outcome === 'failed' ? `Øv, ${thanking.sub.name}` : `Tak, ${thanking.sub.name}!`, false, t)
+    bubble(MAIN.cx, MAIN.dy - 34, thanking.sub.outcome === 'failed' ? L(`Øv, ${thanking.sub.name}`, `Oh no, ${thanking.sub.name}`) : L(`Tak, ${thanking.sub.name}!`, `Thanks, ${thanking.sub.name}!`), false, t)
   } else if (where === 'desk') {
     say(MAIN.cx, MAIN.dy - 34, main, t)
   }
@@ -398,7 +415,7 @@ const drawSpeech = frame => {
     if (sub && !(sub.staff && !sub.isOnJob)) say(cx, dy - 34, sub.activity, t + seat * 230, nameOf(sub))
   })
   for (const { sub, pose } of walkers) {
-    if (pose.handover) bubble(pose.x, pose.y - 52, sub.outcome === 'failed' ? `Gik i stå: ${sub.task}` : `Afleverer: ${sub.task}`, sub.outcome === 'failed', t)
+    if (pose.handover) bubble(pose.x, pose.y - 52, sub.outcome === 'failed' ? L(`Gik i stå: ${sub.task}`, `Got stuck: ${sub.task}`) : L(`Afleverer: ${sub.task}`, `Handing over: ${sub.task}`), sub.outcome === 'failed', t)
   }
   // On the floor they sit close, so each speaks only now and then: to
   // grumble, or when it waits for you. What they do is in the list.
@@ -454,11 +471,11 @@ const drawSpeech = frame => {
   // At the meeting Claude opens, then each says what they are on, in turn
   if (meeting && meetingPose?.isThere) {
     const round = Math.floor(meetingPose.there / 3000)
-    if (round === 0) bubble(meetingPose.x, meetingPose.y - 44, 'Kort status, alle sammen', false, t)
+    if (round === 0) bubble(meetingPose.x, meetingPose.y - 44, L('Kort status, alle sammen', 'Quick status, everyone'), false, t)
     else {
       const sub = meeting.order[(round - 1) % meeting.order.length]
       const w = walkers.find(x => x.sub.id === sub.id && x.pose.isThere)
-      const status = sub.activity.detail === modText('Tænker') ? 'Jeg tænker stadig over min opgave' : sub.activity.detail
+      const status = sub.activity.detail === modText('Tænker') ? L('Jeg tænker stadig over min opgave', 'Still thinking about my task') : sub.activity.detail
       if (w && meetingPose.there % 3000 < 2600) bubble(w.pose.x, w.pose.y - 44, status, false, t, 40)
     }
   }
@@ -484,7 +501,7 @@ export const draw = () => {
   ctx.drawImage(background, 0, 0)
   applyView(ctx)
 
-  const main = s?.main ?? { state: 'idle', detail: 'Ingen session' }
+  const main = s?.main ?? { state: 'idle', detail: L('Ingen session', 'No session') }
   const subs = s?.subs ?? []
   const walks = { ...WALKS, ...(s?.walks ?? {}) }
   const list = desks()
@@ -643,7 +660,7 @@ export const draw = () => {
   const bought = game?.bought?.at(-1)
   if (bought?.item === 'desk' && now - bought.at < 5000) {
     const d = list[list.length - 1]
-    if (d) party({ kind: 'confetti', label: 'Nyt skrivebord!', at: t - (now - bought.at) }, d, t)
+    if (d) party({ kind: 'confetti', label: L('Nyt skrivebord!', 'New desk!'), at: t - (now - bought.at) }, d, t)
   }
   drawMinimap()
 }

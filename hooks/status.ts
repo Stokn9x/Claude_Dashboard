@@ -1,6 +1,6 @@
 import { atom, update } from 'claude-code'
 import type { GameSummary, Office, Other } from '../types'
-import { emptyOffice, WALKS, readOffice, slashed } from './office'
+import { emptyOffice, WALKS, readOffice, slashed, T } from './office'
 import type { $ } from './office'
 
 // The session's office in $.state: the engine wants the reference spelled
@@ -20,6 +20,7 @@ export const HEARTBEAT_MS = 30_000
 export const READ_MS = 3000
 export const SERVER_CHECK_MS = 60_000
 export const NO_SERVER = 'Kontorets server kunne ikke starte. Prøv igen om lidt; bliver det ved, så sig det til den, der har sat kontoret op.'
+export const NO_SERVER_EN = "The office's server could not start. Try again in a moment; if it keeps happening, tell whoever set the office up."
 export const STALE_MS = 120_000
 export let lastWritten = ''
 export let lastWriteAt = 0
@@ -205,11 +206,24 @@ export async function retireOldServer($: $) {
 // too old, or the server would not start for some other reason.
 const NODE_MIN = 18
 export async function whyNoServer($: $) {
+  const o = await readOffice($)
   const run = await $.process.run(['node', '--version'], { timeoutMs: 10_000 }).catch(() => null)
-  if (!run || run.exitCode !== 0) return 'Kontoret kræver Node.js 18 eller nyere, og det er ikke installeret på denne computer. Hent LTS-versionen på https://nodejs.org, og start Claude igen bagefter.'
+  if (!run || run.exitCode !== 0) {
+    return T(
+      o,
+      'Kontoret kræver Node.js 18 eller nyere, og det er ikke installeret på denne computer. Hent LTS-versionen på https://nodejs.org, og start Claude igen bagefter.',
+      'The office needs Node.js 18 or newer, and it is not installed on this computer. Get the LTS version at https://nodejs.org, then start Claude again.',
+    )
+  }
   const major = Number(/^v?(\d+)/.exec(run.stdout.trim())?.[1])
-  if (major && major < NODE_MIN) return `Kontoret kræver Node.js 18 eller nyere, og du har ${run.stdout.trim()}. Hent en nyere version på https://nodejs.org, og start Claude igen bagefter.`
-  return NO_SERVER
+  if (major && major < NODE_MIN) {
+    return T(
+      o,
+      `Kontoret kræver Node.js 18 eller nyere, og du har ${run.stdout.trim()}. Hent en nyere version på https://nodejs.org, og start Claude igen bagefter.`,
+      `The office needs Node.js 18 or newer, and you have ${run.stdout.trim()}. Get a newer version at https://nodejs.org, then start Claude again.`,
+    )
+  }
+  return T(o, NO_SERVER, NO_SERVER_EN)
 }
 
 export async function startServer($: $) {

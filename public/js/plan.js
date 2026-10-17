@@ -13,6 +13,7 @@
 // a closed depot until it is bought, so the house never has a hole in it.
 // This file is the only place that knows the plan: the mod times every walk
 // and lets the page find the way.
+import { L } from './i18n.js'
 import { store, owns } from './store.js'
 
 // Something bought, or, for a list, any one of them.
@@ -440,42 +441,42 @@ export const placeOf = seat => {
 // table in the lounge, decor.
 // Each room's sign by its door on the hall: an icon and a name.
 export const ROOM_NAMES = {
-  team: ['👥', 'Teamrum 1'],
-  team2: ['👥', 'Teamrum 2'],
+  team: ['👥', L('Teamrum 1', 'Team room 1')],
+  team2: ['👥', L('Teamrum 2', 'Team room 2')],
   claude: ['✨', 'Claude'],
-  meeting: ['📊', 'Mødelokale'],
+  meeting: ['📊', L('Mødelokale', 'Meeting room')],
   lounge: ['🛋️', 'Lounge'],
-  reception: ['🛎️', 'Reception'],
-  quiet: ['🤫', 'Stillerum'],
-  kitchen: ['☕', 'Køkken'],
+  reception: ['🛎️', L('Reception', 'Reception')],
+  quiet: ['🤫', L('Stillerum', 'Quiet room')],
+  kitchen: ['☕', L('Køkken', 'Kitchen')],
   toilet: ['🚻', 'Toilet'],
 }
 
 export const ITEMS = {
-  desk: { name: 'Skrivebord', icon: '🪑', about: 'Hjælpere uden skrivebord sidder i receptionen med en laptop og brokker sig.' },
-  'team1-2': { name: 'Teamrum 1, trin 2', icon: '🏗️', about: 'Teamrum 1 vokser mod vest med plads til tre skriveborde mere.' },
-  'team1-3': { name: 'Teamrum 1, trin 3', icon: '🏗️', about: 'Teamrum 1 vokser endnu længere mod vest, ud på grunden: tre skriveborde mere.' },
-  team2: { name: 'Teamrum 2', icon: '🏢', about: 'Et nyt teamrum over for det første, med plads til tre skriveborde.' },
-  'team2-2': { name: 'Teamrum 2, trin 2', icon: '🏗️', about: 'Teamrum 2 vokser mod vest med plads til tre skriveborde mere.' },
-  'team2-3': { name: 'Teamrum 2, trin 3', icon: '🏗️', about: 'Teamrum 2 vokser endnu længere mod vest: tre skriveborde mere, 22 i alt.' },
-  kitchen: { name: 'Køkken', icon: '☕', about: 'En kaffemaskine og et lille bord. Claude holder kaffepause her i stedet for ved skrivebordet.' },
-  'kitchen-2': { name: 'Køkken, trin 2', icon: '🍽️', about: 'Køkkenet vokser ind i depotet: et stort bord, køleskab og snackautomat.' },
-  lounge: { name: 'Lounge', icon: '🛋️', about: 'En lounge med sofa og spillekonsol, hvor hjælperne med fri slapper af.' },
-  'lounge-2': { name: 'Lounge, trin 2', icon: '🎱', about: 'Loungen vokser ind i depotet: pool-bord og dartskive.' },
-  'lounge-3': { name: 'Lounge, trin 3', icon: '🎸', about: 'Loungen vokser ud på grunden mod øst: bar, arkademaskine, jukebox og en guitar.' },
-  toilet: { name: 'Toilet', icon: '🚻', about: 'Et toilet med én bås. Hvem har ikke brug for det?' },
-  'toilet-2': { name: 'Toilet, trin 2', icon: '🚻', about: 'En bås mere og en håndvask, mod øst.' },
-  'toilet-3': { name: 'Toilet, trin 3', icon: '🚻', about: 'En tredje bås, ud på grunden mod øst. Ingen kø mere.' },
-  pingpong: { name: 'Bordtennisbord', icon: '🏓', about: 'Et bordtennisbord i loungen, hvor to spiller i pauserne.', needs: 'lounge' },
-  meeting: { name: 'Mødelokale', icon: '📊', about: 'Et mødelokale ved siden af Claude med et langt bord og en skærm på væggen.' },
-  reception: { name: 'Reception', icon: '🛎️', about: 'Indretning af receptionen bag hoveddøren: skranke, sofa, logo og Bodil, der byder hjælperne velkommen og siger farvel.' },
-  plants: { name: 'Planter overalt', icon: '🪴', about: 'Store planter i teamrummet, stillerummet og hos Claude.' },
-  cat: { name: 'Kontorkat', icon: '🐈', about: 'En rød kat, der sover i receptionen, spiser i køkkenet og sætter sig hos Claude. Claude klapper den i pauserne.' },
-  rugs: { name: 'Tæpper', icon: '🧶', about: 'Bløde tæpper under skrivebordene i teamrummene og stillerummet.' },
-  art: { name: 'Kunst på væggene', icon: '🖼️', about: 'Malerier på væggene i teamrummet og hos Claude.' },
-  neon: { name: 'Neonskilt', icon: '💡', about: 'Et lyserødt "SHIP IT" i teamrummet, der lyser om aftenen.' },
-  espresso: { name: 'Espressomaskine', icon: '☕', about: 'En rigtig espressomaskine i køkkenet. Den damper hele dagen.' },
-  aquarium: { name: 'Akvarium', icon: '🐠', about: 'Et akvarium med fisk i stillerummet.' },
-  chairs: { name: 'Ergonomiske stole', icon: '💺', about: 'Bedre stole til alle skriveborde. Ryggen siger tak.' },
-  screens: { name: 'Store skærme', icon: '🖥️', about: 'Brede skærme på alle skriveborde.' },
+  desk: { name: L('Skrivebord', 'Desk'), icon: '🪑', about: L('Hjælpere uden skrivebord sidder i receptionen med en laptop og brokker sig.', 'Helpers without a desk sit in the reception with a laptop and grumble.') },
+  'team1-2': { name: L('Teamrum 1, trin 2', 'Team room 1, step 2'), icon: '🏗️', about: L('Teamrum 1 vokser mod vest med plads til tre skriveborde mere.', 'Team room 1 grows west, with room for three more desks.') },
+  'team1-3': { name: L('Teamrum 1, trin 3', 'Team room 1, step 3'), icon: '🏗️', about: L('Teamrum 1 vokser endnu længere mod vest, ud på grunden: tre skriveborde mere.', 'Team room 1 grows further west, out onto the grounds: three more desks.') },
+  team2: { name: L('Teamrum 2', 'Team room 2'), icon: '🏢', about: L('Et nyt teamrum over for det første, med plads til tre skriveborde.', 'A new team room across from the first, with room for three desks.') },
+  'team2-2': { name: L('Teamrum 2, trin 2', 'Team room 2, step 2'), icon: '🏗️', about: L('Teamrum 2 vokser mod vest med plads til tre skriveborde mere.', 'Team room 2 grows west, with room for three more desks.') },
+  'team2-3': { name: L('Teamrum 2, trin 3', 'Team room 2, step 3'), icon: '🏗️', about: L('Teamrum 2 vokser endnu længere mod vest: tre skriveborde mere, 22 i alt.', 'Team room 2 grows further west: three more desks, 22 in all.') },
+  kitchen: { name: L('Køkken', 'Kitchen'), icon: '☕', about: L('En kaffemaskine og et lille bord. Claude holder kaffepause her i stedet for ved skrivebordet.', 'A coffee machine and a small table. Claude takes its coffee breaks here instead of at its desk.') },
+  'kitchen-2': { name: L('Køkken, trin 2', 'Kitchen, step 2'), icon: '🍽️', about: L('Køkkenet vokser ind i depotet: et stort bord, køleskab og snackautomat.', 'The kitchen grows into the store room: a big table, a fridge and a snack machine.') },
+  lounge: { name: 'Lounge', icon: '🛋️', about: L('En lounge med sofa og spillekonsol, hvor hjælperne med fri slapper af.', 'A lounge with a sofa and a games console, where helpers off work unwind.') },
+  'lounge-2': { name: L('Lounge, trin 2', 'Lounge, step 2'), icon: '🎱', about: L('Loungen vokser ind i depotet: pool-bord og dartskive.', 'The lounge grows into the store room: a pool table and a dartboard.') },
+  'lounge-3': { name: L('Lounge, trin 3', 'Lounge, step 3'), icon: '🎸', about: L('Loungen vokser ud på grunden mod øst: bar, arkademaskine, jukebox og en guitar.', 'The lounge grows east onto the grounds: a bar, an arcade machine, a jukebox and a guitar.') },
+  toilet: { name: 'Toilet', icon: '🚻', about: L('Et toilet med én bås. Hvem har ikke brug for det?', 'A toilet with one stall. Who doesn’t need one?') },
+  'toilet-2': { name: L('Toilet, trin 2', 'Toilet, step 2'), icon: '🚻', about: L('En bås mere og en håndvask, mod øst.', 'One more stall and a sink, to the east.') },
+  'toilet-3': { name: L('Toilet, trin 3', 'Toilet, step 3'), icon: '🚻', about: L('En tredje bås, ud på grunden mod øst. Ingen kø mere.', 'A third stall, out on the grounds to the east. No more queue.') },
+  pingpong: { name: L('Bordtennisbord', 'Ping-pong table'), icon: '🏓', about: L('Et bordtennisbord i loungen, hvor to spiller i pauserne.', 'A ping-pong table in the lounge, where two play on their breaks.'), needs: 'lounge' },
+  meeting: { name: L('Mødelokale', 'Meeting room'), icon: '📊', about: L('Et mødelokale ved siden af Claude med et langt bord og en skærm på væggen.', 'A meeting room next to Claude, with a long table and a screen on the wall.') },
+  reception: { name: 'Reception', icon: '🛎️', about: L('Indretning af receptionen bag hoveddøren: skranke, sofa, logo og Bodil, der byder hjælperne velkommen og siger farvel.', 'Furnishes the reception behind the front door: a counter, a sofa, a logo and Bodil, who welcomes the helpers and sees them off.') },
+  plants: { name: L('Planter overalt', 'Plants everywhere'), icon: '🪴', about: L('Store planter i teamrummet, stillerummet og hos Claude.', 'Big plants in the team room, the quiet room and Claude’s office.') },
+  cat: { name: L('Kontorkat', 'Office cat'), icon: '🐈', about: L('En rød kat, der sover i receptionen, spiser i køkkenet og sætter sig hos Claude. Claude klapper den i pauserne.', 'A ginger cat that sleeps in the reception, eats in the kitchen and sits with Claude. Claude strokes it on breaks.') },
+  rugs: { name: L('Tæpper', 'Rugs'), icon: '🧶', about: L('Bløde tæpper under skrivebordene i teamrummene og stillerummet.', 'Soft rugs under the desks in the team rooms and the quiet room.') },
+  art: { name: L('Kunst på væggene', 'Art on the walls'), icon: '🖼️', about: L('Malerier på væggene i teamrummet og hos Claude.', 'Paintings on the walls in the team room and Claude’s office.') },
+  neon: { name: L('Neonskilt', 'Neon sign'), icon: '💡', about: L('Et lyserødt "SHIP IT" i teamrummet, der lyser om aftenen.', 'A pink "SHIP IT" in the team room that glows in the evening.') },
+  espresso: { name: L('Espressomaskine', 'Espresso machine'), icon: '☕', about: L('En rigtig espressomaskine i køkkenet. Den damper hele dagen.', 'A real espresso machine in the kitchen. It steams all day.') },
+  aquarium: { name: L('Akvarium', 'Aquarium'), icon: '🐠', about: L('Et akvarium med fisk i stillerummet.', 'An aquarium with fish in the quiet room.') },
+  chairs: { name: L('Ergonomiske stole', 'Ergonomic chairs'), icon: '💺', about: L('Bedre stole til alle skriveborde. Ryggen siger tak.', 'Better chairs for every desk. Your back will thank you.') },
+  screens: { name: L('Store skærme', 'Big screens'), icon: '🖥️', about: L('Brede skærme på alle skriveborde.', 'Wide screens on every desk.') },
 }

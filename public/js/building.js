@@ -10,6 +10,7 @@ import { MAIN, PLAN, ROOM_NAMES, WORLD, at, topWallOf, doormat, frameOf, isBuilt
 import { applyView, onResize, visibleRect, visibleRooms, view } from './camera.js'
 import { isNightAt, sideWindows, skyAt } from './light.js'
 import { drawGrounds } from './outdoors.js'
+import { L } from './i18n.js'
 import { plant, roomDrawers } from './rooms.js'
 
 const WALL = '#3E4852'
@@ -233,5 +234,5 @@ export const drawBuilding = (project, hour, look = {}) => {
   g.font = `700 8px ${FONT}`
   g.fillStyle = '#E9EEF2'
   g.textAlign = 'center'
-  g.fillText(clip(project || 'Kontoret', 26), MAIN.cx, WORLD.y + 11.5)
+  g.fillText(clip(project || L('Kontoret', 'The office'), 26), MAIN.cx, WORLD.y + 11.5)
 }

@@ -54,12 +54,12 @@ const row = (name, title, about) => {
 // Your own agents, and the plugins' (off until put on): on the staff they
 // are in all day; off it, one comes in as a helper when it has a task, and
 // goes again.
-const ON_STAFF = 'På kontoret hele dagen'
-const OFF_STAFF = 'Kommer kun, når den har en opgave'
+const ON_STAFF = L('På kontoret hele dagen', 'In the office all day')
+const OFF_STAFF = L('Kommer kun, når den har en opgave', 'Only comes in when it has a task')
 const crewSection = () => {
   const agents = knownAgents()
-  const heading = el('h3', {}, ['Faste medarbejdere'])
-  if (!agents.length) return [heading, el('p', { className: 'crew-empty' }, ['Dine egne agenter fra /agents i Claude Code møder ind her og er på kontoret hele dagen. Du har ingen endnu.'])]
+  const heading = el('h3', {}, [L('Faste medarbejdere', 'Regulars')])
+  if (!agents.length) return [heading, el('p', { className: 'crew-empty' }, [L('Dine egne agenter fra /agents i Claude Code møder ind her og er på kontoret hele dagen. Du har ingen endnu.', 'Your own agents from /agents in Claude Code clock in here and stay in the office all day. You have none yet.')])]
   const { names } = crewOf()
   const rows = agents.map(agent => {
     const input = el('input', { type: 'checkbox', checked: isOnStaff(agent) })
@@ -73,16 +73,16 @@ const crewSection = () => {
     })
     return el('label', { className: 'setting' }, [input, el('span', {}, [el('strong', {}, [names[agent] ?? ownName(agent)]), about])])
   })
-  return [heading, el('div', { className: 'crew-list' }, rows), el('p', { className: 'crew-empty' }, ['Klik på en fast medarbejder i kontoret for at give den et navn.'])]
+  return [heading, el('div', { className: 'crew-list' }, rows), el('p', { className: 'crew-empty' }, [L('Klik på en fast medarbejder i kontoret for at give den et navn.', 'Click a regular in the office to give it a name.')])]
 }
 
 const open = () => {
-  box = el('div', { className: 'settings', role: 'dialog', ariaLabel: 'Indstillinger' }, [
-    el('h3', {}, ['Indstillinger']),
+  box = el('div', { className: 'settings', role: 'dialog', ariaLabel: L('Indstillinger', 'Settings') }, [
+    el('h3', {}, [L('Indstillinger', 'Settings')]),
     langRow(),
-    row('weather', 'Vejr', 'Regn og sne over kontoret. Årstiderne bliver, også uden.'),
+    row('weather', L('Vejr', 'Weather'), L('Regn og sne over kontoret. Årstiderne bliver, også uden.', 'Rain and snow over the office. The seasons stay, even without.')),
     ...crewSection(),
-    el('button', { type: 'button', className: 'settings-tour', onclick: () => (close(), showTour()) }, ['Vis rundvisningen igen']),
+    el('button', { type: 'button', className: 'settings-tour', onclick: () => (close(), showTour()) }, [L('Vis rundvisningen igen', 'Show the tour again')]),
   ])
   document.body.append(box)
   button.ariaExpanded = 'true'
@@ -90,7 +90,7 @@ const open = () => {
 
 button.hidden = false
 button.textContent = '⚙'
-button.title = 'Indstillinger'
+button.title = L('Indstillinger', 'Settings')
 button.ariaExpanded = 'false'
 button.addEventListener('click', e => {
   e.stopPropagation()

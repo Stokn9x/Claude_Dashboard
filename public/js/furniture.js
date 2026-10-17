@@ -4,6 +4,7 @@ import { owns } from './store.js'
 import { OUTLINE, FONT, circle, ctx, faint, label, rect, rounded, shadow } from './gfx.js'
 import { hashOf, kr } from './util.js'
 import { at, firstRoom, isBuilt, typeOf } from './plan.js'
+import { L } from './i18n.js'
 
 const screens = { working: '#5E6B7A', reading: '#E9EEF2', editing: '#1F2A44', running: '#0F1418', browsing: '#D7E9FA', waiting: '#E5484D', idle: '#1B2433' }
 
@@ -157,7 +158,7 @@ export const board = (stats, kroner) => {
   if (!room) return
   const b = at(room, typeOf(room).board)
   const left = b.x + 4
-  label('I dag', left, b.y + 7, 5.5, '#5B6672', 700, 'left')
+  label(L('I dag', 'Today'), left, b.y + 7, 5.5, '#5B6672', 700, 'left')
   if (!stats || (!stats.linesAdded && !stats.linesRemoved && typeof kroner !== 'number')) {
     rect(left, b.y + 12, 26, 1.5, '#3E7CC9')
     rect(left, b.y + 17, 18, 1.5, '#E07A4F')

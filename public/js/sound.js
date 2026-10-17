@@ -5,6 +5,7 @@
 // files. A button in the header turns it off, and that is remembered.
 // Browsers only play sound after the page has been clicked once.
 import { remember, remembered } from './util.js'
+import { L } from './i18n.js'
 
 // [frequency in Hz, start in s, length in s, wave, volume]
 const TUNES = {
@@ -71,7 +72,7 @@ export const playFor = events => {
 
 const render = () => {
   button.textContent = isOn ? '🔊' : '🔇'
-  button.title = isOn ? 'Lyd er slået til. Klik for at slå den fra.' : 'Lyd er slået fra. Klik for at slå den til.'
+  button.title = isOn ? L('Lyd er slået til. Klik for at slå den fra.', 'Sound is on. Click to turn it off.') : L('Lyd er slået fra. Klik for at slå den til.', 'Sound is off. Click to turn it on.')
   button.ariaPressed = String(isOn)
 }
 button.addEventListener('click', () => {

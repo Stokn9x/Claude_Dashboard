@@ -2,7 +2,7 @@
 
 A Claude Code mod that shows Claude and its subagents as pixel people in an office, drawn on a page in the browser, plus a small game: the work earns kroner, which buy desks, rooms and furniture. Everything stays on this computer.
 
-Talk to the user in Danish. The page is dark only (the user's wish); there is no light theme. All text the user sees (page, panel, button, README, UDVIDELSER.md, SPIL.md) is Danish; code comments are English, in full sentences.
+Talk to the user in Danish. The page is dark only (the user's wish); there is no light theme. The docs (README, UDVIDELSER.md, SPIL.md) are Danish; code comments are English, in full sentences. The office itself speaks Danish or English, chosen under ⚙ (see Language below).
 
 ## How it fits together
 
@@ -71,6 +71,14 @@ Bump the version in `.claude-plugin/plugin.json` (both copies) and `VERSION` in 
 
 Commit messages end with `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`. Pushing to `Stokn9x/Claude_Dashboard` is fine.
 
+## Language
+
+Every text a person sees is written where it is used, in both languages: `L('Butik', 'Shop')` on the page (`public/js/i18n.js`), `T(o, 'Åbn kontor', 'Open office')` in the mod (`office.ts`), `T('…', '…')` on the server. The choice is the server's (`prefs.json`, `POST /api/prefs`); the page keeps a copy in localStorage and reloads on a change, so texts built when a module loads follow too. Until one is chosen, the browser's language decides and is sent to the server. In Node (the tests) the page is Danish, so tests compare the Danish texts.
+
+- **The mod writes Danish for the page** (activity details, tasks, party plates). The page turns them into English on arrival (`inLanguage`, from the patterns in `MOD_TEXTS`): a new detail in `activity.ts` needs a pattern there. Code that compares such a text compares it with `modText('Tænker')`.
+- **Times, dates and numbers** use `locale()`, never 'da-DK'.
+- English on the canvas is kept about as short as the Danish (bubbles clip at ~30 characters).
+
 ## Pitfalls we have hit
 
 - **`$.state` survives a reload of the mod.** An office saved by an older version lacks newer fields: read it through `fresh()` and give every new field a default in `emptyOffice`.
@@ -80,7 +88,7 @@ Commit messages end with `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com
 - **Don't rebuild buttons on every update.** The state arrives several times a second; a button replaced under the pointer swallows the click. Build once, then update text and `disabled` (see `buildShop`).
 - **CSS class names are shared.** `.note` in the people list carries `grid-column: 2`; use the shop's own classes (`.hint`). `.bar` is a day in the progress chart (the header bar is `.topbar`).
 - **A fixed element has no `offsetParent`.** To see whether the floating panel shows, look at its `getBoundingClientRect()` width.
-- **The server serves only known names:** `/`, `/style.css` and `/js/<lowercase>.js`. A new module needs a lowercase name without dashes.
+- **The server serves only known names:** `/`, `/style.css` and `/js/<lowercase>.js`. A new module needs a name of lowercase letters and digits, without dashes.
 - **The mod across files.** The engine reads the mod's source before it loads it: a function that gets `$` from another file must be a function declaration (`export async function tidy($: $) {…}`), never an arrow in a `const`; and every file that reads or writes `$.state` makes its own `atom({ plugin: 'agent-kontor', key: 'office' } as const, emptyOffice)` (the same key is the same state). `claude.exe plugin validate` says so when one slips.
 - **Line endings are LF everywhere** (`.gitattributes`), also on Windows: a patch script writes plain newlines and nothing else.
 - **Patch scripts:** heredocs mangle backslashes and quotes. Write larger patches as Python files with the Write tool, assert every replacement, and remember to actually run the script. A `\n` or `\t` inside a Python string in such a script becomes a real newline or tab in the file: check the result with `node --check`, or fix the spot with the Edit tool.

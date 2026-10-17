@@ -4,6 +4,7 @@
 // a reload keeps the recent lines.
 import { store } from './store.js'
 import { el, remember, remembered } from './util.js'
+import { L, locale } from './i18n.js'
 
 const KEEP = 40
 const SHOWN = 8
@@ -11,7 +12,7 @@ const ICONS = { session: '🏢', arrive: '🚪', deliver: '📦', stuck: '⚠️
 
 const box = document.getElementById('feed')
 const list = el('ol', { className: 'feed-list' }, [])
-const toggle = el('button', { className: 'feed-head', type: 'button', ariaExpanded: 'false' }, [el('strong', {}, ['Aktivitet']), el('span', { className: 'feed-more' }, ['Vis flere'])])
+const toggle = el('button', { className: 'feed-head', type: 'button', ariaExpanded: 'false' }, [el('strong', {}, [L('Aktivitet', 'Activity')]), el('span', { className: 'feed-more' }, [L('Vis flere', 'Show more')])])
 box.replaceChildren(toggle, list)
 
 let events = []
@@ -20,13 +21,13 @@ try {
 } catch {}
 let isOpen = remembered('feed-open') === 'yes'
 
-const clockTime = at => new Date(at).toLocaleTimeString('da-DK', { hour: '2-digit', minute: '2-digit' })
+const clockTime = at => new Date(at).toLocaleTimeString(locale(), { hour: '2-digit', minute: '2-digit' })
 
 const render = () => {
   box.hidden = events.length === 0
   box.classList.toggle('is-open', isOpen)
   toggle.ariaExpanded = String(isOpen)
-  toggle.lastChild.textContent = isOpen ? 'Vis færre' : events.length > 1 ? 'Vis flere' : ''
+  toggle.lastChild.textContent = isOpen ? L('Vis færre', 'Show fewer') : events.length > 1 ? L('Vis flere', 'Show more') : ''
   // With more than one session, each line says which project it is from.
   const isMixed = new Set(store.state.sessions.map(s => s.project)).size > 1
   list.replaceChildren(

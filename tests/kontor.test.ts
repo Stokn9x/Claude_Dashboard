@@ -963,3 +963,23 @@ test("a plugin's agent is no regular until it is put on the staff", async ($, on
   ])
   expect(subs()[1]).toMatchObject({ name: 'Company Researcher' })
 })
+
+test('the button and the panel speak the language chosen on the office page', async ($, on) => {
+  const clock = engine(on)
+  let prefs = JSON.stringify({ lang: 'en' })
+  on('env.get', (_, e) => ({ value: e.name === 'USERPROFILE' ? 'C:/Users/test' : undefined }) as never)
+  on('fs.read', (_, e) => ({ value: e.path.endsWith('prefs.json') ? prefs : '' }) as never)
+  on('fs.list', () => ({ value: [] }) as never)
+  on('fs.write', () => ({ value: undefined }) as never)
+
+  await $.session.start(start())
+  const band = await $.ui.mount({ plugin: 'agent-kontor', surface: 'desktop', component: 'AbovePrompt', props: { hasSurvey: false, isWorking: false, maxRows: 10 } as never })
+  expect((await band.find({ key: 'kontor' }))?.text).toContain('Open office')
+  const pane = await $.ui.mount({ plugin: 'agent-kontor', surface: 'desktop', component: 'Pane', requestId: 'kontor', props: paneProps })
+  expect(JSON.stringify(await pane.drawn())).toContain('The office is drawn in your browser')
+
+  // Danish again, a moment after it is chosen.
+  prefs = JSON.stringify({ lang: 'da' })
+  await clock.advance(3500)
+  expect((await band.find({ key: 'kontor' }))?.text).toContain('Åbn kontor')
+})

@@ -6,13 +6,29 @@
 // the right one. A change reloads the page, so texts built when a module
 // loads follow too. Until one is chosen, the browser's language decides.
 // No DOM is touched when this loads: in Node (the tests) it is Danish.
-import { remember, remembered } from './util.js'
+
+// This browser's copy, read and written here and not through util.js, which
+// imports this module: no circle between the two. Storage may be missing or
+// throw (a private window); the page works without it.
+const KEY = 'agent-kontor:lang'
+const remembered = () => {
+  try {
+    return globalThis.localStorage?.getItem(KEY) ?? null
+  } catch {
+    return null
+  }
+}
+const remember = value => {
+  try {
+    globalThis.localStorage?.setItem(KEY, value)
+  } catch {}
+}
 
 export const LANGS = ['da', 'en']
 
 const initial = () => {
   if (typeof document === 'undefined') return 'da'
-  const kept = remembered('lang')
+  const kept = remembered()
   if (LANGS.includes(kept)) return kept
   return /^da\b/i.test(globalThis.navigator?.language ?? '') ? 'da' : 'en'
 }
@@ -31,7 +47,7 @@ export const useLang = next => {
 }
 
 // The language as chosen here, kept for the next load.
-export const keepLang = next => remember('lang', next)
+export const keepLang = next => remember(next)
 
 // What the mod writes in Danish ("Læser api.ts", "Venter på din
 // godkendelse"), in English: each pattern once, the rest kept as it is
@@ -63,6 +79,11 @@ const MOD_TEXTS = [
   [/^Bruger browseren$/, 'Using the browser'],
   [/^Bruger (.*)$/, 'Using $1'],
   [/^Kontoret$/, 'The office'],
+  // The plates over a desk when something is celebrated
+  [/^Testene er grønne$/, 'Tests are green'],
+  [/^Testene fejler$/, 'Tests are failing'],
+  [/^Committet$/, 'Committed'],
+  [/^Pull request åbnet$/, 'Pull request opened'],
   // The demo's tasks
   [/^Kortlæg API’et$/, 'Map the API'],
   [/^Skriv tests$/, 'Write tests'],
@@ -90,6 +111,7 @@ export const inLanguage = data => {
     ...s,
     project: modText(s.project),
     main: doing(s.main),
+    party: s.party ? { ...s.party, label: modText(s.party.label) } : s.party,
     subs: (s.subs ?? []).map(sub => ({ ...sub, task: modText(sub.task), activity: doing(sub.activity) })),
   }))
   const today = data.game?.stats?.today

@@ -15,7 +15,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-const VERSION = '0.32.0'
+const VERSION = '0.33.0'
 const HOST = '127.0.0.1'
 const PORT = Number(process.env.AGENT_KONTOR_PORT || 4747)
 const HERE = path.dirname(fileURLToPath(import.meta.url))
@@ -65,6 +65,9 @@ const COUNTS = Object.keys(RATES)
 // The floor plan the saved game is drawn for: 2 is the plan with the
 // corridor and rooms that grow in steps (0.19.0).
 const PLAN_VERSION = 2
+
+// A text the page shows, in the language chosen there (prefs, below).
+const T = (da, en) => (prefs.lang === 'en' ? en : da)
 const newGame = () => ({ v: 1, plan: PLAN_VERSION, kroner: 0, owned: { ...START, rooms: [...START.rooms] }, credited: {}, startedAt: Date.now() })
 
 // A game saved for the old floor plan, moved over to the new one so nobody
@@ -251,7 +254,7 @@ let floorNow = 0
 let floorWhere = ''
 
 const wellbeing = () => {
-  const parts = [{ what: 'Grundniveau', points: WELLBEING.base }]
+  const parts = [{ what: T('Grundniveau', 'Base level'), points: WELLBEING.base }]
   for (const item of LIFTS) {
     if (game.owned.rooms.includes(item)) parts.push({ what: item, points: WELLBEING[item] })
   }
@@ -516,10 +519,10 @@ const priceOf = item => {
 }
 
 const buy = item => {
-  if (typeof item !== 'string') return { status: 400, error: 'Forkert forespørgsel' }
+  if (typeof item !== 'string') return { status: 400, error: T('Forkert forespørgsel', 'Bad request') }
   const price = priceOf(item)
-  if (price === null) return { status: 409, error: 'Det kan ikke købes lige nu' }
-  if (game.kroner < price) return { status: 409, error: `Det koster ${price} kr, og du har ${Math.floor(game.kroner)} kr` }
+  if (price === null) return { status: 409, error: T('Det kan ikke købes lige nu', 'That cannot be bought right now') }
+  if (game.kroner < price) return { status: 409, error: T(`Det koster ${price} kr, og du har ${Math.floor(game.kroner)} kr`, `It costs ${price} kr, and you have ${Math.floor(game.kroner)} kr`) }
   game.kroner -= price
   if (item === 'desk') game.owned.desks += 1
   else game.owned.rooms = [...game.owned.rooms, item]
@@ -540,24 +543,24 @@ const bestDay = k => Math.max(0, ...Object.values(game.days ?? {}).map(d => d[k]
 const ALL_ROOMS = Object.keys(ROOM_PRICES)
 
 const ACHIEVEMENTS = [
-  { id: 'lines-1', name: 'Første linje', about: 'Skriv den første linje', reward: 10, value: () => total('added'), target: 1 },
-  { id: 'lines-1k', name: '1.000 linjer', about: 'Skriv 1.000 linjer i alt', reward: 100, value: () => total('added'), target: 1000 },
-  { id: 'lines-10k', name: '10.000 linjer', about: 'Skriv 10.000 linjer i alt', reward: 500, value: () => total('added'), target: 10_000 },
-  { id: 'lines-100k', name: '100.000 linjer', about: 'Skriv 100.000 linjer i alt', reward: 2000, value: () => total('added'), target: 100_000 },
-  { id: 'day-1k', name: 'En god dag', about: 'Skriv 1.000 linjer på én dag', reward: 300, value: () => bestDay('added'), target: 1000 },
-  { id: 'tasks-10', name: 'Holdspiller', about: 'Få 10 opgaver afleveret af hjælpere', reward: 100, value: () => total('delivered'), target: 10 },
-  { id: 'tasks-100', name: 'Teamleder', about: 'Få 100 opgaver afleveret af hjælpere', reward: 500, value: () => total('delivered'), target: 100 },
-  { id: 'tests-10', name: 'Grøn bølge', about: 'Kør grønne tests 10 gange', reward: 150, value: () => total('tests'), target: 10 },
-  { id: 'commits-10', name: 'Committed', about: 'Lav 10 commits', reward: 150, value: () => total('commits'), target: 10 },
-  { id: 'prs-5', name: 'Ship it', about: 'Åbn 5 pull requests', reward: 300, value: () => total('prs'), target: 5 },
-  { id: 'desk-3', name: 'Indflytning', about: 'Køb det første skrivebord', reward: 50, value: () => game.owned.desks, target: 1 },
-  { id: 'desk-10', name: 'Fuldt hus', about: 'Køb alle 22 skriveborde', reward: 1000, value: () => game.owned.desks, target: MAX_DESKS },
-  { id: 'kitchen', name: 'Kaffekultur', about: 'Byg køkkenet', reward: 100, value: () => (game.owned.rooms.includes('kitchen') ? 1 : 0), target: 1 },
-  { id: 'all-rooms', name: 'Hele kontoret', about: 'Byg alle rum og alt inventar', reward: 2000, value: () => ALL_ROOMS.filter(r => game.owned.rooms.includes(r)).length, target: ALL_ROOMS.length },
-  { id: 'wellbeing-90', name: 'Trivselsguru', about: 'Nå en trivsel på 90', reward: 500, value: () => wellbeing().score, target: 90 },
-  { id: 'days-5', name: 'Stabil', about: 'Arbejd på 5 forskellige dage', reward: 300, value: daysActive, target: 5 },
-  { id: 'days-20', name: 'Stamgæst', about: 'Arbejd på 20 forskellige dage', reward: 1000, value: daysActive, target: 20 },
-  { id: 'streak-5', name: 'I stødet', about: 'Arbejd 5 dage i træk', reward: 300, value: () => game.streak?.count ?? 0, target: 5 },
+  { id: 'lines-1', en: ['First line', 'Write the first line'], name: 'Første linje', about: 'Skriv den første linje', reward: 10, value: () => total('added'), target: 1 },
+  { id: 'lines-1k', en: ['1,000 lines', 'Write 1,000 lines in all'], name: '1.000 linjer', about: 'Skriv 1.000 linjer i alt', reward: 100, value: () => total('added'), target: 1000 },
+  { id: 'lines-10k', en: ['10,000 lines', 'Write 10,000 lines in all'], name: '10.000 linjer', about: 'Skriv 10.000 linjer i alt', reward: 500, value: () => total('added'), target: 10_000 },
+  { id: 'lines-100k', en: ['100,000 lines', 'Write 100,000 lines in all'], name: '100.000 linjer', about: 'Skriv 100.000 linjer i alt', reward: 2000, value: () => total('added'), target: 100_000 },
+  { id: 'day-1k', en: ['A good day', 'Write 1,000 lines in one day'], name: 'En god dag', about: 'Skriv 1.000 linjer på én dag', reward: 300, value: () => bestDay('added'), target: 1000 },
+  { id: 'tasks-10', en: ['Team player', 'Have helpers hand in 10 tasks'], name: 'Holdspiller', about: 'Få 10 opgaver afleveret af hjælpere', reward: 100, value: () => total('delivered'), target: 10 },
+  { id: 'tasks-100', en: ['Team lead', 'Have helpers hand in 100 tasks'], name: 'Teamleder', about: 'Få 100 opgaver afleveret af hjælpere', reward: 500, value: () => total('delivered'), target: 100 },
+  { id: 'tests-10', en: ['Green wave', 'Run green tests 10 times'], name: 'Grøn bølge', about: 'Kør grønne tests 10 gange', reward: 150, value: () => total('tests'), target: 10 },
+  { id: 'commits-10', en: ['Committed', 'Make 10 commits'], name: 'Committed', about: 'Lav 10 commits', reward: 150, value: () => total('commits'), target: 10 },
+  { id: 'prs-5', en: ['Ship it', 'Open 5 pull requests'], name: 'Ship it', about: 'Åbn 5 pull requests', reward: 300, value: () => total('prs'), target: 5 },
+  { id: 'desk-3', en: ['Moving in', 'Buy the first desk'], name: 'Indflytning', about: 'Køb det første skrivebord', reward: 50, value: () => game.owned.desks, target: 1 },
+  { id: 'desk-10', en: ['Full house', 'Buy all 22 desks'], name: 'Fuldt hus', about: 'Køb alle 22 skriveborde', reward: 1000, value: () => game.owned.desks, target: MAX_DESKS },
+  { id: 'kitchen', en: ['Coffee culture', 'Build the kitchen'], name: 'Kaffekultur', about: 'Byg køkkenet', reward: 100, value: () => (game.owned.rooms.includes('kitchen') ? 1 : 0), target: 1 },
+  { id: 'all-rooms', en: ['The whole office', 'Build every room and all the furniture'], name: 'Hele kontoret', about: 'Byg alle rum og alt inventar', reward: 2000, value: () => ALL_ROOMS.filter(r => game.owned.rooms.includes(r)).length, target: ALL_ROOMS.length },
+  { id: 'wellbeing-90', en: ['Wellbeing guru', 'Reach a wellbeing of 90'], name: 'Trivselsguru', about: 'Nå en trivsel på 90', reward: 500, value: () => wellbeing().score, target: 90 },
+  { id: 'days-5', en: ['Steady', 'Work on 5 different days'], name: 'Stabil', about: 'Arbejd på 5 forskellige dage', reward: 300, value: daysActive, target: 5 },
+  { id: 'days-20', en: ['Old hand', 'Work on 20 different days'], name: 'Stamgæst', about: 'Arbejd på 20 forskellige dage', reward: 1000, value: daysActive, target: 20 },
+  { id: 'streak-5', en: ['On a roll', 'Work 5 days in a row'], name: 'I stødet', about: 'Arbejd 5 dage i træk', reward: 300, value: () => game.streak?.count ?? 0, target: 5 },
 ]
 
 const checkAchievements = now => {
@@ -607,7 +610,7 @@ const saveCrew = () => {
 // on it, false off.
 const changeCrew = change => {
   const agent = change?.agent
-  if (typeof agent !== 'string' || !AGENT.test(agent)) return { status: 400, error: 'Ukendt agent' }
+  if (typeof agent !== 'string' || !AGENT.test(agent)) return { status: 400, error: T('Ukendt agent', 'Unknown agent') }
   const names = { ...crew.names }
   let removed = [...crew.removed]
   let added = [...crew.added]
@@ -624,7 +627,7 @@ const changeCrew = change => {
     added = added.filter(x => x !== agent)
     if (change.isAdded) added.push(agent)
   }
-  if (Object.keys(names).length > CREW_MAX || removed.length > CREW_MAX || added.length > CREW_MAX) return { status: 400, error: 'For mange' }
+  if (Object.keys(names).length > CREW_MAX || removed.length > CREW_MAX || added.length > CREW_MAX) return { status: 400, error: T('For mange', 'Too many') }
   crew = { names, removed, added }
   saveCrew()
   return { status: 200 }
@@ -647,7 +650,7 @@ const loadPrefs = () => {
 }
 // {"lang":"en"}
 const changePrefs = change => {
-  if (!LANGS.includes(change?.lang)) return { status: 400, error: 'Ukendt sprog' }
+  if (!LANGS.includes(change?.lang)) return { status: 400, error: T('Ukendt sprog', 'Unknown language') }
   prefs = { ...prefs, lang: change.lang }
   try {
     fs.mkdirSync(path.dirname(PREFS), { recursive: true })
@@ -676,7 +679,7 @@ const gameView = () => ({
   bought: (game.log ?? []).slice(-5),
   streak: streakView(),
   stats: statsView(),
-  achievements: ACHIEVEMENTS.map(a => ({ id: a.id, name: a.name, about: a.about, reward: a.reward, value: Math.min(a.value(), a.target), target: a.target, at: game.achieved?.[a.id] ?? null })),
+  achievements: ACHIEVEMENTS.map(a => ({ id: a.id, name: T(a.name, a.en[0]), about: T(a.about, a.en[1]), reward: a.reward, value: Math.min(a.value(), a.target), target: a.target, at: game.achieved?.[a.id] ?? null })),
 })
 
 // The last two weeks day by day, today, the best day and the totals.
@@ -833,7 +836,7 @@ const start = () => {
 
 // The page, its stylesheet and its modules: only these names, so no path
 // from the address ever reaches outside the public folder.
-const MODULE = /^\/js\/[a-z]+\.js$/
+const MODULE = /^\/js\/[a-z0-9]+\.js$/
 const fileFor = pathname => {
   if (pathname === '/' || pathname === '/index.html') return ['index.html', 'text/html; charset=utf-8']
   if (pathname === '/style.css') return ['style.css', 'text/css; charset=utf-8']
@@ -851,7 +854,7 @@ const isLocalOrigin = origin => origin === `http://${HOST}:${PORT}` || origin ==
 // price and saldo, and what a change to the regulars may be.
 const handlePost = (req, res, act) => {
   const json = (status, body) => res.writeHead(status, { 'content-type': 'application/json', 'cache-control': 'no-store' }).end(JSON.stringify(body))
-  if (!isLocalOrigin(req.headers.origin ?? '') || req.headers['x-kontor-token'] !== TOKEN) return json(403, { error: 'Ikke tilladt' })
+  if (!isLocalOrigin(req.headers.origin ?? '') || req.headers['x-kontor-token'] !== TOKEN) return json(403, { error: T('Ikke tilladt', 'Not allowed') })
   let body = ''
   req.setEncoding('utf8')
   req.on('data', chunk => {
@@ -863,7 +866,7 @@ const handlePost = (req, res, act) => {
     try {
       asked = JSON.parse(body)
     } catch {
-      return json(400, { error: 'Forkert forespørgsel' })
+      return json(400, { error: T('Forkert forespørgsel', 'Bad request') })
     }
     const result = act(asked)
     if (result.status === 200) {

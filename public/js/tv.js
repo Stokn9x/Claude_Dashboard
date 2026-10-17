@@ -8,6 +8,7 @@
 import { store, focused } from './store.js'
 import { canvas } from './gfx.js'
 import { glide, goHome } from './camera.js'
+import { L } from './i18n.js'
 
 const button = document.getElementById('tv')
 const FOLLOW_MS = 1000
@@ -21,7 +22,7 @@ const set = on => {
   isOn = on
   document.body.classList.toggle('tv', on)
   button.ariaPressed = String(on)
-  button.title = on ? 'Afslut tv-tilstand (T eller Esc)' : 'Tv-tilstand: fuld skærm, og kameraet følger det, der sker (T)'
+  button.title = on ? L('Afslut tv-tilstand (T eller Esc)', 'Leave TV mode (T or Esc)') : L('Tv-tilstand: fuld skærm, og kameraet følger det, der sker (T)', 'TV mode: full screen, and the camera follows what happens (T)')
   if (on && !document.fullscreenElement) document.documentElement.requestFullscreen?.().catch(() => {})
   if (!on && document.fullscreenElement) document.exitFullscreen?.().catch(() => {})
   if (!on) goHome()

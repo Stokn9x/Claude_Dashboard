@@ -3,6 +3,7 @@
 // the page gives one a name of its own, and takes it off the staff or on
 // again; the server keeps it in crew.json, and the mod seats who is on.
 import { store } from './store.js'
+import { L } from './i18n.js'
 
 export const crewOf = () => ({ names: {}, removed: [], added: [], ...(store.state.game?.crew ?? {}) })
 
@@ -23,8 +24,8 @@ export const knownAgents = () =>
 // listing), in words; null when it does not say.
 export const originOf = agent => {
   const source = (store.state.sessions ?? []).map(s => s.agentSources?.[agent]).find(Boolean) ?? (isPluginAgent(agent) ? 'plugin' : null)
-  if (source === 'plugin') return `Fra pluginet ${pluginOf(agent) ?? ''}`.trim()
-  return { user: 'Din egen agent', project: 'Fra projektet', org: 'Fra organisationen' }[source] ?? null
+  if (source === 'plugin') return L(`Fra pluginet ${pluginOf(agent) ?? ''}`, `From the ${pluginOf(agent) ?? ''} plugin`).replace(/\s+/g, ' ').trim()
+  return { user: L('Din egen agent', 'Your own agent'), project: L('Fra projektet', 'From the project'), org: L('Fra organisationen', 'From the organisation') }[source] ?? null
 }
 
 // An agent's own name, without its plugin.

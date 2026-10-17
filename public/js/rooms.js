@@ -6,6 +6,7 @@
 import { owns } from './store.js'
 import { OUTLINE, FONT } from './gfx.js'
 import { ROOM_TYPES } from './plan.js'
+import { L } from './i18n.js'
 
 // A framed painting on a wall: sky, hills and a sun, in three colours.
 const painting = (g, fill, x, y, w, h, [land, sky, sun]) => {
@@ -488,7 +489,7 @@ export const roomDrawers = {
     g.font = `700 8.5px ${FONT}`
     g.fillStyle = '#5B6672'
     g.textAlign = 'center'
-    g.fillText('Depot', r.x + r.w / 2, r.y + r.h / 2 - 20)
+    g.fillText(L('Depot', 'Storage'), r.x + r.w / 2, r.y + r.h / 2 - 20)
   },
 }
 // A ping-pong table, net across the middle
