@@ -71,3 +71,26 @@ export const idlePlan = (idleSubs, now, taken = new Set()) => {
   })
   return plan
 }
+
+// A regular (one of your own agents, in all day) between jobs takes time
+// off too, and keeps its desk. Time runs in stretches of three minutes; in
+// about every other one, from its id and the clock, it goes to the lounge,
+// the kitchen or the lawn like a helper off work. Only a stretch that began
+// once it had sat ready a minute: nobody leaves the moment it sits down.
+// When the stretch ends, or a job comes, it walks back to its desk.
+export const REGULAR_SLOT_MS = 3 * 60_000
+export const READY_FIRST_MS = 60_000
+
+// When its time off began, or null when it is at its desk.
+export const offSince = (sub, now, walks) => {
+  if (!sub.staff || sub.isOnJob || sub.phase !== 'working') return null
+  const slot = Math.floor(now / REGULAR_SLOT_MS)
+  const start = slot * REGULAR_SLOT_MS
+  const ready = sub.since + (walks?.arrive ?? 12_000)
+  if (ready + READY_FIRST_MS > start) return null
+  return stir(hashOf(sub.id), slot + 101) % 100 < 50 ? start : null
+}
+
+// Off work now: a helper between handing over and going home, or a
+// regular on its time off.
+export const isOffWork = (sub, now, walks) => sub.phase === 'idle' || offSince(sub, now, walks) !== null

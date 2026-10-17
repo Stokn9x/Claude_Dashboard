@@ -14,7 +14,7 @@ import { blueprint, board, chair, clock, coffeePot, desk, deskPlant, deskThingsF
 import { PAUSE_SLOT_MS, bowlOf, catNow, catPlaces, claudePause } from './cat.js'
 import { christmasLights, daylight, drawWeather, evening, timeOfDay, weatherNow } from './light.js'
 import { chatFor, grumbleAt } from './voices.js'
-import { IDLE_WALK_MS, idlePlan } from './idle.js'
+import { IDLE_WALK_MS, idlePlan, isOffWork, offSince } from './idle.js'
 import { GROUNDS, handoffFor } from './plan.js'
 import { applyView, drawMinimap, isInView, pixelsPerUnit, stepGlide, view, visibleRect } from './camera.js'
 import { background, drawBuilding } from './building.js'
@@ -58,17 +58,21 @@ const lineupsOf = key => {
 // a desk or out of the door once they are called on or go home.
 const idleWalks = new Map()
 const lastIdle = new Map()
+// A regular back from its time off: the walk to its desk ({ from, start }).
+const backWalks = new Map()
 
-// Where a helper off work is now: walking to its idle spot, or there.
-const idlePose = (sub, plan, now) => {
+// Where a helper off work is now: walking to its idle spot, or there. The
+// first walk sets off from where it handed over, or, a regular, from its
+// desk when its time off began.
+const idlePose = (sub, plan, now, first = { from: handoffFor(sub.seat), start: sub.since }) => {
   const target = plan.get(sub.id)
   if (!target) return null
   let walk = idleWalks.get(sub.id)
   const isNewSpot = walk && (walk.to.x !== target.spot.x || walk.to.y !== target.spot.y)
   if (!walk || isNewSpot) {
-    // From where it is now, or, the first time, from where it handed over.
-    const from = walk ? lastIdle.get(sub.id) ?? walk.to : handoffFor(sub.seat)
-    walk = { from: { x: from.x, y: from.y }, to: target.spot, start: walk ? now : sub.since }
+    // From where it is now, or, the first time, from where it set off.
+    const from = walk ? lastIdle.get(sub.id) ?? walk.to : first.from
+    walk = { from: { x: from.x, y: from.y }, to: target.spot, start: walk ? now : first.start }
     idleWalks.set(sub.id, walk)
   }
   const points = route(walk.from, walk.to)
@@ -488,8 +492,11 @@ export const draw = () => {
   // empty chair: Claude leaves the kitchen or the meeting to take it.
   const isReceiving = subs.some(x => x.phase === 'delivering')
   const settledHere = s ? lineupsOf(s.key) : null
-  const meeting = meetingNow(subs, now, walks, main, settledHere)
-  const pause = breakNow(subs, now, walks, meeting, settledHere)
+  // A regular on its time off is not asked to a meeting or a break.
+  const offNow = sub => isOffWork(sub, now, walks)
+  const atHand = subs.filter(sub => offSince(sub, now, walks) === null)
+  const meeting = meetingNow(atHand, now, walks, main, settledHere)
+  const pause = breakNow(atHand, now, walks, meeting, settledHere)
   const onErrand = errandsNow(subs, now, meeting, pause)
   const meetingPose = meeting?.withClaude && !isReceiving ? errandPose(MAIN_SPOT, { kind: 'meeting', start: meeting.start, stay: STAY.meeting, dest: meeting.head }, now) : null
   // On a pause Claude takes a coffee, waters its plants or strokes the cat
@@ -499,7 +506,7 @@ export const draw = () => {
   const lounge = firstRoom('lounge')
   const tableEnds = owns('pingpong') ? spotsIn(lounge, typeOf(lounge).pingpong) : []
   const isBreakAtTable = [...(pause?.errands.values() ?? [])].some(e => e.kind === 'pingpong')
-  const partner = tableEnds.length === 2 && !isBreakAtTable ? subs.filter(x => x.phase === 'idle').sort((a, b) => (a.id < b.id ? -1 : 1))[0] ?? null : null
+  const partner = tableEnds.length === 2 && !isBreakAtTable ? subs.filter(offNow).sort((a, b) => (a.id < b.id ? -1 : 1))[0] ?? null : null
   const rest = meetingPose || main.state !== 'idle' || isReceiving ? null : claudePause(now, { table: partner ? tableEnds : null })
   const playsWith = rest?.kind === 'pingpong' ? partner : null
   const claudeWhere = meetingPose ? 'meeting' : rest ? rest.kind : 'desk'
@@ -512,16 +519,46 @@ export const draw = () => {
   // Off work, a helper keeps clear of the spots a break or the meeting uses.
   const taken = new Set([...(pause?.errands.values() ?? [])].map(e => `${e.dest.x},${e.dest.y}`).concat([...(meeting?.seats.values() ?? [])].map(p => `${p.x},${p.y}`)))
   if (playsWith) for (const p of tableEnds) taken.add(`${p.x},${p.y}`)
-  const plan = idlePlan(subs.filter(sub => sub.phase === 'idle' && sub !== playsWith), now, taken)
+  const plan = idlePlan(subs.filter(sub => offNow(sub) && sub !== playsWith), now, taken)
   // Claude's partner goes to the other end of the table.
   if (playsWith) plan.set(playsWith.id, { kind: 'pingpong', spot: rest.partnerSpot, index: 1, slot: rest.slot })
-  const poses = new Map(
-    subs.map(sub => [sub.id, sub.phase === 'idle' ? idlePose(sub, plan, now) : poseOf(sub, now, walks, sub.from === 'idle' ? lastIdle.get(sub.id) ?? GROUNDS.hangout[0] : null)]),
-  )
+  // A regular whose time off is over, or who got a job, walks back to its
+  // desk from where it was, then sits down.
+  const backToDesk = sub => {
+    let back = backWalks.get(sub.id)
+    if (!back) {
+      back = { from: lastIdle.get(sub.id), start: now }
+      backWalks.set(sub.id, back)
+    }
+    const points = route(back.from, placeOf(sub.seat).spot)
+    const k = (now - back.start) / walkMs(points, IDLE_WALK_MS)
+    if (k < 1) return walkAt(points, k)
+    backWalks.delete(sub.id)
+    lastIdle.delete(sub.id)
+    return null
+  }
+  const poseFor = sub => {
+    if (sub.phase === 'idle') return idlePose(sub, plan, now)
+    const off = offSince(sub, now, walks)
+    if (off !== null) {
+      backWalks.delete(sub.id)
+      return idlePose(sub, plan, now, { from: placeOf(sub.seat).spot, start: off })
+    }
+    // Handing a job over on the way back: it walks to Claude from here, and
+    // comes back from Claude's desk.
+    if (sub.staff && sub.phase !== 'working') {
+      backWalks.delete(sub.id)
+      lastIdle.delete(sub.id)
+    }
+    const isBack = sub.staff && sub.phase === 'working' && lastIdle.has(sub.id)
+    return (isBack && backToDesk(sub)) || poseOf(sub, now, walks, sub.from === 'idle' ? lastIdle.get(sub.id) ?? GROUNDS.hangout[0] : null)
+  }
+  const poses = new Map(subs.map(sub => [sub.id, poseFor(sub)]))
   // Forget the idle walks of those no longer off work, and where helpers
   // idled once they are in no session at all.
   const everyone = new Set(store.state.sessions.flatMap(x => (x.subs ?? []).map(sub => sub.id)))
-  for (const id of idleWalks.keys()) if (!subs.some(sub => sub.id === id && sub.phase === 'idle')) idleWalks.delete(id)
+  for (const id of idleWalks.keys()) if (!subs.some(sub => sub.id === id && offNow(sub))) idleWalks.delete(id)
+  for (const id of backWalks.keys()) if (!everyone.has(id)) backWalks.delete(id)
   for (const id of lastIdle.keys()) if (!everyone.has(id)) lastIdle.delete(id)
   // Nobody jumps: a helper far from where it was drawn walks over first.
   const bridged = new Map()

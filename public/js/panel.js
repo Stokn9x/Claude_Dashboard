@@ -13,6 +13,7 @@ import { fit, glide } from './camera.js'
 import { WALKS } from './routes.js'
 import { renderShop, moodFace } from './shop.js'
 import { renderProgress, announce } from './progress.js'
+import { offSince } from './idle.js'
 
 const tabs = document.getElementById('tabs')
 const people = document.getElementById('people')
@@ -145,7 +146,9 @@ const homeIn = (sub, now = Date.now()) => {
 }
 
 export const phaseLabel = (sub, onFloorFrom) =>
-  sub.outcome === 'failed' && (sub.phase === 'delivering' || sub.phase === 'leaving')
+  offSince(sub, Date.now(), { ...WALKS, ...(focused()?.walks ?? {}) }) !== null
+    ? 'Holder fri'
+    : sub.outcome === 'failed' && (sub.phase === 'delivering' || sub.phase === 'leaving')
     ? 'Gik i stå'
     : sub.phase === 'idle'
       ? homeIn(sub)

@@ -690,3 +690,23 @@ test('a regular without a desk has its own grumbles; on the bench the usual ones
   assert.ok(regular && helper)
   assert.notEqual(regular, helper)
 })
+
+test('a regular between jobs takes time off about every other stretch, never on a job or just sat down', () => {
+  const walks = { arrive: 12_000 }
+  const T = idle.REGULAR_SLOT_MS
+  const base = 1000 * T
+  const regular = { id: 'staff-code-reviewer', staff: 'code-reviewer', phase: 'working', since: base - 10 * T }
+  const slots = Array.from({ length: 40 }, (_, i) => idle.offSince(regular, base + i * T + 5000, walks))
+  const off = slots.filter(x => x !== null)
+  assert.ok(off.length >= 10 && off.length <= 30, `off in ${off.length} of 40`)
+  // Time off begins when its stretch does.
+  for (const [i, at] of slots.entries()) if (at !== null) assert.equal(at, base + i * T)
+  const offAt = base + slots.findIndex(x => x !== null) * T + 5000
+  assert.ok(idle.isOffWork(regular, offAt, walks))
+  // At a job, or just sat down after one: at its desk.
+  assert.equal(idle.offSince({ ...regular, isOnJob: true }, offAt, walks), null)
+  assert.equal(idle.offSince({ ...regular, since: offAt - 30_000 }, offAt, walks), null)
+  assert.equal(idle.offSince({ ...regular, phase: 'arriving' }, offAt, walks), null)
+  // A helper is never on a regular's time off.
+  assert.equal(idle.offSince({ ...regular, staff: undefined }, offAt, walks), null)
+})
