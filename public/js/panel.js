@@ -32,7 +32,8 @@ const dot = state => el('span', { className: 'dot', style: `background:${stateCo
 const PILL = { reading: 'Læser', editing: 'Skriver', running: 'Kører', browsing: 'Nettet', waiting: 'Venter på dig', working: 'Arbejder', idle: 'Pause' }
 const pill = (state, detail) => {
   const colour = stateColor[state] ?? '#8A94A0'
-  const text = state === 'working' && detail === 'Tænker' ? 'Tænker' : PILL[state] ?? state
+  // A teammate between its turns is ready for its next message, not on a break.
+  const text = state === 'working' && detail === 'Tænker' ? 'Tænker' : state === 'idle' && detail === 'Venter på en besked' ? 'Ledig' : PILL[state] ?? state
   return el('span', { className: 'pill', style: `color:${colour};background:color-mix(in srgb, ${colour} 16%, transparent)` }, [text])
 }
 // The heading says it already; the details need not say it again
