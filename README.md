@@ -8,6 +8,7 @@ Et pixel-kontor set ovenfra, i din browser. Tryk på **🏢 Åbn kontor** over c
 - **Hele vinduet:** kontoret ligger midt på en grund med græs, træer, en sø og en vej med biler og gadelygter, og fylder hele browservinduet. Listen, butikken og fremskridt svæver i et panel i venstre side, som kan foldes sammen med **‹**; på en telefon ligger panelet i bunden.
 - **Kamera:** træk for at flytte rundt, rul eller knib for at zoome, og dobbeltklik eller tryk **Vis hele kontoret** for at komme tilbage. Når du har flyttet dig, viser et lille kort i hjørnet, hvor du er. Tryk **Gå til** i den røde "venter på dig"-boks for at hoppe hen til den, der venter. Tastaturet virker også: pile eller WASD flytter, + og − zoomer, og 0 viser hele kontoret.
 - **Tv-tilstand:** tryk 📺 i topbjælken eller T, så fylder kontoret hele skærmen uden panel, og kameraet følger selv det, der sker: først den, der venter på dig, så hjælpere på vej ind eller med et resultat, og ellers dem, der arbejder. Esc slukker den.
+- **Rundvisning:** første gang du åbner kontoret, viser en kort rundvisning, hvad det kan. Tryk **?** i topbjælken for at se den igen.
 - **Hjælpernes type og model:** en Explore-hjælper har et forstørrelsesglas på skrivebordet, en Plan-hjælper en tegningsrulle, og navneskiltet har modellens farve: Opus lilla, Sonnet blå, Haiku grøn.
 - **Aktivitet:** nederst står det seneste, der er sket: hvem der kom ind, afleverede eller gik i stå, grønne tests, køb og præstationer. Tryk på boksen for at se flere. Hjælperne kommer op ad stien fra vejen og går samme vej hjem.
 - **Vækst:** alle rum ligger langs en hovedgang. Teamrum, køkken, lounge og toilet starter små og vokser i trin, ud på grunden eller ind i et depot, op til 22 skriveborde. Loungen får pool, dart, bar og spil til hjælperne med fri, og receptionen bag hoveddøren kan indrettes, så Bodil byder alle velkommen. Hjælperne går i højre side af gangen og lige gennem dørene. Se [GRUNDPLAN.md](GRUNDPLAN.md).
@@ -42,7 +43,7 @@ Skriv `/kontor demo`, så kommer seks hjælpere ind, arbejder et stykke tid og a
 
 ## Installér
 
-Kræver [Node.js](https://nodejs.org) 18 eller nyere til kontorets lille server.
+Kræver [Node.js](https://nodejs.org) 18 eller nyere til kontorets lille server. Mangler det, siger knappen **🏢 Åbn kontor** det og viser, hvor du henter det.
 
 ### Med Claude desktop
 

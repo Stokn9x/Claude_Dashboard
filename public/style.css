@@ -107,6 +107,26 @@ button.chip { cursor: pointer; }
 .card-steps time { color: var(--soft); font-variant-numeric: tabular-nums; margin-right: 8px; }
 
 /* The bottom-right corner: back to the whole office, and the minimap */
+/* ── Welcome: the tour the first time ──────────────────────────────── */
+.welcome { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; padding: 16px; background: rgba(8, 11, 15, 0.55); backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); animation: welcome-in 0.2s ease-out; }
+.welcome-card { width: min(440px, 100%); display: grid; gap: 10px; padding: 22px 22px 18px; border-radius: 18px; background: var(--glass); border: 1px solid rgba(255, 255, 255, 0.08); box-shadow: var(--shadow); }
+.welcome-icon { font-size: 34px; line-height: 1; }
+.welcome h2 { margin: 2px 0 2px; font-size: 19px; }
+.welcome p { margin: 0; color: var(--soft); font-size: 14px; line-height: 1.5; }
+.welcome-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 8px; }
+.welcome-dots { display: flex; gap: 6px; }
+.welcome-dots span { width: 7px; height: 7px; border-radius: 50%; background: var(--line); }
+.welcome-dots span.is-on { background: var(--accent); }
+.welcome-buttons { display: flex; gap: 8px; }
+.welcome-buttons button { border: 0; border-radius: 9px; padding: 8px 16px; font-weight: 600; cursor: pointer; }
+.welcome-skip { background: none; color: var(--soft); }
+.welcome-skip:hover { color: var(--ink); }
+.welcome-next { background: var(--accent); color: #FFFFFF; }
+.welcome-next:hover { filter: brightness(1.1); }
+#help { font-weight: 700; min-width: 30px; }
+@keyframes welcome-in { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .welcome { animation: none; } }
+
 /* ── Tv mode: the office alone, and the camera follows ──────────────── */
 body.tv .side, body.tv .side-open, body.tv .feed, body.tv .corner, body.tv .card { display: none !important; }
 body.tv header { opacity: 0.55; transition: opacity 0.3s; }

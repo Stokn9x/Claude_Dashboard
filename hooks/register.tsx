@@ -7,7 +7,7 @@ import { base, activityFor } from './activity'
 import { setMain, setActivity, noteTool, arrive, deliver, handIn, teammateWaits, wakes, TIDY_MS, tidy, sweepAgents, runDemo } from './helpers'
 import { LINES_PER_EDIT, earn, partiesFor, creditCommit, celebrate, countPatch, countLines } from './earnings'
 import type { Patch } from './earnings'
-import { ADDRESS, WRITE_MS, READ_MS, SERVER_CHECK_MS, NO_SERVER, writeStatus, readOthers, readGame, leaveOffice, openOffice, keepServer } from './status'
+import { ADDRESS, WRITE_MS, READ_MS, SERVER_CHECK_MS, whyNoServer, writeStatus, readOthers, readGame, leaveOffice, openOffice, keepServer } from './status'
 
 // The session's office in $.state: the engine wants the reference spelled
 // out in every file that reads or writes it, so each file makes its own.
@@ -44,6 +44,11 @@ const phaseText: Record<Phase, string> = {
 
 // ─── Hooks ──────────────────────────────────────────────────────────────
 
+// The button opens the office, or says why it cannot.
+async function openOrSay($: $) {
+  if (!(await openOffice($))) $.ui.toast(await whyNoServer($), { timeoutMs: 15_000 })
+}
+
 export const register: Register = on => {
   // spawn tool_use_id → the subagent, to see it out when its call ends. A
   // background one's call returns at once, so it waits for SubagentStop.
@@ -69,7 +74,7 @@ export const register: Register = on => {
       await $.ui.open({ id: PANE, title: '🏢 Kontor', focus: true })
       return { text: 'Listen over hvem der laver hvad står i panelet.' }
     }
-    const where = (await openOffice($)) ? `Kontoret er åbent i din browser på ${ADDRESS}.` : NO_SERVER
+    const where = (await openOffice($)) ? `Kontoret er åbent i din browser på ${ADDRESS}.` : await whyNoServer($)
     if (arg === 'demo') {
       await runDemo($)
       return { text: `${where} Seks hjælpere er på vej ind.` }
@@ -213,7 +218,7 @@ export const register: Register = on => {
         o.main.state === 'waiting' ? 'Claude venter på dig' : helpers ? `${helpers} ${helpers === 1 ? 'hjælper' : 'hjælpere'} i kontoret` : null
       return (
         <Box flexDirection="row" gap={1}>
-          <Button key="kontor" label="🏢 Åbn kontor" onPress={() => void quietly(openOffice($))} />
+          <Button key="kontor" label="🏢 Åbn kontor" onPress={() => void quietly(openOrSay($))} />
           {note ? <Text color={o.main.state === 'waiting' ? '#E5484D' : undefined} dimColor={o.main.state !== 'waiting'}>{note}</Text> : null}
         </Box>
       )
@@ -269,7 +274,7 @@ export const register: Register = on => {
             <Text dimColor wrap="wrap">{`Det ligger på ${ADDRESS}. Alle dine sessioner sidder i samme kontor.`}</Text>
           </Box>
           <Box flexDirection="row" gap={2} paddingX={1}>
-            <Button label="Åbn kontor" onPress={() => void quietly(openOffice($))} />
+            <Button label="Åbn kontor" onPress={() => void quietly(openOrSay($))} />
             <Button label="Kopiér adresse" onPress={press => void quietly($.ui.copy({ text: ADDRESS, surface: press.surface }))} />
           </Box>
           {o.game ? (

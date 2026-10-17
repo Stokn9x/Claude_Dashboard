@@ -827,3 +827,26 @@ test('a teammate stays at its desk between turns, hands in each task from the li
   expect(sub().phase).toBe('delivering')
   expect(earned().delivered).toBe(1)
 })
+
+test('without Node.js, the button says what is missing and where to get it', async ($, on) => {
+  engine(on)
+  const toasts: string[] = []
+  on('ui.toast', (_, e) => {
+    toasts.push((e as { text: string }).text)
+    return { value: undefined } as never
+  })
+  on('env.get', (_, e) => ({ value: e.name === 'OS' ? 'Windows_NT' : undefined }) as never)
+  on('http.fetch', () => {
+    throw new Error('ECONNREFUSED')
+  })
+  on('process.run', () => {
+    throw new Error('ENOENT: node')
+  })
+  await $.session.start(start())
+  const band = await $.ui.mount({ plugin: 'agent-kontor', surface: 'desktop', component: 'AbovePrompt', props: { hasSurvey: false, isWorking: false, maxRows: 10 } as never })
+  await band.press({ key: 'kontor' })
+  expect(toasts.join(' ')).toContain('Node.js 18')
+  expect(toasts.join(' ')).toContain('https://nodejs.org')
+  const answer = (await $.command.run({ command: 'kontor', args: '' } as never)) as { text: string }
+  expect(answer.text).toContain('ikke installeret')
+})

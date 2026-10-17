@@ -100,13 +100,20 @@ const renderChips = () => {
 // The tabs stand in the order the sessions started, oldest first: the server
 // lists them by their latest write, which every heartbeat changes.
 const byStart = (a, b) => (a.startedAt ?? 0) - (b.startedAt ?? 0) || (a.key < b.key ? -1 : a.key > b.key ? 1 : 0)
+// A tab's name: the project, and when two sessions share one, the time
+// each began, so they can be told apart.
+const tabName = (x, sessions) => {
+  const name = x.project || 'Session'
+  if (sessions.filter(y => (y.project || 'Session') === name).length < 2 || !x.startedAt) return name
+  return `${name} · ${new Date(x.startedAt).toLocaleTimeString('da-DK', { hour: '2-digit', minute: '2-digit' })}`
+}
 const renderTabs = s => {
   const sessions = [...store.state.sessions].sort(byStart)
   const key = JSON.stringify([sessions.map(x => [x.key, x.project, x.main.state]), s?.key])
   if (key === tabsKey) return
   tabsKey = key
   tabs.replaceChildren(
-    ...sessions.map(x => el('button', { className: 'tab', type: 'button', onclick: () => choose(x.key), ariaPressed: String(x === s), title: x.main.detail }, [dot(x.main.state), x.project || 'Session'])),
+    ...sessions.map(x => el('button', { className: 'tab', type: 'button', onclick: () => choose(x.key), ariaPressed: String(x === s), title: x.main.detail }, [dot(x.main.state), tabName(x, sessions)])),
   )
 }
 
