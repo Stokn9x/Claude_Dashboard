@@ -641,3 +641,12 @@ test('the log hears when Claude finishes a long turn, not a short or a cut one',
   assert.deepEqual(kinds({ endedAt: 2, ms: 240_000, isAborted: true }), [])
   assert.deepEqual(kinds({ endedAt: 1, ms: 300_000, isAborted: false }), [], 'the same turn again is no news')
 })
+
+test('a teammate that handed in a task walks back from Claude to its desk', () => {
+  owning(['claude', 'team'], 3)
+  const sub = helper('t1', { seat: 1, phase: 'arriving', from: 'handover', since: 0 })
+  const start = routes.poseOf(sub, 1)
+  const hand = plan.handoffFor(1)
+  assert.ok(Math.hypot(start.x - hand.x, start.y - hand.y) < 3, 'it sets off from beside Claude')
+  assert.equal(routes.poseOf(sub, routes.WALKS.arrive).seated, true, 'and sits down at its desk')
+})

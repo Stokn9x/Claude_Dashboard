@@ -4,7 +4,7 @@ import type { AgentState, Phase } from '../types'
 import { emptyOffice, thinking, pause, readOffice, quietly } from './office'
 import type { $ } from './office'
 import { base, activityFor } from './activity'
-import { setMain, setActivity, noteTool, arrive, deliver, TIDY_MS, tidy, sweepAgents, runDemo } from './helpers'
+import { setMain, setActivity, noteTool, arrive, deliver, handIn, teammateWaits, wakes, TIDY_MS, tidy, sweepAgents, runDemo } from './helpers'
 import { LINES_PER_EDIT, earn, partiesFor, creditCommit, celebrate, countPatch, countLines } from './earnings'
 import type { Patch } from './earnings'
 import { ADDRESS, WRITE_MS, READ_MS, SERVER_CHECK_MS, NO_SERVER, writeStatus, readOthers, readGame, leaveOffice, openOffice, keepServer } from './status'
@@ -82,8 +82,11 @@ export const register: Register = on => {
     return next(e)
   })
 
+  // A turn in a subagent's or teammate's loop is theirs, not Claude's: a
+  // teammate woken by a message starts thinking at its desk.
   on('turn.start', async ($, e, next) => {
-    await quietly(setMain($, thinking))
+    if (e.agentId) await quietly(wakes($, e.agentId))
+    else await quietly(setMain($, thinking))
     return next(e)
   })
 
@@ -94,6 +97,8 @@ export const register: Register = on => {
     if (e.agentId) {
       const answer = typeof e.answer === 'string' ? e.answer.trim().slice(0, ANSWER_MAX) : ''
       if (answer) await quietly(update($, office, o => ({ ...o, subs: o.subs.map(s => (s.id === e.agentId ? { ...s, answer } : s)) })))
+      // A teammate's turn is over: it waits at its desk for its next message.
+      await quietly(teammateWaits($, e.agentId))
       return result
     }
     const u = e.usage
@@ -119,8 +124,17 @@ export const register: Register = on => {
   })
 
   // The subagent's own loop has ended: its work is done, whatever its call did.
+  // A teammate's turn ending is no stop: it waits for its next message, and
+  // leaves when the engine's list says it has ended.
   on('classic.SubagentStop', async ($, e, next) => {
-    await quietly(deliver($, e.agent_id))
+    const sub = (await readOffice($)).subs.find(s => s.id === e.agent_id)
+    if (!sub?.teammate) await quietly(deliver($, e.agent_id))
+    return next(e)
+  })
+
+  // A task on the team's list done by a teammate: it hands it in.
+  on('classic.TaskCompleted', async ($, e, next) => {
+    if (e.teammate_name) await quietly(handIn($, e.teammate_name, e.task_subject ?? ''))
     return next(e)
   })
 
@@ -133,8 +147,10 @@ export const register: Register = on => {
   on('agent.spawn', async ($, e, next) => {
     const r = await next(e)
     if ('agentId' in r && r.agentId) {
-      spawned.set(e.tool_use_id, { agentId: r.agentId, isBackground: e.background })
-      await quietly(arrive($, r.agentId, e.description || 'En opgave', { state: 'working', detail: e.description || 'Går i gang' }, { type: e.subagentType, model: r.model }))
+      spawned.set(e.tool_use_id, { agentId: r.agentId, isBackground: e.background || !!e.isTeammate })
+      // A teammate keeps its name in the team, for its card and its tasks.
+      const teammate = e.isTeammate ? (r.teammateId?.split('@')[0] ?? e.name ?? 'teammate') : undefined
+      await quietly(arrive($, r.agentId, e.description || 'En opgave', { state: 'working', detail: e.description || 'Går i gang' }, { type: e.subagentType, model: r.model, teammate }))
     }
     return r
   })

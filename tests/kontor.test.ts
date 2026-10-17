@@ -773,3 +773,57 @@ test("the status file carries Claude's last turn, the context's fill and a helpe
   expect(status.stats.context).toBe(45)
   expect(status.subs[0]?.answer).toBe('API’et har tre endepunkter: /a, /b og /c.')
 })
+
+test('a teammate stays at its desk between turns, hands in each task from the list and walks back', async ($, on) => {
+  const clock = engine(on, async e => {
+    if (e.tool !== 'Agent') return undefined
+    await $.agent.spawn({ tool_use_id: e.tool_use_id, prompt: 'p', description: 'Undersøg API’et', subagentType: 'teammate', parentModel: 'm', background: true, isTeammate: true, name: 'researcher' } as never)
+    return { result: { status: 'teammate_spawned', agent_id: `sub-${e.tool_use_id}`, teammate_id: 'researcher@team', name: 'researcher' } }
+  })
+  const file = statusFile(on)
+  let status = 'running'
+  on('agent.list', () => ({ value: [agentEntry('sub-t1', status)] }) as never)
+  on('classic.SubagentStop', () => ({}) as never)
+  on('classic.TaskCompleted', () => ({}) as never)
+  await $.session.start(start())
+  type Seen = { phase: string; teammate?: string; from?: string; activity: { state: string; detail: string } }
+  const sub = () => file.last()?.subs[0] as unknown as Seen
+  const earned = () => (JSON.parse(JSON.stringify(file.last())) as { earned: Record<string, number> }).earned
+
+  await $.tool.call({ tool: 'Agent', prompt: 'p', description: 'Undersøg API’et', tool_use_id: 't1', name: 'researcher' } as never)
+  await clock.advance(13_000)
+  expect(sub().phase).toBe('working')
+  expect(sub().teammate).toBe('researcher')
+
+  // Its turn ends: it waits for a message, at its desk, and no stop sends it home.
+  await $.turn.complete({ reason: 'answer', answer: 'Klar', durationMs: 1000, isAborted: false, turnId: 'a1', agentId: 'sub-t1' } as never)
+  status = 'idle'
+  await $.classic.SubagentStop({ agent_id: 'sub-t1', agent_type: 'researcher', stop_hook_active: false, agent_transcript_path: '' } as never)
+  await clock.advance(4000)
+  expect(sub().phase).toBe('working')
+  expect(sub().activity.detail).toBe('Venter på en besked')
+
+  // A message wakes it; its turn is its own, not Claude's.
+  await $.turn.start({ text: 'Næste', turnId: 'a2', agentId: 'sub-t1' } as never)
+  await clock.advance(600)
+  expect(sub().activity.detail).toBe('Tænker')
+  expect(file.last()?.main.detail).not.toBe('Tænker')
+
+  // A task from the team's list done: over to Claude with it, and back.
+  await $.classic.TaskCompleted({ task_id: '1', task_subject: 'Skriv tests til API’et', teammate_name: 'researcher' } as never)
+  await clock.advance(600)
+  expect(sub().phase).toBe('delivering')
+  expect(sub().activity.detail).toBe('Afleverer: Skriv tests til API’et')
+  expect(earned().delivered).toBe(1)
+  await clock.advance(11_000)
+  expect(sub().phase).toBe('arriving')
+  expect(sub().from).toBe('handover')
+  await clock.advance(13_000)
+  expect(sub().phase).toBe('working')
+
+  // The team is done: it goes home, and that earns nothing more.
+  status = 'completed'
+  await clock.advance(3500)
+  expect(sub().phase).toBe('delivering')
+  expect(earned().delivered).toBe(1)
+})

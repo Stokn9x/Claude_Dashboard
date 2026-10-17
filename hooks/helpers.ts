@@ -1,6 +1,6 @@
 import { atom, update } from 'claude-code'
 import type { Activity, AgentState, Phase, Step, Sub } from '../types'
-import { emptyOffice, WALKS, pause, offWork, readOffice, quietly } from './office'
+import { emptyOffice, WALKS, pause, offWork, readOffice, quietly, thinking } from './office'
 import type { $ } from './office'
 import { earn, PARTY_MS, celebrate } from './earnings'
 
@@ -85,9 +85,9 @@ export async function noteTool($: $, agentId: string | undefined, activity: Acti
 
 // In by the door; tidy() sits it down when its walk is over.
 // The spawn's agent type and model come along, for the page to draw.
-export async function arrive($: $, id: string, task: string, activity: Activity, kind: { type?: string; model?: string } = {}) {
+export async function arrive($: $, id: string, task: string, activity: Activity, kind: { type?: string; model?: string; teammate?: string } = {}) {
   const now = await $.clock.now()
-  const extra = { ...(kind.type ? { type: kind.type } : {}), ...(kind.model ? { model: kind.model } : {}) }
+  const extra = { ...(kind.type ? { type: kind.type } : {}), ...(kind.model ? { model: kind.model } : {}), ...(kind.teammate ? { teammate: kind.teammate } : {}) }
   await update($, office, o => (o.subs.some(s => s.id === id) ? o : { ...o, subs: [...o.subs, { ...newSub(id, task, activity, 'arriving', now, o.subs), ...extra }] }))
 }
 
@@ -103,12 +103,41 @@ export async function deliver($: $, id: string, outcome?: 'failed') {
       const detail = outcome === 'failed' ? `Gik i stå: ${s.task}` : `Afleverer: ${s.task}`
       return { ...s, phase: 'delivering' as Phase, since: now, outcome, activity: { state: 'working' as AgentState, detail } }
     }),
-    // A finished task earns; a failed one, or the demo's, does not.
+    // A finished task earns; a failed one, the demo's, or a teammate leaving
+    // (each task it handed in has earned already) does not.
     earned:
-      outcome !== 'failed' && !id.startsWith('demo-') && o.subs.some(s => s.id === id && (s.phase === 'arriving' || s.phase === 'working'))
+      outcome !== 'failed' && !id.startsWith('demo-') && o.subs.some(s => s.id === id && !s.teammate && (s.phase === 'arriving' || s.phase === 'working'))
         ? earn(o.earned, { delivered: 1 })
         : o.earned,
   }))
+}
+
+// A teammate's task done (the team's task list says so): over to Claude with
+// it, then back to its desk. It earns as a delivered task.
+export async function handIn($: $, teammate: string, subject: string) {
+  const now = await $.clock.now()
+  await update($, office, o => {
+    const sub = o.subs.find(s => s.teammate === teammate && (s.phase === 'arriving' || s.phase === 'working'))
+    if (!sub) return o
+    const task = subject.trim().slice(0, 100) || sub.task
+    return {
+      ...o,
+      subs: o.subs.map(s => (s === sub ? { ...s, task, phase: 'delivering' as Phase, since: now, isBack: true, outcome: undefined, activity: { state: 'working' as AgentState, detail: `Afleverer: ${task}` } } : s)),
+      earned: earn(o.earned, { delivered: 1 }),
+    }
+  })
+}
+
+// A turn begins in a helper's loop (a teammate woken by a message): it starts
+// thinking, if the office knows it already; its spawn seats a new one.
+export async function wakes($: $, id: string) {
+  await update($, office, o => ({ ...o, subs: o.subs.map(s => (s.id === id && (s.phase === 'arriving' || s.phase === 'working') ? { ...s, activity: thinking } : s)) }))
+}
+
+// Between its turns a teammate waits at its desk for a message.
+const waitingForWord: Activity = { state: 'idle', detail: 'Venter på en besked' }
+export async function teammateWaits($: $, id: string) {
+  await update($, office, o => ({ ...o, subs: o.subs.map(s => (s.id === id && s.teammate && (s.phase === 'arriving' || s.phase === 'working') ? { ...s, activity: waitingForWord } : s)) }))
 }
 
 // Every walk is worked out from when it began, never from a timer, so a
@@ -122,6 +151,8 @@ export const nextPhase = (s: Sub, now: number): Sub | null => {
   if (s.phase === 'delivering') {
     const handedOver = WALKS.deliver + WALKS.handover
     if (elapsed < handedOver) return s
+    // A teammate that handed in a task walks back to its desk.
+    if (s.isBack) return { ...s, phase: 'arriving', since: s.since + handedOver, from: 'handover', isBack: undefined, activity: thinking }
     // A finished helper stays a while off work; one that got stuck goes home.
     return s.outcome === 'failed'
       ? { ...s, phase: 'leaving', since: s.since + handedOver }

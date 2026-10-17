@@ -57,7 +57,7 @@ export const renderCard = () => {
     typeof who.tools === 'number' ? `${who.tools} ${who.tools === 1 ? 'værktøj' : 'værktøjer'}` : null,
     who.linesAdded || who.linesRemoved ? `+${who.linesAdded ?? 0} −${who.linesRemoved ?? 0} linjer` : null,
     who.temper ? `${who.temper} type` : null,
-    who.type || who.model ? [typeText(who.type), modelFamily(who.model)].filter(Boolean).join(' på ') : null,
+    who.teammate ? `Holdkammerat «${who.teammate}»${modelFamily(who.model) ? ` på ${modelFamily(who.model)}` : ''}` : who.type || who.model ? [typeText(who.type), modelFamily(who.model)].filter(Boolean).join(' på ') : null,
   ].filter(Boolean)
   const steps = [...(who.recent ?? [])].reverse()
   card.replaceChildren(

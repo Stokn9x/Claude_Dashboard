@@ -24,6 +24,7 @@ Et pixel-kontor set ovenfra, i din browser. Tryk på **🏢 Åbn kontor** over c
 - **Fejringer:** konfetti når testene er grønne (`npm test`, `pytest`, `jest`, `vitest`, `cargo test` …), en regnsky når de fejler, og balloner ved `git commit` og `gh pr create`.
 - **Tak:** når en hjælper afleverer, siger Claude tak ved navn.
 - **Fri:** en hjælper, der er færdig, bliver et par minutter og spiller bordtennis, henter kaffe, sætter sig i sofaen eller snakker med en anden på græsset. Tager Claude fat i den igen, går den tilbage til et skrivebord; ellers går den hjem. Hver hjælper har sit eget temperament (kæk, tør, dramatisk eller positiv), som man kan høre på replikkerne.
+- **Agent teams:** holdkammerater bliver ved deres skrivebord, så længe teamet arbejder, og står og venter på en besked mellem deres ture. Når en løser en opgave fra teamets liste, går den over til Claude med den og tilbage igen.
 - **Alle dine sessioner** har en fane øverst på siden. Kontoret viser den, der arbejder, indtil du selv vælger en fane, og de andre sessioner sidder i projektrummet nederst.
 - I panelet står linjer kode, pris og hvor meget af 5-timers-grænsen, sessionen har brugt. Skriv `/kontor panel` for at se den samme liste som tekst i et panel i Claude, med saldo, trivsel og stribe øverst.
 

@@ -22,8 +22,11 @@ export type Sub = {
   activity: Activity
   // Set when the helper's loop failed or was stopped instead of finishing.
   outcome?: 'failed'
-  // Set on a walk that starts where the helper was idling, not at the door.
-  from?: 'idle'
+  // Set on a walk that starts where the helper was idling, not at the door,
+  // or (a teammate) at Claude's desk after handing in a task.
+  from?: 'idle' | 'handover'
+  // A teammate handing in a task goes back to its desk afterwards.
+  isBack?: boolean
   // For the details card. Absent on helpers an older version seated.
   startedAt?: number
   tools?: number
@@ -36,6 +39,9 @@ export type Sub = {
   model?: string
   // The start of its final answer, once its loop has finished, for the card.
   answer?: string
+  // A teammate of an agent team: its name in the team. It stays at its desk
+  // between turns, hands in each task it completes and walks back.
+  teammate?: string
 }
 
 // Claude's last finished turn: when it ended, how long it took, and whether

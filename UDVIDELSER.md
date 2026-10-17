@@ -28,6 +28,7 @@ Status: ✅ lavet · 🟡 delvist · ⬜ ikke lavet · ⏸️ parkeret · ➖ ik
 | 0.11.1 | Fejlrettelser: ingen går gennem væggene (døre forbinder rummene i rutegitteret, og der er fri vej ud af Claudes kontor), nyt toilet med døren ud til et frit område, ingen fliser i væggene; langsommere indtjening og højere priser, så kontoret bygges over uger |
 | 0.12.0 | En lækrere side rundt om kontoret: topbjælke med ikon, trivsel, saldo og forbindelsesprik; kort med pixel-portræt og statuspille i listen; venteboks med "Gå til"; butik med ikoner og fremdrift; kun mørkt tema |
 | 0.13.0 | Spillets fase 4: pynt og opgraderinger i butikken, 17 præstationer med belønning og notifikation, statistik i den nye fane Fremskridt |
+| 0.27.0 | Agent teams: en holdkammerat bliver ved sit skrivebord, så længe teamet lever, og venter dér på en besked mellem sine ture i stedet for at gå hjem. Løser den en opgave fra teamets liste, går den over til Claude med den (og tjener som en afleveret opgave) og tilbage til skrivebordet. Kortet viser dens navn i teamet. Desuden: en subagents eller holdkammerats tur gjorde før Claude til "Tænker"; nu er turen dens egen |
 | 0.26.0 | Nyttigt i hverdagen: når Claude bliver færdig med en tur, der tog mindst to minutter, kommer der en lyd, en linje i loggen, en browser-besked (med 🔔 slået til) og ✅ Færdig i fanens titel, til du kigger. En hjælpers svar gemmes (begyndelsen af det) og står på dens kort og ved opgaven i Fremskridt, hvor man klikker for at læse det. På Claudes skrivebord står en kaffekande, der tømmes med 5-timers-grænsen, og en plante, der visner, efterhånden som konteksten fyldes; panelet og Claudes kort siger, hvor fuld konteksten er |
 | 0.25.1 | To, der går samme stykke vej samtidig, går side om side i stedet for gennem hinanden. Afprøvet: ingen gåtur krydser et købt skrivebord, og en subagent, der beder om lov, er den, der rækker hånden op, ikke Claude |
 | 0.25.0 | Månedens medarbejder: hjælpernes navne går igen, så serveren fører en tavle pr. navn og måned (opgaver, dem der gik i stå, linjer). Fremskridt viser sidste måneds medarbejder med pokal og månedens stilling med medaljer, og den, der fører måneden, har en ⭐ på navneskiltet. Ved skrivebordene står hjælperens navn nu i taleboblen, fordi rækken bagved dækker navneskiltet |
@@ -224,6 +225,13 @@ En samlet gennemgang før nye ting: koden læst igennem (mod, server og side), a
 2. **Pengene:** 75-80, så ingen tjener for meget eller for lidt. Lavet i 0.19.2.
 3. **Robusthed:** 90-93. Lavet i 0.20.1.
 4. **Småting:** 89 og 94, lavet i 0.23.1 og 0.20.1.
+
+## 🤝 Agent teams
+
+| # | Hvad | Str. | Status |
+|---|---|---|---|
+| 95 | **Holdkammerater i kontoret:** bliver ved skrivebordet mellem ture, afleverer hver opgave fra teamets liste hos Claude og går tilbage. Lavet i 0.27.0. | M | ✅ |
+| 96 | **Holdkammerater i deres eget terminalvindue** (tmux, iTerm) kører i en anden Claude-proces: de kan ikke ses arbejde i lederens kontor, og deres egen session får sin egen fane. Motoren siger ikke en session, at den er en holdkammerat, så de kan ikke kobles sammen endnu. I desktop-appen kører holdkammerater i samme proces, og der virker det. | M | ⏸️ |
 
 ## 🧹 Oprydning
 

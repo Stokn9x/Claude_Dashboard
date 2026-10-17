@@ -370,7 +370,9 @@ export const poseOf = (sub, now, walks = WALKS, origin = null) => {
   if (sub.phase === 'working') return { seated: true }
   if (sub.phase === 'idle') return { isIdle: true }
   if (sub.phase === 'arriving') {
-    const points = sub.from === 'idle' && origin ? route(origin, placeOf(sub.seat).spot) : arriveRoute(sub.seat)
+    // From the lawn or the lounge after time off, from Claude's desk after a
+    // teammate handed in a task, or in by the front door.
+    const points = sub.from === 'idle' && origin ? route(origin, placeOf(sub.seat).spot) : sub.from === 'handover' ? route(handoffFor(sub.seat), placeOf(sub.seat).spot) : arriveRoute(sub.seat)
     const ms = walkMs(points, walks.arrive)
     return e >= ms ? { seated: true } : walkAt(points, e / ms)
   }
