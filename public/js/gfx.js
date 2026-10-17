@@ -2,9 +2,11 @@
 // them draw in world units on the main canvas, through the camera.
 import { clip } from './util.js'
 import { modText } from './i18n.js'
+import { pixelate } from './pixel.js'
 
 export const canvas = document.getElementById('office')
-export const ctx = canvas.getContext('2d')
+// Round shapes in pixel steps, like the figures (pixel.js).
+export const ctx = pixelate(canvas.getContext('2d'))
 
 export const OUTLINE = '#2B2230'
 export const FONT = "'Segoe UI', system-ui, -apple-system, sans-serif"

@@ -7,6 +7,7 @@ import { GROUNDS, PLAN, hasNow, isBuilt, isOpenDoor, rectOf, roomById, shiftOf, 
 import { visibleRect, visibleRooms } from './camera.js'
 import { stir } from './util.js'
 import { weatherAt } from './weather.js'
+import { PIXEL, snap } from './pixel.js'
 import { settings } from './settings.js'
 
 // The time of day, in hours (14.5 is half past two). ?tid=21:30 in the
@@ -56,33 +57,78 @@ const topWindows = () => PLAN.rooms.filter(isBuilt).flatMap(room => topWindowsOf
 
 // Sunlight through the windows, falling at an angle that follows the sun:
 // from the east in the morning, from the west in the afternoon.
+// A beam is drawn in pixel rows (or columns, for a side window): each a
+// little wider as it falls, on the grid, and fainter in three steps.
+const BEAM_STEPS = [1, 0.62, 0.3]
+const beamStep = t => BEAM_STEPS[Math.min(BEAM_STEPS.length - 1, Math.floor(t * BEAM_STEPS.length))]
 export const daylight = h => {
   const strength = 1 - darknessAt(h) / NIGHT
   if (strength <= 0) return
   const warm = h < 10 || h > 15
   const colour = warm ? '255, 196, 110' : '255, 232, 160'
   const slant = (12 - h) * 5
-  const beam = (points, x0, y0, x1, y1) => {
-    const g = ctx.createLinearGradient(x0, y0, x1, y1)
-    g.addColorStop(0, `rgba(${colour}, ${0.6 * strength})`)
-    g.addColorStop(1, `rgba(${colour}, 0)`)
-    ctx.fillStyle = g
-    ctx.beginPath()
-    points.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)))
-    ctx.closePath()
-    ctx.fill()
+  // Down from a window in the north wall: from x0..x1 at the top to the
+  // same shifted by `shift` at the bottom.
+  const down = (x0, x1, y, length, shift, widen) => {
+    const rows = Math.round(length / PIXEL)
+    for (let i = 0; i < rows; i++) {
+      const t = i / rows
+      const left = snap(x0 - widen * t + shift * t)
+      const right = snap(x1 + widen * t + shift * t)
+      ctx.fillStyle = `rgba(${colour}, ${0.5 * strength * beamStep(t)})`
+      ctx.fillRect(left, snap(y) + i * PIXEL, right - left, PIXEL)
+    }
   }
-  for (const { x, y } of topWindows()) {
-    beam([[x, y], [x + 56, y], [x + 64 + slant, y + 76], [x - 8 + slant, y + 76]], 0, y, 0, y + 76)
+  // Across from a window in a side wall, the same way.
+  const across = (x, y0, y1, length, direction, widen) => {
+    const columns = Math.round(length / PIXEL)
+    for (let i = 0; i < columns; i++) {
+      const t = i / columns
+      const top = snap(y0 - widen * t)
+      const bottom = snap(y1 + widen * t)
+      const left = snap(x) + (direction > 0 ? i : -i - 1) * PIXEL
+      ctx.fillStyle = `rgba(${colour}, ${0.5 * strength * beamStep(t)})`
+      ctx.fillRect(left, top, PIXEL, bottom - top)
+    }
   }
+  for (const { x, y } of topWindows()) down(x, x + 56, y, 76, slant, 8)
   // The low sun reaches in through one side or the other.
   for (const w of sideWindows()) {
     ctx.globalAlpha = w.isLeft ? (h < 12 ? 1 : 0.35) : h >= 12 ? 1 : 0.35
     const inner = w.isLeft ? w.x + 6 : w.x
-    const far = w.isLeft ? inner + 84 : inner - 84
-    beam([[inner, w.y], [inner, w.y + w.h], [far, w.y + w.h + 18], [far, w.y - 18]], inner, 0, far, 0)
+    across(inner, w.y, w.y + w.h, 84, w.isLeft ? 1 : -1, 18)
   }
   ctx.globalAlpha = 1
+}
+
+// A pool of light as pixel art draws one: in steps, with a checker of
+// pixels where one step meets the next, never a smooth fade. Each size and
+// colour is drawn once, a pixel to a canvas pixel, and laid down scaled up
+// with hard edges.
+const BAYER = [0, 0.5, 0.75, 0.25]
+const LEVELS = 4
+const pools = new Map()
+const poolOf = (r, colour) => {
+  const key = `${r}|${colour}`
+  if (pools.has(key)) return pools.get(key)
+  const n = Math.max(2, Math.round((2 * r) / PIXEL))
+  const sprite = document.createElement('canvas')
+  sprite.width = n
+  sprite.height = n
+  const g = sprite.getContext('2d')
+  const mid = n / 2
+  for (let j = 0; j < n; j++) {
+    for (let i = 0; i < n; i++) {
+      const d = Math.hypot(i + 0.5 - mid, j + 0.5 - mid) / mid
+      if (d >= 1) continue
+      const level = Math.floor((1 - d) ** 1.4 * LEVELS + BAYER[(j % 2) * 2 + (i % 2)])
+      if (level <= 0) continue
+      g.fillStyle = `rgba(${colour}, ${Math.min(LEVELS, level) / LEVELS})`
+      g.fillRect(i, j, 1, 1)
+    }
+  }
+  pools.set(key, sprite)
+  return sprite
 }
 
 // The weather over everything: a greyer light under clouds, rain falling
@@ -123,9 +169,8 @@ export const drawWeather = (w, t) => {
       const speed = 0.6 + fraction(i, 12) * 0.8
       const fy = (fraction(i, 11) + (t / 14_000) * speed) % 1
       const fx = (fraction(i, 10) + Math.sin(t / 1600 + i) * 0.006 + 1) % 1
-      ctx.beginPath()
-      ctx.arc(v.x + fx * v.w, v.y + fy * v.h, (1.1 + fraction(i, 13) * 1.6) * pixel, 0, Math.PI * 2)
-      ctx.fill()
+      const size = Math.round(2 + fraction(i, 13) * 2) * pixel
+      ctx.fillRect(v.x + fx * v.w, v.y + fy * v.h, size, size)
     }
   }
 }
@@ -157,11 +202,11 @@ export const evening = (h, screens, headlights = []) => {
   ctx.fillRect(v.x, v.y, v.w, v.h)
   const k = dark / NIGHT
   const glow = (x, y, r, colour, alpha) => {
-    const g = ctx.createRadialGradient(x, y, 0, x, y, r)
-    g.addColorStop(0, `rgba(${colour}, ${alpha * k})`)
-    g.addColorStop(1, `rgba(${colour}, 0)`)
-    ctx.fillStyle = g
-    ctx.fillRect(x - r, y - r, r * 2, r * 2)
+    const sprite = poolOf(r, colour)
+    const size = sprite.width * PIXEL
+    ctx.globalAlpha = Math.min(1, alpha * k)
+    ctx.drawImage(sprite, snap(x - size / 2), snap(y - size / 2), size, size)
+    ctx.globalAlpha = 1
   }
   const rooms = visibleRooms().filter(isBuilt)
   ctx.globalCompositeOperation = 'lighter'

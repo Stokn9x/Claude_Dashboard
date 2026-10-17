@@ -732,3 +732,34 @@ test("in English the mod's Danish texts are turned over on arrival; the rest is 
   }
   assert.equal(i18n.modText('Læser api.ts'), 'Læser api.ts')
 })
+
+test('round shapes are drawn in pixel steps on the figures’ grid', async () => {
+  const { pixelate, PIXEL } = await import(js('pixel'))
+  // A context that only remembers the points of its path.
+  const fake = () => {
+    const points = []
+    const c = { moveTo: (x, y) => points.push([x, y]), lineTo: (x, y) => points.push([x, y]), rect: (x, y, w, h) => points.push(['rect', x, y, w, h]), closePath() {}, points }
+    return pixelate(c)
+  }
+  const onGrid = v => Math.abs(v / PIXEL - Math.round(v / PIXEL)) < 1e-9
+  const steps = pts => pts.every((p, i) => i === 0 || p[0] === pts[i - 1][0] || p[1] === pts[i - 1][1])
+
+  const circle = fake()
+  circle.arc(70, 70, 14, 0, Math.PI * 2)
+  assert.ok(circle.points.length > 8)
+  assert.ok(circle.points.every(([x, y]) => onGrid(x) && onGrid(y)), 'every point on the grid')
+  assert.ok(steps(circle.points), 'only steps across and down, never a slope')
+  const xs = circle.points.map(p => p[0])
+  assert.ok(Math.max(...xs) - Math.min(...xs) >= 28 - PIXEL, 'it keeps its size')
+
+  const box = fake()
+  box.roundRect(10, 10, 60, 30, 6)
+  assert.ok(box.points.every(([x, y]) => onGrid(x) && onGrid(y)))
+  assert.ok(steps(box.points))
+
+  // Smaller than a pixel or two: a square of pixels, never nothing.
+  const bulb = fake()
+  bulb.arc(20, 20, 1.8, 0, Math.PI * 2)
+  assert.equal(bulb.points[0][0], 'rect')
+  assert.ok(bulb.points[0][3] >= PIXEL)
+})

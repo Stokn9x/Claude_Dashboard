@@ -12,6 +12,7 @@ import { isNightAt, sideWindows, skyAt } from './light.js'
 import { drawGrounds } from './outdoors.js'
 import { L } from './i18n.js'
 import { plant, roomDrawers } from './rooms.js'
+import { pixelate } from './pixel.js'
 
 const WALL = '#3E4852'
 const WALL_TOP = '#5A6672'
@@ -139,7 +140,7 @@ export const drawBuilding = (project, hour, look = {}) => {
   const key = `${project}|${skyAt(hour)}|${background.width}x${background.height}|${view.x.toFixed(2)},${view.y.toFixed(2)},${view.zoom.toFixed(4)}|${owned}|${look.season}|${snow}|${look.isChristmas}`
   if (key === backgroundKey) return
   backgroundKey = key
-  const g = background.getContext('2d')
+  const g = pixelate(background.getContext('2d'))
   g.setTransform(1, 0, 0, 1, 0, 0)
   g.clearRect(0, 0, background.width, background.height)
   applyView(g)

@@ -8,6 +8,17 @@ import { OUTLINE, FONT } from './gfx.js'
 import { ROOM_TYPES } from './plan.js'
 import { L } from './i18n.js'
 
+// A lit sign: the letters with a halo of their glow colour around them, a
+// step out on every side, never a blur (the office is pixel art).
+const glowText = (g, text, x, y, glow, fill) => {
+  g.fillStyle = glow
+  g.globalAlpha = 0.55
+  for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) g.fillText(text, x + dx, y + dy)
+  g.globalAlpha = 1
+  g.fillStyle = fill
+  g.fillText(text, x, y)
+}
+
 // A framed painting on a wall: sky, hills and a sun, in three colours.
 const painting = (g, fill, x, y, w, h, [land, sky, sun]) => {
   fill(x - 1, y - 1, w + 2, h + 2, '#6E4B32')
@@ -165,11 +176,7 @@ export const roomDrawers = {
       slab(g, 30, 316, 60, 13, 3, '#2B1F33')
       g.font = `800 8px ${FONT}`
       g.textAlign = 'center'
-      g.shadowColor = '#FF5FA2'
-      g.shadowBlur = 6
-      g.fillStyle = '#FF8CC2'
-      g.fillText('SHIP IT', 60, 326)
-      g.shadowBlur = 0
+      glowText(g, 'SHIP IT', 60, 326, '#FF5FA2', '#FF8CC2')
     }
     if (owns('plants')) for (const [x, y] of [[0, 556], [100, 338]]) bigPlant(g, fill, x, y)
   },
@@ -223,11 +230,7 @@ export const roomDrawers = {
     slab(g, 322, 316, 84, 13, 3, '#20262E')
     g.font = `800 8px ${FONT}`
     g.textAlign = 'center'
-    g.shadowColor = '#E3875E'
-    g.shadowBlur = 6
-    g.fillStyle = '#F2A07A'
-    g.fillText('CLAUDE & CO', 364, 325.5)
-    g.shadowBlur = 0
+    glowText(g, 'CLAUDE & CO', 364, 325.5, '#E3875E', '#F2A07A')
     // The waiting area along the south wall: two soft rugs
     slab(g, 188, 466, 72, 94, 6, '#D8CDB8')
     slab(g, 336, 466, 72, 94, 6, '#D8CDB8')
@@ -327,11 +330,7 @@ export const roomDrawers = {
     slab(g, 866, 4, 62, 13, 3, '#2B1F33')
     g.font = `800 8px ${FONT}`
     g.textAlign = 'center'
-    g.shadowColor = '#FF5FA2'
-    g.shadowBlur = 8
-    g.fillStyle = '#FF8CC2'
-    g.fillText('LOUNGE', 897, 14)
-    g.shadowBlur = 0
+    glowText(g, 'LOUNGE', 897, 14, '#FF5FA2', '#FF8CC2')
     bigPlant(g, fill, 750, 30)
     if (owns('pingpong')) pingpongTable(fill, dot, t.pingpongTable)
     // The pool table on a big purple rug: wooden rim, green cloth, pockets, balls set up
