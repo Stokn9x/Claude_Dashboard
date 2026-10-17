@@ -853,7 +853,7 @@ test('without Node.js, the button says what is missing and where to get it', asy
 
 // Your own agents, as the engine lists them for the Agent tool.
 const usageWith = (on: On, agents: string[]) =>
-  on('session.usage', () => ({ value: { startedAt: 0, context: { percent: 5, breakdown: { agents: agents.map(agentType => ({ agentType, source: 'projectSettings', tokens: 10 })) } }, rateLimits: [] } }) as never)
+  on('session.usage', () => ({ value: { startedAt: 0, context: { percent: 5, breakdown: { agents: agents.map(agentType => ({ agentType, source: agentType.includes(':') ? 'plugin' : 'projectSettings', tokens: 10 })) } }, rateLimits: [] } }) as never)
 type Regular = { id: string; seat: number; phase: string; from?: string; task: string; job?: string; isOnJob?: boolean; answer?: string; tools?: number; activity: { state: string; detail: string } }
 
 test('your own agents are regulars: in all day at the first desks, they take the jobs of their type and walk back', async ($, on) => {
@@ -952,6 +952,8 @@ test("a plugin's agent is no regular until it is put on the staff", async ($, on
   await $.session.start(start())
   await clock.advance(2000)
   expect(subs().map(s => s.id)).toEqual(['staff-code-reviewer'])
+  // Where each comes from, for the page to say.
+  expect((file.last() as unknown as { agentSources: Record<string, string> }).agentSources).toEqual({ 'code-reviewer': 'project', 'stripe:Company Researcher': 'plugin' })
 
   crew = JSON.stringify({ added: ['stripe:Company Researcher'] })
   await clock.advance(3500)

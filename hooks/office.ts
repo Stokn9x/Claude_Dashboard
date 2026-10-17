@@ -46,6 +46,7 @@ export const emptyOffice: Office = {
   agents: [],
   removed: [],
   added: [],
+  agentSources: {},
 }
 const office = atom({ plugin: 'agent-kontor', key: 'office' } as const, emptyOffice)
 

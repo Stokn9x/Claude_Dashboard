@@ -5,7 +5,7 @@
 // The game is always on: there is no switch for it (the user's decision).
 import { el, remember, remembered } from './util.js'
 import { showTour } from './welcome.js'
-import { crewOf, isOnStaff, knownAgents, ownName, pluginOf, setOnStaff } from './crew.js'
+import { crewOf, isOnStaff, knownAgents, originOf, ownName, setOnStaff } from './crew.js'
 
 export const settings = { weather: remembered('weather') !== 'off' }
 
@@ -39,9 +39,8 @@ const crewSection = () => {
   const { names } = crewOf()
   const rows = agents.map(agent => {
     const input = el('input', { type: 'checkbox', checked: isOnStaff(agent) })
-    // Where it comes from, when that is worth saying: its own name under a
-    // name given, its plugin.
-    const origin = [names[agent] ? ownName(agent) : null, pluginOf(agent) ? `fra pluginet ${pluginOf(agent)}` : null].filter(Boolean).join(', ')
+    // Its own name under a name given, and where it comes from.
+    const origin = [names[agent] ? ownName(agent) : null, originOf(agent)].filter(Boolean).join(' · ')
     const aboutText = () => `${origin ? `${origin} · ` : ''}${input.checked ? ON_STAFF : OFF_STAFF}`
     const about = el('small', {}, [aboutText()])
     input.addEventListener('change', async () => {

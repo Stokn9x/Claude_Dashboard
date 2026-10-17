@@ -112,7 +112,12 @@ export type Office = {
   agents: string[]
   removed: string[]
   added: string[]
+  // Where each agent comes from: yours, the project's, the organisation's,
+  // a plugin's (or somewhere else, as the engine words it).
+  agentSources: Record<string, AgentSource>
 }
+
+export type AgentSource = 'user' | 'project' | 'org' | 'plugin' | 'other'
 
 export type GameSummary = { kroner: number; wellbeing: number; streak: number; unlocked: number; achievements: number }
 

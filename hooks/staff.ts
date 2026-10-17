@@ -1,5 +1,5 @@
 import { atom, update } from 'claude-code'
-import type { Sub } from '../types'
+import type { AgentSource, Sub } from '../types'
 import { emptyOffice, readOffice, slashed } from './office'
 import type { $ } from './office'
 
@@ -30,32 +30,37 @@ export const isAtWork = (s: Sub) => !s.staff || !!s.isOnJob
 const NAME = /^name:\s*["']?([\w.:-]+)/m
 async function agentFiles($: $) {
   const home = (await $.env.get('USERPROFILE')) ?? (await $.env.get('HOME'))
-  const dirs = ['.claude/agents', ...(home ? [`${slashed(home)}/.claude/agents`] : [])]
-  const found: string[] = []
-  for (const dir of dirs) {
+  const dirs: [string, AgentSource][] = [['.claude/agents', 'project'], ...(home ? [[`${slashed(home)}/.claude/agents`, 'user'] as [string, AgentSource]] : [])]
+  const found: { agentType: string; source: AgentSource }[] = []
+  for (const [dir, source] of dirs) {
     const entries = await $.fs.list(dir).catch(() => [])
     for (const entry of entries) {
       if (entry.kind !== 'file' || !entry.name.endsWith('.md')) continue
       const text = await $.fs.read(`${dir}/${entry.name}`).catch(() => '')
       const name = typeof text === 'string' ? NAME.exec(text.split(/^---\s*$/m)[1] ?? '')?.[1] : undefined
-      if (name) found.push(name)
+      if (name) found.push({ agentType: name, source })
     }
   }
   return found
 }
 
+// Where an agent comes from, in the engine's words, as the page says it.
+const SOURCES: Record<string, AgentSource> = { userSettings: 'user', projectSettings: 'project', localSettings: 'project', policySettings: 'org', plugin: 'plugin' }
+export const sourceOf = (source: string): AgentSource => SOURCES[source] ?? 'other'
+
 export async function findAgents($: $) {
-  let agents: string[] = []
+  let listed: { agentType: string; source: AgentSource }[] = []
   try {
     const usage = await $.session.usage({ breakdown: 'summary' })
-    agents = (usage.context.breakdown?.agents ?? []).map(a => a.agentType).filter(Boolean)
+    listed = (usage.context.breakdown?.agents ?? []).filter(a => a.agentType).map(a => ({ agentType: a.agentType, source: sourceOf(a.source) }))
   } catch {
     // An engine that cannot break the context down: the files below.
   }
-  if (agents.length === 0) agents = await agentFiles($)
-  agents = [...new Set(agents)].sort((a, b) => a.localeCompare(b))
+  if (listed.length === 0) listed = await agentFiles($)
+  const agents = [...new Set(listed.map(a => a.agentType))].sort((a, b) => a.localeCompare(b))
+  const agentSources = Object.fromEntries(listed.map(a => [a.agentType, a.source]))
   const o = await readOffice($)
-  if (JSON.stringify(agents) !== JSON.stringify(o.agents)) await update($, office, x => ({ ...x, agents }))
+  if (JSON.stringify([agents, agentSources]) !== JSON.stringify([o.agents, o.agentSources])) await update($, office, x => ({ ...x, agents, agentSources }))
 }
 
 // A plugin's agent: `<plugin>:<name>`. Your own have no colon in their name.

@@ -45,6 +45,7 @@ export const statusOf = (o: Office) => ({
   walks: WALKS,
   // Your own agents, for the page's list of regulars.
   agents: o.agents ?? [],
+  agentSources: o.agentSources ?? {},
 })
 
 // Written when it changes, and now and then besides so the server knows the

@@ -8,7 +8,7 @@ import { freeArea, hitAt, pixelsPerUnit, toScreen, wasDrag } from './camera.js'
 import { phaseLabel, showPanel, choose } from './panel.js'
 import { buyItem } from './shop.js'
 import { TEMPER_TEXT, temperOf } from './voices.js'
-import { changeCrew, crewOf, ownName, setOnStaff } from './crew.js'
+import { changeCrew, crewOf, originOf, ownName, setOnStaff } from './crew.js'
 
 const card = document.getElementById('card')
 
@@ -90,7 +90,7 @@ export const renderCard = () => {
     typeof who.tools === 'number' && !isReady ? `${who.tools} ${who.tools === 1 ? 'værktøj' : 'værktøjer'}` : null,
     (who.linesAdded || who.linesRemoved) && !isReady ? `+${who.linesAdded ?? 0} −${who.linesRemoved ?? 0} linjer` : null,
     who.temper ? `${who.temper} type` : null,
-    who.staff ? `Fast medarbejder · ${ownName(who.staff)}${modelFamily(who.model) ? ` på ${modelFamily(who.model)}` : ''}` : who.teammate ? `Holdkammerat «${who.teammate}»${modelFamily(who.model) ? ` på ${modelFamily(who.model)}` : ''}` : who.type || who.model ? [typeText(who.type), modelFamily(who.model)].filter(Boolean).join(' på ') : null,
+    who.staff ? [`Fast medarbejder · ${ownName(who.staff)}${modelFamily(who.model) ? ` på ${modelFamily(who.model)}` : ''}`, originOf(who.staff)].filter(Boolean).join(' · ') : who.teammate ? `Holdkammerat «${who.teammate}»${modelFamily(who.model) ? ` på ${modelFamily(who.model)}` : ''}` : who.type || who.model ? [typeText(who.type), modelFamily(who.model)].filter(Boolean).join(' på ') : null,
   ].filter(Boolean)
   const steps = [...(who.recent ?? [])].reverse()
   card.replaceChildren(

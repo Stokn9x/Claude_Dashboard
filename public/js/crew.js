@@ -19,6 +19,14 @@ export const knownAgents = () =>
     (a, b) => isPluginAgent(a) - isPluginAgent(b) || a.localeCompare(b),
   )
 
+// Where an agent comes from, as the sessions' files say (the engine's
+// listing), in words; null when it does not say.
+export const originOf = agent => {
+  const source = (store.state.sessions ?? []).map(s => s.agentSources?.[agent]).find(Boolean) ?? (isPluginAgent(agent) ? 'plugin' : null)
+  if (source === 'plugin') return `Fra pluginet ${pluginOf(agent) ?? ''}`.trim()
+  return { user: 'Din egen agent', project: 'Fra projektet', org: 'Fra organisationen' }[source] ?? null
+}
+
 // An agent's own name, without its plugin.
 export const ownName = agent => agent.split(':').pop() || agent
 
