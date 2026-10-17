@@ -10,6 +10,7 @@ const STEPS = [
     title: 'Velkommen til kontoret',
     lines: [
       'Claude sidder ved det store skrivebord. Når Claude sender subagenter afsted, kommer de ind ad døren som hjælpere og sætter sig ved et skrivebord.',
+      'Dine egne agenter fra /agents er faste medarbejdere: de er her hele dagen, får de første skriveborde og tager selv opgaverne af deres slags.',
       'Boblerne siger, hvad de laver lige nu. Rækker nogen hånden op, og boblen er rød, venter de på dig.',
       'Klik på en figur for at se, hvad den laver, og hvad den har svaret.',
     ],

@@ -8,6 +8,7 @@ import { setMain, setActivity, noteTool, arrive, deliver, handIn, teammateWaits,
 import { LINES_PER_EDIT, earn, partiesFor, creditCommit, celebrate, countPatch, countLines } from './earnings'
 import type { Patch } from './earnings'
 import { ADDRESS, WRITE_MS, READ_MS, SERVER_CHECK_MS, whyNoServer, writeStatus, readOthers, readGame, leaveOffice, openOffice, keepServer } from './status'
+import { AGENTS_MS, findAgents, readCrew, isOf, isAtWork } from './staff'
 
 // The session's office in $.state: the engine wants the reference spelled
 // out in every file that reads or writes it, so each file makes its own.
@@ -65,6 +66,12 @@ export const register: Register = on => {
     $.clock.every(READ_MS, () => void quietly(sweepAgents($)))
     $.clock.every(READ_MS, () => void quietly(readGame($)))
     $.clock.every(SERVER_CHECK_MS, () => void quietly(keepServer($)))
+    // Your own agents come in to work: who they are, and who was taken off.
+    // (The list of agents a moment later, once the session is under way.)
+    await quietly(readCrew($))
+    $.clock.after(1500, () => void quietly(findAgents($)))
+    $.clock.every(READ_MS, () => void quietly(readCrew($)))
+    $.clock.every(AGENTS_MS, () => void quietly(findAgents($)))
     return next(e)
   })
 
@@ -101,7 +108,7 @@ export const register: Register = on => {
     // A helper's last answer: the start of it, for its card and the day's list.
     if (e.agentId) {
       const answer = typeof e.answer === 'string' ? e.answer.trim().slice(0, ANSWER_MAX) : ''
-      if (answer) await quietly(update($, office, o => ({ ...o, subs: o.subs.map(s => (s.id === e.agentId ? { ...s, answer } : s)) })))
+      if (answer) await quietly(update($, office, o => ({ ...o, subs: o.subs.map(s => (isOf(s, e.agentId) ? { ...s, answer } : s)) })))
       // A teammate's turn is over: it waits at its desk for its next message.
       await quietly(teammateWaits($, e.agentId))
       return result
@@ -132,7 +139,7 @@ export const register: Register = on => {
   // A teammate's turn ending is no stop: it waits for its next message, and
   // leaves when the engine's list says it has ended.
   on('classic.SubagentStop', async ($, e, next) => {
-    const sub = (await readOffice($)).subs.find(s => s.id === e.agent_id)
+    const sub = (await readOffice($)).subs.find(s => isOf(s, e.agent_id))
     if (!sub?.teammate) await quietly(deliver($, e.agent_id))
     return next(e)
   })
@@ -189,7 +196,7 @@ export const register: Register = on => {
             earned: earn(o.earned, { added: Math.min(counted.added, LINES_PER_EDIT), removed: Math.min(counted.removed, LINES_PER_EDIT) }),
             editedSinceCommit: { added: (o.editedSinceCommit?.added ?? 0) + counted.added, removed: (o.editedSinceCommit?.removed ?? 0) + counted.removed },
             subs: o.subs.map(s =>
-              s.id === e.agentId ? { ...s, linesAdded: (s.linesAdded ?? 0) + counted.added, linesRemoved: (s.linesRemoved ?? 0) + counted.removed } : s,
+              isOf(s, e.agentId) && isAtWork(s) ? { ...s, linesAdded: (s.linesAdded ?? 0) + counted.added, linesRemoved: (s.linesRemoved ?? 0) + counted.removed } : s,
             ),
           })),
         )
@@ -199,7 +206,9 @@ export const register: Register = on => {
       const result = ran.result as { interrupted?: boolean; backgroundTaskId?: string }
       const command = String((e as unknown as { command?: unknown }).command ?? '')
       const parties = result.backgroundTaskId || result.interrupted ? [] : partiesFor(command, !ran.isError)
-      for (const party of parties) await quietly(celebrate($, e.agentId ?? 'main', party))
+      // A regular's party is at its own desk, by its own id.
+      const who = e.agentId ? ((await readOffice($)).subs.find(s => isOf(s, e.agentId))?.id ?? e.agentId) : 'main'
+      for (const party of parties) await quietly(celebrate($, who, party))
       if (parties.some(party => party.label === 'Committet')) await quietly(creditCommit($, command))
     }
     if (!sub) await quietly(setActivity($, e.agentId, thinking))
@@ -213,7 +222,8 @@ export const register: Register = on => {
     try {
       const { Box, Button, Text } = $.ui.resolve(e)
       const o = await readOffice($)
-      const helpers = o.subs.length
+      // Regulars between jobs are only sitting there.
+      const helpers = o.subs.filter(isAtWork).length
       const note =
         o.main.state === 'waiting' ? 'Claude venter på dig' : helpers ? `${helpers} ${helpers === 1 ? 'hjælper' : 'hjælpere'} i kontoret` : null
       return (

@@ -850,3 +850,93 @@ test('without Node.js, the button says what is missing and where to get it', asy
   const answer = (await $.command.run({ command: 'kontor', args: '' } as never)) as { text: string }
   expect(answer.text).toContain('ikke installeret')
 })
+
+// Your own agents, as the engine lists them for the Agent tool.
+const usageWith = (on: On, agents: string[]) =>
+  on('session.usage', () => ({ value: { startedAt: 0, context: { percent: 5, breakdown: { agents: agents.map(agentType => ({ agentType, source: 'projectSettings', tokens: 10 })) } }, rateLimits: [] } }) as never)
+type Regular = { id: string; seat: number; phase: string; from?: string; task: string; job?: string; isOnJob?: boolean; answer?: string; tools?: number; activity: { state: string; detail: string } }
+
+test('your own agents are regulars: in all day at the first desks, they take the jobs of their type and walk back', async ($, on) => {
+  const clock = engine(on, async e => {
+    if (e.tool !== 'Agent') return undefined
+    const x = e as unknown as { subagent_type: string; description: string }
+    await $.agent.spawn({ tool_use_id: e.tool_use_id, prompt: 'p', description: x.description, subagentType: x.subagent_type, parentModel: 'm', background: true } as never)
+    return { result: { status: 'async_launched' } }
+  })
+  usageWith(on, ['qa-tester', 'code-reviewer'])
+  on('classic.SubagentStop', () => ({}) as never)
+  const file = statusFile(on)
+  const subs = () => file.last()?.subs as unknown as Regular[]
+  const one = (id: string) => subs().find(s => s.id === id) as Regular
+  const earned = () => (JSON.parse(JSON.stringify(file.last())) as { earned: Record<string, number> }).earned
+  const call = (id: string, type: string, description: string) => $.tool.call({ tool: 'Agent', prompt: 'p', description, subagent_type: type, tool_use_id: id } as never)
+
+  await $.session.start(start())
+  await clock.advance(2000)
+  // In by the door, in name order, on the lowest seats.
+  expect(subs().map(s => [s.id, s.seat, s.phase])).toEqual([
+    ['staff-code-reviewer', 0, 'arriving'],
+    ['staff-qa-tester', 1, 'arriving'],
+  ])
+  expect((file.last() as unknown as { agents: string[] }).agents).toEqual(['code-reviewer', 'qa-tester'])
+  await clock.advance(13_000)
+  expect(one('staff-code-reviewer').phase).toBe('working')
+  expect(one('staff-code-reviewer').activity.detail).toBe('Klar til en opgave')
+
+  // A job of its type is the regular's: nobody new comes in.
+  await call('a1', 'code-reviewer', 'Gennemgå diffen')
+  await $.tool.call({ tool: 'Read', file_path: 'C:/x/api.ts', tool_use_id: 'r1', agentId: 'sub-a1' } as never)
+  await clock.advance(600)
+  expect(subs().length).toBe(2)
+  expect(one('staff-code-reviewer')).toMatchObject({ job: 'sub-a1', isOnJob: true, task: 'Gennemgå diffen', tools: 1, phase: 'working' })
+
+  // A second job of the same kind at once comes in as a helper of its own,
+  // after the regulars, and so does a job of another kind.
+  await call('a2', 'code-reviewer', 'Gennemgå testene')
+  await call('a3', 'general-purpose', 'Find gammel kode')
+  await clock.advance(600)
+  expect(subs().map(s => [s.id, s.seat])).toEqual([
+    ['staff-code-reviewer', 0],
+    ['staff-qa-tester', 1],
+    ['sub-a2', 2],
+    ['sub-a3', 3],
+  ])
+
+  // Done: over to Claude with it, and back to its desk, ready again.
+  await $.classic.SubagentStop({ agent_id: 'sub-a1', agent_type: 'code-reviewer', stop_hook_active: false, agent_transcript_path: '' } as never)
+  await $.turn.complete({ reason: 'answer', answer: 'To fejl i api.ts', durationMs: 1000, isAborted: false, turnId: 'x1', agentId: 'sub-a1' } as never)
+  await clock.advance(600)
+  expect(one('staff-code-reviewer')).toMatchObject({ phase: 'delivering', isOnJob: false, answer: 'To fejl i api.ts' })
+  expect(one('staff-code-reviewer').activity.detail).toBe('Afleverer: Gennemgå diffen')
+  expect(earned().delivered).toBe(1)
+  // A stop said twice earns once.
+  await $.classic.SubagentStop({ agent_id: 'sub-a1', agent_type: 'code-reviewer', stop_hook_active: false, agent_transcript_path: '' } as never)
+  await clock.advance(11_000)
+  expect(earned().delivered).toBe(1)
+  expect(one('staff-code-reviewer')).toMatchObject({ phase: 'arriving', from: 'handover', task: '' })
+  await clock.advance(13_000)
+  expect(one('staff-code-reviewer').phase).toBe('working')
+  expect(one('staff-code-reviewer').activity.detail).toBe('Klar til en opgave')
+})
+
+test('a regular taken off the staff on the page goes home between jobs, and one taken on comes in', async ($, on) => {
+  const clock = engine(on)
+  usageWith(on, ['code-reviewer', 'qa-tester'])
+  let crew = JSON.stringify({ removed: ['qa-tester'] })
+  on('fs.read', (_, e) => ({ value: e.path.endsWith('crew.json') ? crew : '' }) as never)
+  const file = statusFile(on)
+  const subs = () => file.last()?.subs as unknown as Regular[]
+
+  await $.session.start(start())
+  await clock.advance(2000)
+  expect(subs().map(s => s.id)).toEqual(['staff-code-reviewer'])
+
+  crew = JSON.stringify({ removed: ['code-reviewer'] })
+  await clock.advance(3500)
+  expect(subs().map(s => [s.id, s.phase, s.seat])).toEqual([
+    ['staff-code-reviewer', 'leaving', 0],
+    ['staff-qa-tester', 'arriving', 0],
+  ])
+  await clock.advance(10_000)
+  expect(subs().map(s => s.id)).toEqual(['staff-qa-tester'])
+})

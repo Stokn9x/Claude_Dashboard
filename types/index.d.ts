@@ -42,6 +42,14 @@ export type Sub = {
   // A teammate of an agent team: its name in the team. It stays at its desk
   // between turns, hands in each task it completes and walks back.
   teammate?: string
+  // A regular: one of your own agents (from /agents), by its type. It is in
+  // the office all day, at the lowest seats, and takes the jobs of its type:
+  // `job` is the agent loop it works for now (or did last), `isOnJob` whether
+  // it is at it, `jobAt` when it began. Between jobs it is ready at its desk.
+  staff?: string
+  job?: string
+  isOnJob?: boolean
+  jobAt?: number
 }
 
 // Claude's last finished turn: when it ended, how long it took, and whether
@@ -97,6 +105,10 @@ export type Office = {
   lastTurn: LastTurn | null
   // How full the context window is, in per cent, as the engine last said.
   context: number | null
+  // Your own agents this session can call on (their types), and the ones
+  // taken off the staff on the office page (the server's crew.json).
+  agents: string[]
+  removed: string[]
 }
 
 export type GameSummary = { kroner: number; wellbeing: number; streak: number; unlocked: number; achievements: number }

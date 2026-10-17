@@ -43,6 +43,8 @@ export const statusOf = (o: Office) => ({
   turn: o.lastTurn,
   earned: o.earned,
   walks: WALKS,
+  // Your own agents, for the page's list of regulars.
+  agents: o.agents ?? [],
 })
 
 // Written when it changes, and now and then besides so the server knows the
@@ -71,9 +73,9 @@ export async function readOthers($: $) {
     if (!entry.name.endsWith('.json') || entry.name === `${o.sessionKey}.json`) continue
     const text = await $.fs.read(`${dir}/${entry.name}`).catch(() => '')
     try {
-      const other = JSON.parse(typeof text === 'string' ? text : '') as Partial<Other> & { ended?: boolean; subs?: unknown[] }
+      const other = JSON.parse(typeof text === 'string' ? text : '') as Partial<Other> & { ended?: boolean; subs?: { staff?: string; isOnJob?: boolean }[] }
       if (!other.ended && other.key && other.main?.state && now - (other.updatedAt ?? 0) < STALE_MS) {
-        others.push({ key: other.key, project: other.project ?? '', main: other.main, helpers: other.subs?.length ?? other.helpers ?? 0, updatedAt: other.updatedAt ?? 0 })
+        others.push({ key: other.key, project: other.project ?? '', main: other.main, helpers: other.subs?.filter(x => !x.staff || x.isOnJob).length ?? other.helpers ?? 0, updatedAt: other.updatedAt ?? 0 })
       }
     } catch {
       // A file half-written by another session: next round.

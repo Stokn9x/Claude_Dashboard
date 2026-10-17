@@ -54,3 +54,12 @@ export const modelFamily = model => {
 // An agent type in Danish, for the card; one we do not know by its own name.
 const TYPE_TEXT = { Explore: 'Udforsker', Plan: 'Planlægger', 'general-purpose': 'Generalist' }
 export const typeText = type => (type ? TYPE_TEXT[type] ?? type : null)
+
+// A regular (one of your own agents) by the name it was given on the page,
+// over its agent's own; `agentName` keeps the own one for the card.
+export const crewNamed = data => {
+  const names = data?.game?.crew?.names ?? {}
+  if (!Object.keys(names).length) return data
+  const named = sub => (sub.staff && names[sub.staff] ? { ...sub, name: names[sub.staff], agentName: sub.name } : sub)
+  return { ...data, sessions: (data.sessions ?? []).map(s => ({ ...s, subs: (s.subs ?? []).map(named) })) }
+}

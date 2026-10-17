@@ -13,6 +13,7 @@ import { addEvents, onEvents } from './feed.js'
 import { playFor } from './sound.js'
 import { notifyFor, titleFor } from './notify.js'
 import { settle } from './routes.js'
+import { crewNamed } from './util.js'
 import './tip.js'
 import './tv.js'
 import './welcome.js'
@@ -28,7 +29,8 @@ onEvents(notifyFor)
 // When each helper's phase was first seen here (see settle in routes.js)
 const seen = new Map()
 
-const receive = data => {
+const receive = raw => {
+  const data = crewNamed(raw)
   const next = { ...data, sessions: settle(data.sessions ?? [], seen, Date.now()) }
   addEvents(eventsBetween(store.state, next))
   store.state = next

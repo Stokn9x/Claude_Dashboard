@@ -419,3 +419,56 @@ test("a helper's answer is kept with its task, also when it comes after the hand
     await stop(child)
   }
 })
+
+test('a regular can be named, taken off the staff and on again, and the change lands in crew.json', async () => {
+  const home = newHome()
+  const child = await start(home)
+  const crewFile = path.join(home, '.claude', 'agent-kontor', 'crew.json')
+  try {
+    const { token } = JSON.parse((await get('/api/state')).body)
+    const post = change => fetch(`http://127.0.0.1:${PORT}/api/crew`, { method: 'POST', headers: { origin: `http://127.0.0.1:${PORT}`, 'x-kontor-token': token }, body: JSON.stringify(change) })
+    assert.equal((await post({ agent: 'code-reviewer', name: '  Rikke   Reviewer  ' })).status, 200)
+    assert.equal((await post({ agent: 'qa-tester', isRemoved: true })).status, 200)
+    assert.equal((await post({ agent: 'wiki-writer', isRemoved: true })).status, 200)
+    assert.equal((await post({ agent: 'wiki-writer', isRemoved: false })).status, 200)
+    assert.equal((await post({ agent: '../evil', name: 'x' })).status, 400)
+    // Without the page's token, nothing changes.
+    const foreign = await fetch(`http://127.0.0.1:${PORT}/api/crew`, { method: 'POST', body: JSON.stringify({ agent: 'qa-tester', isRemoved: false }) })
+    assert.equal(foreign.status, 403)
+    const { crew } = JSON.parse((await get('/api/state')).body).game
+    assert.deepEqual(crew, { names: { 'code-reviewer': 'Rikke Reviewer' }, removed: ['qa-tester'] })
+    assert.deepEqual(JSON.parse(fs.readFileSync(crewFile, 'utf8')), crew)
+    // An empty name gives it its own name back.
+    await post({ agent: 'code-reviewer', name: '' })
+    assert.deepEqual(JSON.parse((await get('/api/state')).body).game.crew.names, {})
+  } finally {
+    await stop(child)
+  }
+  // Read again at the next start.
+  const again = await start(home)
+  try {
+    assert.deepEqual(JSON.parse((await get('/api/state')).body).game.crew.removed, ['qa-tester'])
+  } finally {
+    await stop(again)
+  }
+})
+
+test('a regular between jobs on the floor costs no wellbeing; one at work does', async () => {
+  const home = newHome()
+  const child = await start(home)
+  const file = path.join(home, '.claude', 'agent-kontor', 'sessions', 'fl.json')
+  const status = subs => JSON.stringify({ v: 2, key: 'fl', project: 'kontor', updatedAt: Date.now(), main: { state: 'idle', detail: 'x' }, subs, earned: { added: 0, removed: 0, delivered: 0, tests: 0, commits: 0, prs: 0 } })
+  const regular = (seat, isOnJob) => ({ id: `staff-r${seat}`, name: `r${seat}`, task: '', phase: 'working', since: 0, seat, staff: `r${seat}`, isOnJob, activity: { state: 'idle', detail: 'Klar til en opgave' } })
+  const floor = async () => JSON.parse((await get('/api/state')).body).game.wellbeing.parts.find(p => p.what === 'floor')?.count ?? 0
+  try {
+    // No desks: two regulars ready on the floor, one helper at work.
+    fs.writeFileSync(file, status([regular(0, false), regular(1, false), { id: 'h', name: 'Ida', task: 't', phase: 'working', since: 0, seat: 2, activity: { state: 'reading', detail: 'x' } }]))
+    await sleep(900)
+    assert.equal(await floor(), 1)
+    fs.writeFileSync(file, status([regular(0, true), regular(1, false), { id: 'h', name: 'Ida', task: 't', phase: 'working', since: 0, seat: 2, activity: { state: 'reading', detail: 'x' } }]))
+    await sleep(900)
+    assert.equal(await floor(), 2)
+  } finally {
+    await stop(child)
+  }
+})

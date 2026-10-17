@@ -80,7 +80,7 @@ Replikkerne vælges ud fra rigtige hændelser (opgaver, tests, linjer, hvem der 
 ## Trivsel (fase 3)
 
 En simpel stemningsmåler fra 0 til 100:
-- går **ned**, når hjælpere sidder på gulvet, eller når der ikke er et køkken
+- går **ned**, når hjælpere sidder på gulvet, eller når der ikke er et køkken (en fast medarbejder, der er ledig, tæller ikke, selv om den sidder på gulvet)
 - går **op** med planter, pynt, sofahjørne og bordtennis
 
 Trivslen ganger indtjeningen med 0,8 til 1,2. Det giver en grund til at købe hygge og ikke kun skriveborde.
@@ -155,4 +155,5 @@ Hver fase kan bruges for sig og skal være færdig og testet, før den næste st
 | Trivsel | **Ja, i fase 3.** |
 | Valuta | **Kroner.** |
 | Etager | **Nej.** Kontoret vokser kun ud over grunden, i ét plan. |
+| Faste medarbejdere | **Gratis** (17.10.2026). Dine egne agenter er på kontoret hele dagen, men de skal ikke koste noget: man skal kunne arbejde som normalt. Et købt skrivebord går til en fast før en hjælper; uden skrivebord sidder den på gulvet og brokker sig. Alle er med fra start, uden loft, og hver kan fjernes og hentes tilbage. |
 | Kan spillet slås fra? | **Nej.** Det er altid med, også for kollegerne (17.10.2026). Vejret kan slås fra under ⚙. |

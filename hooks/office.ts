@@ -17,6 +17,8 @@ export const WALKS = { arrive: 12_000, deliver: 8000, handover: 2600, leave: 900
 export const thinking: Activity = { state: 'working', detail: 'Tænker' }
 export const pause: Activity = { state: 'idle', detail: 'Holder pause' }
 export const offWork: Activity = { state: 'idle', detail: 'Holder fri' }
+// A regular between jobs, at its desk (the page's pill says "Ledig").
+export const ready: Activity = { state: 'idle', detail: 'Klar til en opgave' }
 
 export const emptyOffice: Office = {
   sessionKey: '',
@@ -41,6 +43,8 @@ export const emptyOffice: Office = {
   game: null,
   lastTurn: null,
   context: null,
+  agents: [],
+  removed: [],
 }
 const office = atom({ plugin: 'agent-kontor', key: 'office' } as const, emptyOffice)
 

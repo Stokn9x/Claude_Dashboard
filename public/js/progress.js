@@ -3,6 +3,7 @@ import { store } from './store.js'
 import { el, number } from './util.js'
 import { summaryText } from './summary.js'
 import { lookFor, portraitOf } from './figures.js'
+import { knownAgents, shownName } from './crew.js'
 
 const panel = document.getElementById('progress')
 const toasts = document.getElementById('toasts')
@@ -70,7 +71,12 @@ panel.addEventListener('click', async e => {
 // far. The helpers' names come back from session to session (the server
 // keeps a tally per name).
 const monthName = month => new Date(`${month}-15T12:00:00`).toLocaleDateString('da-DK', { month: 'long' })
-const face = name => el('img', { className: 'face', src: portraitOf(`staff:${name}`, lookFor(`staff:${name}`)), alt: '' })
+// A regular is tallied by its agent's name: its face and the name it was given.
+const face = name => {
+  const id = knownAgents().includes(name) ? `staff-${name}` : `staff:${name}`
+  return el('img', { className: 'face', src: portraitOf(id, lookFor(id)), alt: '' })
+}
+const named = name => (knownAgents().includes(name) ? shownName(name) : name)
 const tally = r => `${number(r.tasks)} ${r.tasks === 1 ? 'opgave' : 'opgaver'} · ${number(r.lines)} linjer${r.stuck ? ` · ${number(r.stuck)} gik i stå` : ''}`
 const MEDALS = ['🥇', '🥈', '🥉']
 const staffSection = staff => {
@@ -78,12 +84,12 @@ const staffSection = staff => {
   return [
     el('h3', {}, ['Månedens medarbejder']),
     ...(staff.winner
-      ? [el('div', { className: 'winner' }, [el('span', { className: 'cup', ariaHidden: 'true' }, ['🏆']), face(staff.winner.name), el('div', {}, [el('strong', {}, [staff.winner.name]), el('span', {}, [`${monthName(staff.lastMonth)}: ${tally(staff.winner)}`])])])]
+      ? [el('div', { className: 'winner' }, [el('span', { className: 'cup', ariaHidden: 'true' }, ['🏆']), face(staff.winner.name), el('div', {}, [el('strong', {}, [named(staff.winner.name)]), el('span', {}, [`${monthName(staff.lastMonth)}: ${tally(staff.winner)}`])])])]
       : []),
     ...(staff.ranking.length
       ? [
           el('p', { className: 'hint' }, [`Indtil videre i ${monthName(staff.month)}:`]),
-          el('ol', { className: 'ranking' }, staff.ranking.map((r, i) => el('li', {}, [el('span', { className: 'place' }, [MEDALS[i] ?? `${i + 1}.`]), face(r.name), el('strong', {}, [r.name]), el('span', { className: 'hint' }, [tally(r)])]))),
+          el('ol', { className: 'ranking' }, staff.ranking.map((r, i) => el('li', {}, [el('span', { className: 'place' }, [MEDALS[i] ?? `${i + 1}.`]), face(r.name), el('strong', {}, [named(r.name)]), el('span', { className: 'hint' }, [tally(r)])]))),
         ]
       : []),
   ]

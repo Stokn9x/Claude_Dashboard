@@ -32,8 +32,10 @@ const dot = state => el('span', { className: 'dot', style: `background:${stateCo
 const PILL = { reading: 'Læser', editing: 'Skriver', running: 'Kører', browsing: 'Nettet', waiting: 'Venter på dig', working: 'Arbejder', idle: 'Pause' }
 const pill = (state, detail) => {
   const colour = stateColor[state] ?? '#8A94A0'
-  // A teammate between its turns is ready for its next message, not on a break.
-  const text = state === 'working' && detail === 'Tænker' ? 'Tænker' : state === 'idle' && detail === 'Venter på en besked' ? 'Ledig' : PILL[state] ?? state
+  // A teammate between its turns, or a regular between jobs, is ready for
+  // work, not on a break.
+  const isReady = state === 'idle' && (detail === 'Venter på en besked' || detail === 'Klar til en opgave')
+  const text = state === 'working' && detail === 'Tænker' ? 'Tænker' : isReady ? 'Ledig' : PILL[state] ?? state
   return el('span', { className: 'pill', style: `color:${colour};background:color-mix(in srgb, ${colour} 16%, transparent)` }, [text])
 }
 // The heading says it already; the details need not say it again
@@ -162,7 +164,9 @@ export const phaseLabel = (sub, onFloorFrom) =>
             : onFloorFrom !== undefined && sub.seat >= onFloorFrom
               ? placeOf(sub.seat).isOutside
                 ? 'Venter på bænken'
-                : 'Sidder på gulvet'
+                : sub.staff
+                  ? 'Mangler et skrivebord'
+                  : 'Sidder på gulvet'
               : null
 
 const person = ({ key, name, look, state, detail, note, isClaude }) =>
@@ -195,19 +199,21 @@ const renderPeople = s => {
     typeof stats.fiveHour === 'number' ? `${Math.round(stats.fiveHour)} % af 5-timers-grænsen` : null,
     typeof stats.context === 'number' ? `kontekst ${Math.round(stats.context)} %` : null,
   ].filter(Boolean)
-  // Those waiting for you first, then the rest as they came in
+  // Those waiting for you first, then the rest as they came in; your own
+  // agents, the regulars, in a group of their own above the helpers.
   const subs = [...(s.subs ?? [])].sort((a, b) => (b.activity.state === 'waiting') - (a.activity.state === 'waiting') || a.seat - b.seat)
+  const regulars = subs.filter(x => x.staff)
+  const helpers = subs.filter(x => !x.staff)
   const onFloorFrom = desks().length
   // The minute is in it too: "går hjem om 2 min" counts down.
   const key = JSON.stringify([s.key, s.main, facts, Math.floor(Date.now() / 60_000), subs.map(x => [x.id, x.name, x.task, x.phase, x.from, x.outcome, x.activity, x.seat >= onFloorFrom])])
   if (key === peopleKey) return
   peopleKey = key
+  const row = sub => person({ key: sub.id, name: sub.name, look: lookFor(sub.id), state: sub.activity.state, detail: sub.activity.detail, note: [sub.task, phaseLabel(sub, onFloorFrom)].filter(Boolean).join(' · ') })
   people.replaceChildren(
     person({ key: 'claude', name: 'Claude', look: claudeLook, state: s.main.state, detail: s.main.detail, note: facts.join(' · ') || null, isClaude: true }),
-    ...(subs.length ? [el('li', { className: 'section-label' }, [`Hjælpere · ${subs.length}`])] : []),
-    ...subs.map(sub =>
-      person({ key: sub.id, name: sub.name, look: lookFor(sub.id), state: sub.activity.state, detail: sub.activity.detail, note: [sub.task, phaseLabel(sub, onFloorFrom)].filter(Boolean).join(' · ') }),
-    ),
+    ...(regulars.length ? [el('li', { className: 'section-label' }, [`Faste · ${regulars.length}`]), ...regulars.map(row)] : []),
+    ...(helpers.length ? [el('li', { className: 'section-label' }, [`Hjælpere · ${helpers.length}`]), ...helpers.map(row)] : []),
   )
 }
 

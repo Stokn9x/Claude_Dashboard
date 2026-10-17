@@ -15,7 +15,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-const VERSION = '0.30.0'
+const VERSION = '0.31.0'
 const HOST = '127.0.0.1'
 const PORT = Number(process.env.AGENT_KONTOR_PORT || 4747)
 const HERE = path.dirname(fileURLToPath(import.meta.url))
@@ -260,10 +260,12 @@ const wellbeing = () => {
   return { score, multiplier: 0.8 + (0.4 * score) / 100, parts }
 }
 
+// A regular between jobs on the floor grumbles, but costs nothing: only
+// those at work count, on a seat beyond the desks.
 const floorSittersIn = sessions => {
   let most = { count: 0, project: '' }
   for (const s of sessions) {
-    const count = (s.subs ?? []).filter(sub => sub.phase === 'arriving' || sub.phase === 'working').length - game.owned.desks
+    const count = (s.subs ?? []).filter(sub => (sub.phase === 'arriving' || sub.phase === 'working') && (!sub.staff || sub.isOnJob) && Number(sub.seat) >= game.owned.desks).length
     if (count > most.count) most = { count, project: s.project ?? '' }
   }
   return most
@@ -568,9 +570,60 @@ const checkAchievements = now => {
   }
 }
 
+// ── The regulars ────────────────────────────────────────────────────────
+// Your own agents are in the office all day (the mod seats them). The page
+// can give one a name of its own, or take it off the staff, and take it on
+// again. Kept in a small file beside spil.json, which the mod reads too.
+const CREW = path.join(os.homedir(), '.claude', 'agent-kontor', 'crew.json')
+const AGENT = /^[\w.:@-]{1,100}$/
+const NAME_MAX = 24
+const CREW_MAX = 200
+let crew = { names: {}, removed: [] }
+const loadCrew = () => {
+  try {
+    const saved = JSON.parse(fs.readFileSync(CREW, 'utf8'))
+    const names = Object.fromEntries(Object.entries(saved.names ?? {}).filter(([agent, name]) => AGENT.test(agent) && typeof name === 'string' && name.trim()).slice(0, CREW_MAX))
+    const removed = (Array.isArray(saved.removed) ? saved.removed : []).filter(agent => typeof agent === 'string' && AGENT.test(agent)).slice(0, CREW_MAX)
+    return { names, removed }
+  } catch {
+    return { names: {}, removed: [] }
+  }
+}
+const saveCrew = () => {
+  try {
+    fs.mkdirSync(path.dirname(CREW), { recursive: true })
+    fs.writeFileSync(`${CREW}.tmp`, JSON.stringify(crew, null, 2))
+    fs.renameSync(`${CREW}.tmp`, CREW)
+  } catch {
+    // Kept in memory; the next change writes it again.
+  }
+}
+// {"agent":"code-reviewer","name":"Rikke"} names it ("" gives its own name
+// back); {"agent":"…","isRemoved":true} takes it off the staff, false on.
+const changeCrew = change => {
+  const agent = change?.agent
+  if (typeof agent !== 'string' || !AGENT.test(agent)) return { status: 400, error: 'Ukendt agent' }
+  const names = { ...crew.names }
+  let removed = [...crew.removed]
+  if (typeof change.name === 'string') {
+    const name = change.name.replace(/\s+/g, ' ').trim().slice(0, NAME_MAX)
+    if (name) names[agent] = name
+    else delete names[agent]
+  }
+  if (typeof change.isRemoved === 'boolean') {
+    removed = removed.filter(x => x !== agent)
+    if (change.isRemoved) removed.push(agent)
+  }
+  if (Object.keys(names).length > CREW_MAX || removed.length > CREW_MAX) return { status: 400, error: 'For mange' }
+  crew = { names, removed }
+  saveCrew()
+  return { status: 200 }
+}
+
 // What the page sees of the game: the money, what is owned, what the next
 // things cost, and the latest purchases (for a celebration).
 const gameView = () => ({
+  crew,
   kroner: Math.floor(game.kroner),
   owned: game.owned,
   next: Object.fromEntries(['desk', ...Object.keys(THING_PRICES)].map(item => [item, priceOf(item)])),
@@ -720,6 +773,7 @@ process.on('SIGTERM', stop)
 // The port is ours: read the game and the sessions, and start the work.
 const start = () => {
   game = loadGame()
+  crew = loadCrew()
   isGameChanged = isRecovered || isMigrated
   sessionsNow = readSessions()
   saveGame()
@@ -751,9 +805,10 @@ const fileFor = pathname => {
 const isLocalHost = host => host === `${HOST}:${PORT}` || host === `localhost:${PORT}`
 const isLocalOrigin = origin => origin === `http://${HOST}:${PORT}` || origin === `http://localhost:${PORT}`
 
-// POST /api/buy {"item":"desk"}: from the office page only (its Host, its
-// Origin and its token), a small body, and the server checks price and saldo.
-const handleBuy = (req, res) => {
+// POST /api/buy {"item":"desk"} and POST /api/crew: from the office page
+// only (its Host, its Origin and its token), a small body; the server checks
+// price and saldo, and what a change to the regulars may be.
+const handlePost = (req, res, act) => {
   const json = (status, body) => res.writeHead(status, { 'content-type': 'application/json', 'cache-control': 'no-store' }).end(JSON.stringify(body))
   if (!isLocalOrigin(req.headers.origin ?? '') || req.headers['x-kontor-token'] !== TOKEN) return json(403, { error: 'Ikke tilladt' })
   let body = ''
@@ -763,13 +818,13 @@ const handleBuy = (req, res) => {
     if (body.length > 1024) req.destroy()
   })
   req.on('end', () => {
-    let item = null
+    let asked = null
     try {
-      item = JSON.parse(body).item
+      asked = JSON.parse(body)
     } catch {
       return json(400, { error: 'Forkert forespørgsel' })
     }
-    const result = buy(item)
+    const result = act(asked)
     if (result.status === 200) {
       publish(true)
       return json(200, { ok: true, game: gameView() })
@@ -789,7 +844,8 @@ const server = http.createServer((req, res) => {
     res.writeHead(503, { 'retry-after': '1' }).end()
     return
   }
-  if (req.method === 'POST' && url.pathname === '/api/buy') return handleBuy(req, res)
+  if (req.method === 'POST' && url.pathname === '/api/buy') return handlePost(req, res, asked => buy(asked?.item))
+  if (req.method === 'POST' && url.pathname === '/api/crew') return handlePost(req, res, changeCrew)
   // A newer mod asks an older server to step down: it saves and stops, and
   // the mod starts the new one.
   if (req.method === 'POST' && url.pathname === '/api/quit') {

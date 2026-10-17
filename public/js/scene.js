@@ -388,8 +388,9 @@ const drawSpeech = frame => {
   }
   list.forEach(({ cx, dy }, seat) => {
     const sub = seatedAt(seat)
-    // The name in the bubble: the row behind covers the plate under the desk
-    if (sub) say(cx, dy - 34, sub.activity, t + seat * 230, nameOf(sub))
+    // The name in the bubble: the row behind covers the plate under the desk.
+    // A regular between jobs just sits there, ready: no bubble.
+    if (sub && !(sub.staff && !sub.isOnJob)) say(cx, dy - 34, sub.activity, t + seat * 230, nameOf(sub))
   })
   for (const { sub, pose } of walkers) {
     if (pose.handover) bubble(pose.x, pose.y - 52, sub.outcome === 'failed' ? `Gik i stå: ${sub.task}` : `Afleverer: ${sub.task}`, sub.outcome === 'failed', t)
@@ -399,7 +400,7 @@ const drawSpeech = frame => {
   for (const { sub, spot } of floorSitters) {
     if (sub.activity.state === 'waiting') say(spot.x, spot.y - 44, sub.activity, t)
     else {
-      const grumble = grumbleAt(sub.name, t, hashOf(sub.id), placeOf(sub.seat).isOutside)
+      const grumble = grumbleAt(sub.name, t, hashOf(sub.id), placeOf(sub.seat).isOutside, !!sub.staff)
       if (grumble) bubble(spot.x, spot.y - 44, grumble, false, t)
     }
   }

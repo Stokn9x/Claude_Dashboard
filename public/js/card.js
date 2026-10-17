@@ -8,6 +8,7 @@ import { freeArea, hitAt, pixelsPerUnit, toScreen, wasDrag } from './camera.js'
 import { phaseLabel, showPanel, choose } from './panel.js'
 import { buyItem } from './shop.js'
 import { TEMPER_TEXT, temperOf } from './voices.js'
+import { changeCrew, crewOf, ownName } from './crew.js'
 
 const card = document.getElementById('card')
 
@@ -44,7 +45,37 @@ const subject = () => {
 
 const dot = state => el('span', { className: 'dot', style: `background:${stateColor[state] ?? '#8A94A0'}` })
 
+// A regular's own controls: a name of its own (empty gives its agent's name
+// back), and off the staff (⚙ takes it on again).
+const crewControls = who => {
+  const given = crewOf().names[who.staff] ?? ''
+  const input = el('input', { className: 'crew-name', type: 'text', maxLength: 24, value: given, placeholder: ownName(who.staff), ariaLabel: `Navn til ${ownName(who.staff)}` })
+  const save = async () => {
+    if (input.value.trim() !== given) await changeCrew({ agent: who.staff, name: input.value })
+    input.blur()
+  }
+  input.addEventListener('keydown', e => {
+    // Escape here leaves the field, not the card.
+    e.stopPropagation()
+    if (e.key === 'Enter') void save()
+    else if (e.key === 'Escape') {
+      input.value = given
+      input.blur()
+    }
+  })
+  const remove = async () => {
+    if (await changeCrew({ agent: who.staff, isRemoved: true })) select(null)
+  }
+  return [
+    el('div', { className: 'card-label' }, ['Navn']),
+    el('div', { className: 'crew-edit' }, [input, el('button', { type: 'button', className: 'crew-save', onclick: save }, ['Gem'])]),
+    el('button', { type: 'button', className: 'crew-remove', title: 'Går hjem, når den er færdig med sin opgave. Hent den tilbage under ⚙.', onclick: remove }, ['Fjern fra kontoret']),
+  ]
+}
+
 export const renderCard = () => {
+  // Not while a name is being typed: the card would be built anew under it.
+  if (card.contains(document.activeElement) && document.activeElement.tagName === 'INPUT') return
   const who = subject()
   if (!who) {
     store.selected = null
@@ -52,12 +83,14 @@ export const renderCard = () => {
     return
   }
   const now = Date.now()
+  // A regular between jobs: the counts were its last job's.
+  const isReady = who.staff && !who.isOnJob
   const facts = [
-    who.startedAt ? `I gang i ${ago(now, who.startedAt)}` : null,
-    typeof who.tools === 'number' ? `${who.tools} ${who.tools === 1 ? 'værktøj' : 'værktøjer'}` : null,
-    who.linesAdded || who.linesRemoved ? `+${who.linesAdded ?? 0} −${who.linesRemoved ?? 0} linjer` : null,
+    who.startedAt && !isReady ? `I gang i ${ago(now, who.startedAt)}` : null,
+    typeof who.tools === 'number' && !isReady ? `${who.tools} ${who.tools === 1 ? 'værktøj' : 'værktøjer'}` : null,
+    (who.linesAdded || who.linesRemoved) && !isReady ? `+${who.linesAdded ?? 0} −${who.linesRemoved ?? 0} linjer` : null,
     who.temper ? `${who.temper} type` : null,
-    who.teammate ? `Holdkammerat «${who.teammate}»${modelFamily(who.model) ? ` på ${modelFamily(who.model)}` : ''}` : who.type || who.model ? [typeText(who.type), modelFamily(who.model)].filter(Boolean).join(' på ') : null,
+    who.staff ? `Fast medarbejder · ${ownName(who.staff)}${modelFamily(who.model) ? ` på ${modelFamily(who.model)}` : ''}` : who.teammate ? `Holdkammerat «${who.teammate}»${modelFamily(who.model) ? ` på ${modelFamily(who.model)}` : ''}` : who.type || who.model ? [typeText(who.type), modelFamily(who.model)].filter(Boolean).join(' på ') : null,
   ].filter(Boolean)
   const steps = [...(who.recent ?? [])].reverse()
   card.replaceChildren(
@@ -74,6 +107,7 @@ export const renderCard = () => {
     ...(steps.length
       ? [el('div', { className: 'card-label' }, ['Seneste']), el('ol', { className: 'card-steps' }, steps.map(step => el('li', {}, [el('time', {}, [clockTime(step.at)]), step.detail])))]
       : []),
+    ...(who.staff ? crewControls(who) : []),
   )
   card.hidden = false
   placeCard()

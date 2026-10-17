@@ -21,6 +21,14 @@ const FLOOR = {
   dramatisk: ['Av, min ryg! Min ryg!', 'Jeg skriver det her i et klagebrev', 'Er det sådan, det ender?', 'Hvem har taget min plads?!'],
   positiv: ['Godt for holdningen, det her!', 'Gulvet har udsigt til det hele', 'Snart får jeg et skrivebord', 'Der er hyggeligt hernede'],
 }
+// A regular, one of your own agents, is in all day: without a desk it has
+// more to say about it.
+const REGULAR = {
+  kæk: ['Fast ansat, fast gulv', 'Mit bord er sendt med posten?', 'Jeg har været her hele dagen', 'Vikaren fik vel mit bord?'],
+  tør: ['Jeg bor her. Uden skrivebord.', 'Et skrivebord. Bare ét.', 'Fast medarbejder. Løs plads.', 'Gulvet igen i dag'],
+  dramatisk: ['Hver dag! På gulvet!', 'Fastansat og glemt!', 'Skal jeg sidde her for evigt?!', 'Mit eget skrivebord! Snart?!'],
+  positiv: ['Gulvet er mit faste sted, ha!', 'Snart har jeg mit eget bord!', 'Et skrivebord ville være top!', 'Jeg er her hver dag, gerne!'],
+}
 const BENCH = {
   kæk: ['Frisk luft er også et kontor', 'Jeg holder øje med vejen', 'Wi-fi herude? Næsten.'],
   tør: ['Her er koldt', 'Jeg venter herude', 'Fortovet er pænt'],
@@ -52,9 +60,9 @@ export const chatFor = (a, b, slot) => CHATS[stir(slot, 17) % CHATS.length](a, b
 
 // The line said now, every nine seconds for three, each on its own beat
 // (seed); null between them.
-export const grumbleAt = (name, t, seed, isOutside = false) => {
+export const grumbleAt = (name, t, seed, isOutside = false, isRegular = false) => {
   const phase = (t + seed * 997) % 9000
   if (phase >= 3000) return null
-  const lines = (isOutside ? BENCH : FLOOR)[temperOf(name)]
+  const lines = (isOutside ? BENCH : isRegular ? REGULAR : FLOOR)[temperOf(name)]
   return lines[Math.floor((t + seed * 997) / 9000 + seed) % lines.length]
 }

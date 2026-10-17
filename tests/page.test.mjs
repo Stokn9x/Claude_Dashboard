@@ -664,3 +664,29 @@ test('Claude plays ping-pong only with the table free and someone off work to pl
   assert.deepEqual([game.spot.x, game.partnerSpot.x], [ends[0].x, ends[1].x], 'Claude at one end, the partner at the other')
   assert.deepEqual(routes.checkRoutes([['Claude to the table', plan.MAIN_SPOT, ends[0]], ['Claude back from the table', ends[0], plan.MAIN_SPOT]]).problems, [])
 })
+
+test('a regular goes by the name it was given; the log says when it comes in, takes a job and goes home', () => {
+  const regular = (extra = {}) => ({ id: 'staff-code-reviewer', name: 'code-reviewer', staff: 'code-reviewer', task: '', seat: 0, phase: 'working', since: 0, activity: { state: 'idle', detail: 'Klar til en opgave' }, ...extra })
+  const state = subs => ({ sessions: [{ key: 's', project: 'p', main: { state: 'idle', detail: 'x' }, subs }], game: { crew: { names: { 'code-reviewer': 'Rikke' }, removed: [] } } })
+  const named = util.crewNamed(state([regular(), { id: 'h', name: 'Ida', task: 't', seat: 1, phase: 'working', since: 0, activity: { state: 'reading', detail: 'x' } }]))
+  assert.deepEqual(named.sessions[0].subs.map(s => s.name), ['Rikke', 'Ida'])
+  assert.equal(named.sessions[0].subs[0].agentName, 'code-reviewer')
+
+  const lines = (a, b) => eventsBetween(a, b, 1).map(e => e.text)
+  assert.deepEqual(lines(state([]), state([regular({ phase: 'arriving' })])), ['code-reviewer møder ind'])
+  assert.deepEqual(lines(state([regular()]), state([regular({ isOnJob: true, task: 'Gennemgå diffen' })])), ['code-reviewer går i gang: Gennemgå diffen'])
+  assert.deepEqual(lines(state([regular()]), state([regular({ phase: 'leaving' })])), ['code-reviewer gik hjem'])
+  // At its desk between jobs, nothing new.
+  assert.deepEqual(lines(state([regular()]), state([regular()])), [])
+})
+
+test('a regular without a desk has its own grumbles; on the bench the usual ones', () => {
+  let regular = null
+  let helper = null
+  for (let t = 0; t < 90_000 && !(regular && helper); t += 500) {
+    regular ??= voices.grumbleAt('code-reviewer', t, 3, false, true)
+    helper ??= voices.grumbleAt('code-reviewer', t, 3, false, false)
+  }
+  assert.ok(regular && helper)
+  assert.notEqual(regular, helper)
+})

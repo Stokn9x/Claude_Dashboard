@@ -19,7 +19,10 @@ const sessionEvents = (before, after, now) => {
   const was = new Map((before.subs ?? []).map(sub => [sub.id, sub]))
   for (const sub of after.subs ?? []) {
     const old = was.get(sub.id)
-    if (!old && isAtWork(sub)) events.push(event(now, 'arrive', `${sub.name} kom ind: ${sub.task}`, project))
+    if (!old && isAtWork(sub)) events.push(event(now, 'arrive', sub.staff ? `${sub.name} møder ind` : `${sub.name} kom ind: ${sub.task}`, project))
+    // A regular, in all day, takes a job at its desk, or is taken off the staff.
+    else if (old?.staff && !old.isOnJob && sub.isOnJob) events.push(event(now, 'arrive', `${sub.name} går i gang: ${sub.task}`, project))
+    else if (old?.staff && isAtWork(old) && sub.phase === 'leaving') events.push(event(now, 'home', `${sub.name} gik hjem`, project))
     else if (old?.phase === 'idle' && isAtWork(sub)) events.push(event(now, 'back', `${sub.name} er tilbage på arbejde`, project))
     else if (old?.phase === 'idle' && sub.phase === 'leaving') events.push(event(now, 'home', `${sub.name} gik hjem`, project))
     else if (old && isAtWork(old) && sub.phase === 'delivering') {

@@ -207,6 +207,15 @@ body.tv header:hover { opacity: 1; }
 .ranking { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
 .ranking li { display: grid; grid-template-columns: 24px 30px auto 1fr; gap: 8px; align-items: center; padding: 4px 10px; border-radius: 10px; background: var(--surface-2); font-size: 13px; }
 .ranking .hint { text-align: right; font-size: 11px; }
+.crew-edit { display: flex; gap: 6px; margin-top: 4px; }
+.crew-name { flex: 1; min-width: 0; font: inherit; font-size: 13px; color: var(--ink); background: var(--surface-2); border: 1px solid var(--line); border-radius: 8px; padding: 5px 8px; }
+.crew-name:focus { outline: none; border-color: var(--accent); }
+.crew-save { border: 1px solid var(--line); border-radius: 8px; background: var(--surface-2); color: var(--ink); padding: 5px 10px; cursor: pointer; }
+.crew-save:hover { border-color: var(--faint); }
+.crew-remove { margin-top: 8px; border: 0; background: none; color: var(--soft); padding: 0; font-size: 12px; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
+.crew-remove:hover { color: #E5484D; }
+.crew-list { display: grid; gap: 6px; max-height: 40vh; overflow-y: auto; }
+.crew-empty { color: var(--soft); font-size: 12px; line-height: 1.4; margin: 0; }
 .card-answer { margin: 0; max-height: 9.5em; overflow-y: auto; white-space: pre-wrap; font-size: 12px; line-height: 1.45; color: var(--ink); padding: 6px 8px; border-radius: 8px; background: var(--surface-2); scrollbar-width: thin; }
 .tasks li.has-answer { cursor: pointer; }
 .tasks li.has-answer:hover { background: color-mix(in srgb, var(--accent) 12%, var(--surface-2)); }
