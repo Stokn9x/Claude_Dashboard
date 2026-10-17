@@ -630,10 +630,40 @@ const changeCrew = change => {
   return { status: 200 }
 }
 
+// ── Preferences ─────────────────────────────────────────────────────────
+// The office's language, Danish or English, chosen on the page; the mod
+// reads it too, for its button and panel in Claude. Null until chosen (the
+// page then sends the browser's). Kept beside spil.json.
+const PREFS = path.join(os.homedir(), '.claude', 'agent-kontor', 'prefs.json')
+const LANGS = ['da', 'en']
+let prefs = { lang: null }
+const loadPrefs = () => {
+  try {
+    const saved = JSON.parse(fs.readFileSync(PREFS, 'utf8'))
+    return { lang: LANGS.includes(saved.lang) ? saved.lang : null }
+  } catch {
+    return { lang: null }
+  }
+}
+// {"lang":"en"}
+const changePrefs = change => {
+  if (!LANGS.includes(change?.lang)) return { status: 400, error: 'Ukendt sprog' }
+  prefs = { ...prefs, lang: change.lang }
+  try {
+    fs.mkdirSync(path.dirname(PREFS), { recursive: true })
+    fs.writeFileSync(`${PREFS}.tmp`, JSON.stringify(prefs, null, 2))
+    fs.renameSync(`${PREFS}.tmp`, PREFS)
+  } catch {
+    // Kept in memory; the next change writes it again.
+  }
+  return { status: 200 }
+}
+
 // What the page sees of the game: the money, what is owned, what the next
 // things cost, and the latest purchases (for a celebration).
 const gameView = () => ({
   crew,
+  prefs,
   kroner: Math.floor(game.kroner),
   owned: game.owned,
   next: Object.fromEntries(['desk', ...Object.keys(THING_PRICES)].map(item => [item, priceOf(item)])),
@@ -784,6 +814,7 @@ process.on('SIGTERM', stop)
 const start = () => {
   game = loadGame()
   crew = loadCrew()
+  prefs = loadPrefs()
   isGameChanged = isRecovered || isMigrated
   sessionsNow = readSessions()
   saveGame()
@@ -856,6 +887,7 @@ const server = http.createServer((req, res) => {
   }
   if (req.method === 'POST' && url.pathname === '/api/buy') return handlePost(req, res, asked => buy(asked?.item))
   if (req.method === 'POST' && url.pathname === '/api/crew') return handlePost(req, res, changeCrew)
+  if (req.method === 'POST' && url.pathname === '/api/prefs') return handlePost(req, res, changePrefs)
   // A newer mod asks an older server to step down: it saves and stops, and
   // the mod starts the new one.
   if (req.method === 'POST' && url.pathname === '/api/quit') {

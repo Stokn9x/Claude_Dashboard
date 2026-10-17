@@ -6,6 +6,30 @@
 import { el, remember, remembered } from './util.js'
 import { showTour } from './welcome.js'
 import { crewOf, isOnStaff, knownAgents, originOf, ownName, setOnStaff } from './crew.js'
+import { L, keepLang, lang } from './i18n.js'
+import { store } from './store.js'
+
+// The language, kept by the server for the page and the mod's button alike,
+// and by this browser to start in it. The page reloads in the new one.
+export const saveLang = async next => {
+  keepLang(next)
+  if (!store.state.token) return
+  try {
+    await fetch('/api/prefs', { method: 'POST', headers: { 'content-type': 'application/json', 'x-kontor-token': store.state.token }, body: JSON.stringify({ lang: next }) })
+  } catch {}
+}
+const langRow = () => {
+  const pick = (code, name) =>
+    el('button', { type: 'button', className: 'lang-option', ariaPressed: String(lang === code), lang: code, onclick: async () => {
+      if (code === lang) return
+      await saveLang(code)
+      location.reload()
+    } }, [name])
+  return el('div', { className: 'lang-row' }, [
+    el('span', {}, [el('strong', {}, [L('Sprog', 'Language')]), el('small', {}, [L('Siden og knappen i Claude', 'The page and the button in Claude')])]),
+    el('div', { className: 'lang-pick', role: 'group', ariaLabel: L('Sprog', 'Language') }, [pick('da', 'Dansk'), pick('en', 'English')]),
+  ])
+}
 
 export const settings = { weather: remembered('weather') !== 'off' }
 
@@ -55,6 +79,7 @@ const crewSection = () => {
 const open = () => {
   box = el('div', { className: 'settings', role: 'dialog', ariaLabel: 'Indstillinger' }, [
     el('h3', {}, ['Indstillinger']),
+    langRow(),
     row('weather', 'Vejr', 'Regn og sne over kontoret. Årstiderne bliver, også uden.'),
     ...crewSection(),
     el('button', { type: 'button', className: 'settings-tour', onclick: () => (close(), showTour()) }, ['Vis rundvisningen igen']),

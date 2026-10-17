@@ -14,6 +14,7 @@ import { WALKS } from './routes.js'
 import { renderShop, moodFace } from './shop.js'
 import { renderProgress, announce } from './progress.js'
 import { offSince } from './idle.js'
+import { modText } from './i18n.js'
 
 const tabs = document.getElementById('tabs')
 const people = document.getElementById('people')
@@ -35,12 +36,12 @@ const pill = (state, detail) => {
   const colour = stateColor[state] ?? '#8A94A0'
   // A teammate between its turns, or a regular between jobs, is ready for
   // work, not on a break.
-  const isReady = state === 'idle' && (detail === 'Venter på en besked' || detail === 'Klar til en opgave')
-  const text = state === 'working' && detail === 'Tænker' ? 'Tænker' : isReady ? 'Ledig' : PILL[state] ?? state
+  const isReady = state === 'idle' && (detail === modText('Venter på en besked') || detail === modText('Klar til en opgave'))
+  const text = state === 'working' && detail === modText('Tænker') ? modText('Tænker') : isReady ? 'Ledig' : PILL[state] ?? state
   return el('span', { className: 'pill', style: `color:${colour};background:color-mix(in srgb, ${colour} 16%, transparent)` }, [text])
 }
 // The heading says it already; the details need not say it again
-const withoutWaiting = detail => detail.replace(/^Venter på dig:\s*/, '')
+const withoutWaiting = detail => detail.replace(/^(Venter på dig|Waiting for you):\s*/, '')
 
 // ── The panel: which section, and open or folded away ───────────────────
 // Showing a section opens the panel too, unless asked not to (on load).

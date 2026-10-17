@@ -33,7 +33,7 @@ const sessionEvents = (before, after, now) => {
     const who = (after.subs ?? []).find(sub => sub.id === after.party.who)
     events.push(event(now, after.party.kind, who ? `${who.name}: ${after.party.label}` : after.party.label, project))
   }
-  if (after.main?.state === 'waiting' && before.main?.state !== 'waiting') events.push(event(now, 'waiting', `Claude venter på dig: ${after.main.detail.replace(/^Venter på dig:\s*/, '')}`, project))
+  if (after.main?.state === 'waiting' && before.main?.state !== 'waiting') events.push(event(now, 'waiting', `Claude venter på dig: ${after.main.detail.replace(/^(Venter på dig|Waiting for you):\s*/, '')}`, project))
   // A long turn that ended on its own: worth telling you about.
   const turn = after.turn
   if (turn && turn.endedAt !== before.turn?.endedAt && !turn.isAborted && turn.ms >= DONE_AFTER_MS) {

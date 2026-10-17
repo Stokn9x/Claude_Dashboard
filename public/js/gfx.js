@@ -1,6 +1,7 @@
 // The canvas and the small drawing words everything else is made of. All of
 // them draw in world units on the main canvas, through the camera.
 import { clip } from './util.js'
+import { modText } from './i18n.js'
 
 export const canvas = document.getElementById('office')
 export const ctx = canvas.getContext('2d')
@@ -145,6 +146,6 @@ const thought = (cx, bottom, t) => {
 // `who`, when given, leads the words: at the desks, where the row behind
 // covers the name plates.
 export const say = (cx, bottom, activity, t, who = null) => {
-  if (activity.detail === 'Tænker' && activity.state !== 'waiting') legibly(cx, bottom, 8.5, 12, (cx, bottom) => thought(cx, bottom, t))
+  if (activity.detail === modText('Tænker') && activity.state !== 'waiting') legibly(cx, bottom, 8.5, 12, (cx, bottom) => thought(cx, bottom, t))
   else bubble(cx, bottom, who ? `${who} · ${activity.detail}` : activity.detail, activity.state === 'waiting', t, who ? 30 + who.length + 3 : 30)
 }

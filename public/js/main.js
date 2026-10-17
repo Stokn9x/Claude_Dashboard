@@ -14,6 +14,8 @@ import { playFor } from './sound.js'
 import { notifyFor, titleFor } from './notify.js'
 import { settle } from './routes.js'
 import { crewNamed } from './util.js'
+import { inLanguage, keepLang, lang, translateStatic } from './i18n.js'
+import { saveLang } from './settings.js'
 import './tip.js'
 import './tv.js'
 import './welcome.js'
@@ -29,8 +31,27 @@ onEvents(notifyFor)
 // When each helper's phase was first seen here (see settle in routes.js)
 const seen = new Map()
 
+// The language as the server keeps it: one chosen in another browser is
+// taken over (a reload); none chosen yet, this browser's is sent once.
+let isLangSent = false
+const followLang = game => {
+  const chosen = game?.prefs?.lang
+  if (chosen && chosen !== lang) {
+    keepLang(chosen)
+    location.reload()
+    return true
+  }
+  if (game?.prefs && !chosen && !isLangSent) {
+    isLangSent = true
+    void saveLang(lang)
+  }
+  return false
+}
+
 const receive = raw => {
-  const data = crewNamed(raw)
+  store.state = { ...store.state, token: raw.token ?? store.state.token }
+  if (followLang(raw.game)) return
+  const data = crewNamed(inLanguage(raw))
   const next = { ...data, sessions: settle(data.sessions ?? [], seen, Date.now()) }
   addEvents(eventsBetween(store.state, next))
   store.state = next
@@ -78,6 +99,7 @@ const frame = () => {
   }
 }
 
+translateStatic(document)
 fit()
 new ResizeObserver(fit).observe(document.body)
 new ResizeObserver(fit).observe(document.getElementById('side'))

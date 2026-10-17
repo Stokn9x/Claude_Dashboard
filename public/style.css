@@ -128,6 +128,12 @@ button.chip { cursor: pointer; }
 .setting input { margin-top: 3px; accent-color: var(--accent); width: 16px; height: 16px; }
 .setting span { display: grid; gap: 2px; }
 .setting small { color: var(--soft); font-size: 12px; line-height: 1.4; }
+.lang-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.lang-row > span { display: grid; gap: 2px; }
+.lang-row small { color: var(--soft); font-size: 12px; }
+.lang-pick { display: flex; border: 1px solid var(--line); border-radius: 999px; padding: 2px; background: var(--surface-2); flex-shrink: 0; }
+.lang-option { border: 0; background: none; color: var(--soft); padding: 4px 10px; border-radius: 999px; cursor: pointer; font: inherit; font-size: 12px; }
+.lang-option[aria-pressed="true"] { background: var(--accent); color: #fff; font-weight: 600; }
 .settings-tour { justify-self: start; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-2); color: var(--soft); padding: 6px 12px; cursor: pointer; }
 .settings-tour:hover { color: var(--ink); border-color: var(--faint); }
 

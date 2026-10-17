@@ -21,6 +21,7 @@ import { background, drawBuilding } from './building.js'
 import { drawLife } from './outdoors.js'
 import { party } from './party.js'
 import { forSaleNow, drawSaleOutlines, drawSaleSigns, construction } from './sales.js'
+import { modText } from './i18n.js'
 
 // The longest a walk to a newly bought desk takes; most are shorter
 const MOVE_MS = 12_000
@@ -457,7 +458,7 @@ const drawSpeech = frame => {
     else {
       const sub = meeting.order[(round - 1) % meeting.order.length]
       const w = walkers.find(x => x.sub.id === sub.id && x.pose.isThere)
-      const status = sub.activity.detail === 'Tænker' ? 'Jeg tænker stadig over min opgave' : sub.activity.detail
+      const status = sub.activity.detail === modText('Tænker') ? 'Jeg tænker stadig over min opgave' : sub.activity.detail
       if (w && meetingPose.there % 3000 < 2600) bubble(w.pose.x, w.pose.y - 44, status, false, t, 40)
     }
   }
