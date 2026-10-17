@@ -31,19 +31,19 @@ onResize(() => {
 const drawLot = (g, fill, { x, y, w, h }, snow = 0) => {
   fill(x, y, w, h, '#8FA572')
   fill(x + 6, y + 6, w - 12, h - 12, '#A3B184')
-  for (let i = 0; i < 18; i++) fill(x + ((i * 53) % (w - 16)) + 8, y + ((i * 37) % (h - 16)) + 8, 6, 3, i % 3 ? '#93A775' : '#B9A27A')
+  for (let i = 0; i < 18; i++) fill(x + ((i * 53) % (w - 16)) + 8, y + ((i * 37) % (h - 16)) + 8, 6, 3, i % 3 ? '#8FA572' : '#B9A27A')
   // Under the snow like the rest of the grounds
   if (snow > 0) {
     g.globalAlpha = 0.85 * snow
-    fill(x, y, w, h, '#EEF3F7')
+    fill(x, y, w, h, '#E9EEF2')
     g.globalAlpha = 1
   }
   // The rope, and a stake every forty units or so along it
-  g.strokeStyle = '#E8DCC0'
+  g.strokeStyle = '#E9E2C9'
   g.lineWidth = 1
   g.strokeRect(x + 5.5, y + 5.5, w - 11, h - 11)
   const stake = (px, py) => {
-    fill(px - 2, py - 2, 4, 4, '#5E4330')
+    fill(px - 2, py - 2, 4, 4, '#5C4436')
     fill(px - 1, py - 1, 2, 2, '#8B5E3C')
   }
   for (const [ax, bx] of [[x + 6, x + w - 6]]) {
@@ -82,7 +82,7 @@ const doorSign = (g, door, room) => {
   g.roundRect(x + 1, y + 1.5, w, h, h / 3)
   g.fill()
   g.globalAlpha = 1
-  g.fillStyle = '#1C232C'
+  g.fillStyle = '#1B2433'
   g.strokeStyle = '#5A6672'
   g.lineWidth = Math.max(0.8, size * 0.08)
   g.beginPath()
@@ -121,7 +121,7 @@ const christmasTree = (g, fill, dot, { x, y }) => {
     g.lineTo(x + w, top + y + 9)
     g.lineTo(x - w, top + y + 9)
     g.closePath()
-    g.fillStyle = '#2F7A4A'
+    g.fillStyle = '#357A4A'
     g.fill()
     g.lineWidth = 1
     g.strokeStyle = OUTLINE
@@ -178,7 +178,7 @@ export const drawBuilding = (project, hour, look = {}) => {
     const f = frameOf(room)
     fill(f.x, f.y, f.w, f.h, WALL)
     if (topWallOf(room) > 6) {
-      fill(f.x, f.y, f.w, 6, snow > 0.4 ? '#E6ECF0' : WALL_TOP)
+      fill(f.x, f.y, f.w, 6, snow > 0.4 ? '#E9EEF2' : WALL_TOP)
       for (const wx of topWindowsOf(room)) {
         fill(wx, f.y + 1, 56, 5, sky)
         fill(wx + 27, f.y + 1, 2, 5, WALL_TOP)
@@ -230,7 +230,7 @@ export const drawBuilding = (project, hour, look = {}) => {
     fill(w.x + 1, w.y + w.h / 2 - 1, 4, 2, WALL_TOP)
   }
   // The name plate over Claude's office, in the middle of the house
-  g.fillStyle = '#20262E'
+  g.fillStyle = '#2B2F36'
   g.beginPath()
   g.roundRect(MAIN.cx - 60, WORLD.y + 3, 120, 11, 2)
   g.fill()

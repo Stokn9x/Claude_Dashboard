@@ -39,14 +39,14 @@ export const drawGrounds = (g, view, { season = 'summer', snow = 0 } = {}) => {
   // Grass under everything, as far as the window reaches; flowers in spring
   // and summer; snow over it all when it lies
   fill(view.x, view.y, view.w, view.h, GRASS_IN[season] ?? GRASS)
-  for (const t of TUFTS) if (seen(t.x, t.y)) fill(t.x, t.y, 5, 2, t.k === 0 ? '#6E9E55' : t.k === 1 ? '#8DBB6F' : '#76A65C')
+  for (const t of TUFTS) if (seen(t.x, t.y)) fill(t.x, t.y, 5, 2, t.k === 0 ? '#6E9E55' : t.k === 1 ? '#80B566' : '#7FAE63')
   for (const f of season === 'spring' || season === 'summer' ? FLOWERS : []) {
     if (!seen(f.x, f.y)) continue
     for (const [dx, dy] of [[0, 0], [5, 2], [2, 6], [-4, 4]]) disc(f.x + dx, f.y + dy, 1.4, f.colour)
   }
   if (snow > 0) {
     g.globalAlpha = 0.88 * snow
-    fill(view.x, view.y, view.w, view.h, '#EEF3F7')
+    fill(view.x, view.y, view.w, view.h, '#E9EEF2')
     g.globalAlpha = 1
   }
 
@@ -60,14 +60,14 @@ export const drawGrounds = (g, view, { season = 'summer', snow = 0 } = {}) => {
     g.beginPath()
     g.ellipse(p.x, p.y, p.rx, p.ry, 0, 0, Math.PI * 2)
     // Frozen over in a snowy winter
-    g.fillStyle = snow > 0.4 ? '#B9D6E6' : '#4F97C4'
+    g.fillStyle = snow > 0.4 ? '#BFD0DD' : '#4F97C4'
     g.fill()
     g.beginPath()
     g.ellipse(p.x - 6, p.y - 4, p.rx * 0.78, p.ry * 0.7, 0, 0, Math.PI * 2)
     g.fillStyle = '#62A9D3'
     g.fill()
     for (const [dx, dy] of [[-40, 10], [26, -18], [44, 14]]) {
-      disc(p.x + dx, p.y + dy, 5, '#4E9A55')
+      disc(p.x + dx, p.y + dy, 5, '#4A9150')
       disc(p.x + dx + 2, p.y + dy - 1, 1.4, '#F0A9C4')
     }
     for (const [dx, dy] of [[-p.rx + 6, -10], [-p.rx + 12, 16], [p.rx - 10, -22], [p.rx - 4, 6]]) {
@@ -78,13 +78,13 @@ export const drawGrounds = (g, view, { season = 'summer', snow = 0 } = {}) => {
   // The path from the front door to the pavement
   for (const [x, y, w, h] of GROUNDS.path) {
     fill(x - 2, y - 2, w + 4, h + 4, '#BFAF92')
-    fill(x, y, w, h, '#DCCDB0')
+    fill(x, y, w, h, '#DDCDB7')
   }
   for (const [x, y, w, h] of GROUNDS.path) {
     const isAcross = w > h
     for (let k = 6; k < (isAcross ? w : h) - 4; k += 12) {
-      if (isAcross) fill(x + k, y + 4, 7, h - 8, '#E7DAC0')
-      else fill(x + 4, y + k, w - 8, 7, '#E7DAC0')
+      if (isAcross) fill(x + k, y + 4, 7, h - 8, '#E9E2C9')
+      else fill(x + 4, y + k, w - 8, 7, '#E9E2C9')
     }
   }
 
@@ -94,8 +94,8 @@ export const drawGrounds = (g, view, { season = 'summer', snow = 0 } = {}) => {
   fill(b.x - 14, b.y + 6, 32, 5, '#000000')
   g.globalAlpha = 1
   fill(b.x - 16, b.y - 4, 32, 10, OUTLINE)
-  fill(b.x - 15, b.y - 3, 30, 3, '#A9764A')
-  fill(b.x - 15, b.y + 1, 30, 4, '#C08A58')
+  fill(b.x - 15, b.y - 3, 30, 3, '#A86F45')
+  fill(b.x - 15, b.y + 1, 30, 4, '#C68A5C')
   fill(b.x - 13, b.y + 6, 2, 4, OUTLINE)
   fill(b.x + 11, b.y + 6, 2, 4, OUTLINE)
 
@@ -107,12 +107,12 @@ export const drawGrounds = (g, view, { season = 'summer', snow = 0 } = {}) => {
     if (!seen(x, HEDGE_Y)) continue
     g.beginPath()
     g.roundRect(x, HEDGE_Y, 32, 11, 4)
-    g.fillStyle = '#3E7D45'
+    g.fillStyle = '#3E7A3E'
     g.fill()
     g.lineWidth = 1
     g.strokeStyle = '#2C5E34'
     g.stroke()
-    fill(x + 4, HEDGE_Y + 2, 24, 3, snow > 0.4 ? '#F2F6F9' : '#56A060')
+    fill(x + 4, HEDGE_Y + 2, 24, 3, snow > 0.4 ? '#E9EEF2' : '#4C9A60')
     if ((x / 36) % 3 === 0) disc(x + 22, HEDGE_Y + 6, 1.4, '#E5484D')
   }
 
@@ -123,15 +123,15 @@ export const drawGrounds = (g, view, { season = 'summer', snow = 0 } = {}) => {
     fill(view.x, farPavement.y, view.w, farPavement.h, '#C9C4BA')
     const from = Math.floor(view.x / 16) * 16
     for (let x = from; x < view.x + view.w; x += 16) {
-      fill(x, pavement.y, 1, pavement.h, '#B5AFA3')
-      fill(x, farPavement.y, 1, farPavement.h, '#B5AFA3')
+      fill(x, pavement.y, 1, pavement.h, '#BEB7A9')
+      fill(x, farPavement.y, 1, farPavement.h, '#BEB7A9')
     }
-    fill(view.x, road.y, view.w, road.h, '#4A4F57')
+    fill(view.x, road.y, view.w, road.h, '#3E4852')
     fill(view.x, road.y, view.w, 2, '#9A958C')
     fill(view.x, road.y + road.h - 2, view.w, 2, '#9A958C')
     for (let x = Math.floor(view.x / 30) * 30; x < view.x + view.w; x += 30) fill(x, road.y + road.h / 2 - 1, 16, 2, '#E9E2C9')
     // A pedestrian crossing where the path meets the street
-    for (let k = 0; k < 5; k++) fill(GROUNDS.path.at(-1)[0] - 2 + k * 6, road.y + 4, 3, road.h - 8, '#E9E9E4')
+    for (let k = 0; k < 5; k++) fill(GROUNDS.path.at(-1)[0] - 2 + k * 6, road.y + 4, 3, road.h - 8, '#E6E2DA')
   }
   // Grass on the far side of the street goes on as before.
 
@@ -190,7 +190,7 @@ export const drawGrounds = (g, view, { season = 'summer', snow = 0 } = {}) => {
         g.lineTo(t.x + t.r * 0.3, top - t.r * 0.1)
         g.lineTo(t.x - t.r * 0.3, top - t.r * 0.1)
         g.closePath()
-        g.fillStyle = '#F4F8FB'
+        g.fillStyle = '#FFFFFF'
         g.fill()
       }
     } else if (season === 'winter') {
@@ -207,7 +207,7 @@ export const drawGrounds = (g, view, { season = 'summer', snow = 0 } = {}) => {
         g.stroke()
       }
       g.lineCap = 'butt'
-      if (snow > 0.4) disc(t.x, top + 2, t.r * 0.3, '#F4F8FB')
+      if (snow > 0.4) disc(t.x, top + 2, t.r * 0.3, '#FFFFFF')
     } else {
       const [dark, mid, light] = (season === 'autumn' ? AUTUMN : LEAVES)[t.shade]
       fill(t.x - 2.5, t.y - 12, 5, 13, '#6E4B32')
@@ -241,7 +241,7 @@ const car = (x, y, colour, isRight) => {
   rounded(-17, -7, 34, 15, 4, colour)
   rounded(-7, -6, 16, 13, 3, 'rgba(0,0,0,0.18)')
   rect(5, -5, 4, 11, '#A9D8F5')
-  rect(-9, -5, 3, 11, '#8FC1E3')
+  rect(-9, -5, 3, 11, '#9CC4EC')
   rect(15, -6, 2, 3, '#FFF3C4')
   rect(15, 4, 2, 3, '#FFF3C4')
   rect(-17, -6, 1.5, 3, '#E5484D')
@@ -269,11 +269,11 @@ export const drawLife = (now, t, view) => {
   const dy = p.y + Math.sin(a) * p.ry * 0.45
   const isRight = -Math.sin(a) > 0
   ctx.globalAlpha = 0.35
-  rounded(dx - 9, dy + 2, 18, 3, 1.5, '#9CD3F5')
+  rounded(dx - 9, dy + 2, 18, 3, 1.5, '#A9D8F5')
   ctx.globalAlpha = 1
   rounded(dx - 5, dy - 3, 10, 6, 3, '#F6F1E4', OUTLINE, 1)
   const hx = dx + (isRight ? 4 : -4)
   rounded(hx - 2.5, dy - 7, 5, 5, 2.5, '#3E8A55', OUTLINE, 1)
-  rect(isRight ? hx + 2 : hx - 4, dy - 5, 2, 1.5, '#E8A33D')
+  rect(isRight ? hx + 2 : hx - 4, dy - 5, 2, 1.5, '#F2A541')
   return headlights
 }

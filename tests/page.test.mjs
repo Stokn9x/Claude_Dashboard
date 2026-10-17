@@ -763,3 +763,18 @@ test('round shapes are drawn in pixel steps on the figures’ grid', async () =>
   assert.equal(bulb.points[0][0], 'rect')
   assert.ok(bulb.points[0][3] >= PIXEL)
 })
+
+test('the office is drawn in the colours of its palette, and no others', async () => {
+  const { PALETTE } = await import(js('palette'))
+  const fs = await import('node:fs')
+  const known = new Set(PALETTE)
+  const strays = []
+  for (const name of ['figures', 'furniture', 'rooms', 'outdoors', 'building', 'light', 'scene', 'party', 'sales', 'gfx', 'plan', 'cat']) {
+    const text = fs.readFileSync(new URL(`../public/js/${name}.js`, import.meta.url), 'utf8')
+    for (const [hex] of text.matchAll(/#(?:[0-9A-Fa-f]{6}|[0-9A-Fa-f]{3})\b/g)) {
+      const full = hex.length === 4 ? `#${[...hex.slice(1)].map(c => c + c).join('')}` : hex
+      if (!known.has(full.toUpperCase())) strays.push(`${name}.js ${hex}`)
+    }
+  }
+  assert.deepEqual(strays, [], 'a new colour belongs in palette.js first')
+})

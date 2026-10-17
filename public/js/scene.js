@@ -137,7 +137,7 @@ const fish = t => {
   if (!owns('aquarium') || !room) return
   const { dx, dy } = shiftOf(room)
   const [x, y, w, h] = ROOM_TYPES.quiet.aquarium
-  const colours = ['#F2994A', '#F2C94C', '#EB5757', '#F6F7F8']
+  const colours = ['#F2994A', '#F2C94C', '#EB5757', '#FFFFFF']
   for (let i = 0; i < 4; i++) {
     const k = (((t / (2600 + i * 700) + i * 0.27) % 2) + 2) % 2
     const goingRight = k < 1
@@ -165,7 +165,7 @@ const receptionist = ({ subs, walkers, hits, t }, now, walks) => {
   rect(cx + 12, dy - 12, 18, 12, OUTLINE)
   rect(cx + 13, dy - 11, 16, 9, '#7FB4F0')
   circle(cx - 28, dy + 2, 2.6, '#D6A23C', OUTLINE)
-  tag(cx, dy + 31, RECEPTIONIST.name, '#20262E')
+  tag(cx, dy + 31, RECEPTIONIST.name, '#2B2F36')
   const arriving = walkers.find(w => w.sub.phase === 'arriving' && w.sub.from !== 'idle' && w.pose.isWalking)?.sub
   const leaving = walkers.find(w => w.pose.isHomeward || (w.sub.phase === 'leaving' && !w.pose.isIdle))
   const line = arriving
@@ -291,7 +291,7 @@ const drawClaude = ({ s, main, where, rest, meetingPose, claudeWalk, kitchenSpot
     const { x, y } = kitchenSpot
     standing(x, y, claudeLook, 'front', false, t, 7)
     mug(x + 15, y - 22, true)
-    steam(x + 17, y - 25, t, { puffs: 2, speed: 40, height: 12, alpha: 0.7, colour: '#C9D2DA' })
+    steam(x + 17, y - 25, t, { puffs: 2, speed: 40, height: 12, alpha: 0.7, colour: '#C9CED3' })
     tag(x, y + 3, 'Claude', CLAUDE)
     hits.push({ kind: 'claude', id: 'claude', ...standingBox(x, y) })
     // The coffee machine on the counter, just used
@@ -345,7 +345,7 @@ const drawWalkers = ({ walkers, players, hits, t }) => {
       if (pose.errand.dest.facing === 'back') sittingBack(pose.x, pose.y, look)
       else sitting(pose.x, pose.y, look, false, t, hashOf(sub.id))
       if (kind === 'guitar') {
-        rect(pose.x - 12, pose.y - 16, 16, 6, '#B85A33')
+        rect(pose.x - 12, pose.y - 16, 16, 6, '#B5532E')
         rect(pose.x + 3, pose.y - 15, 10, 2, '#6E4B32')
       }
     }
@@ -655,7 +655,7 @@ export const draw = () => {
   // The one whose card is open, ringed.
   const selected = store.selected
   const ring = selected && hits.find(h => h.kind === selected.kind && h.id === selected.id)
-  if (ring) dashed(ring.x0, ring.y0, ring.x1 - ring.x0, ring.y1 - ring.y0, 6, 'rgba(47,134,214,0.08)', '#2F86D6')
+  if (ring) dashed(ring.x0, ring.y0, ring.x1 - ring.x0, ring.y1 - ring.y0, 6, 'rgba(47,134,214,0.08)', '#3B8FE0')
   store.hits = hits
 
   if (s?.party) {

@@ -77,19 +77,19 @@ const lotSign = (sale, kroner, t) => {
     ctx.globalAlpha = 0.35
     rounded(x + 2, y + 3, w, h, 7, '#000000')
     ctx.globalAlpha = 0.94
-    rounded(x, y, w, h, 7, '#1C232C', sale.canAfford ? '#2E9E8F' : '#3A4552', sale.canAfford ? 1.6 + 0.6 * Math.sin(t / 260) : 1.2)
+    rounded(x, y, w, h, 7, '#1B2433', sale.canAfford ? '#2E9E8F' : '#3E4852', sale.canAfford ? 1.6 + 0.6 * Math.sin(t / 260) : 1.2)
     ctx.globalAlpha = 1
     ctx.font = `12px ${FONT}`
     ctx.textAlign = 'left'
     ctx.textBaseline = 'alphabetic'
     ctx.fillText(item.icon, x + 9, y + 18)
     label(item.name, x + 29, y + 16, 9, '#E9EEF2', 700, 'left')
-    label(kr(sale.price), x + 10, y + 33, 11, sale.canAfford ? '#F2C14E' : '#C9D1D9', 800, 'left')
+    label(kr(sale.price), x + 10, y + 33, 11, sale.canAfford ? '#F2C14E' : '#C9CED3', 800, 'left')
     if (sale.canAfford) {
       rounded(x + 9, y + 39, w - 18, 13, 6.5, '#2E9E8F')
       label(L('Klik for at bygge', 'Click to build'), cx, y + 48.5, 7.5, '#FFFFFF', 700)
     } else {
-      rounded(x + 10, y + 40, w - 20, 4, 2, '#2A333E')
+      rounded(x + 10, y + 40, w - 20, 4, 2, '#2B2F36')
       rounded(x + 10, y + 40, (w - 20) * Math.min(1, kroner / sale.price), 4, 2, '#D6A23C')
       label(L(`Mangler ${kr(missing)}`, `${kr(missing)} to go`), x + 10, y + 53, 7, '#8A94A0', 600, 'left')
     }

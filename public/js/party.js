@@ -22,8 +22,8 @@ export const party = (p, spot, t) => {
       const k = ((age + (i % 4) * 0.17) % 0.7) / 0.7
       rect(spot.cx - 18 + i * 4.5, spot.dy - 50 + k * 28, 1.5, 4, '#5DA9E9')
     }
-    for (const [dx, dy, r] of [[-14, 6, 9], [0, 2, 12], [14, 6, 9], [-6, 10, 9], [8, 10, 9]]) circle(spot.cx + dx, spot.dy - 66 + dy, r, '#8B97A6', OUTLINE)
-    rect(spot.cx - 18, spot.dy - 56, 36, 6, '#8B97A6')
+    for (const [dx, dy, r] of [[-14, 6, 9], [0, 2, 12], [14, 6, 9], [-6, 10, 9], [8, 10, 9]]) circle(spot.cx + dx, spot.dy - 66 + dy, r, '#8A94A0', OUTLINE)
+    rect(spot.cx - 18, spot.dy - 56, 36, 6, '#8A94A0')
   } else {
     ;['#E5484D', '#D6A23C', '#3E7CC9'].forEach((c, i) => {
       const rise = Math.min(1, age / (3 + i * 0.4)) * 80
@@ -43,5 +43,5 @@ export const party = (p, spot, t) => {
       ctx.stroke()
     })
   }
-  tag(spot.cx, spot.dy - 78, p.label, p.kind === 'rain' ? '#5B6B7E' : '#2E9E8F')
+  tag(spot.cx, spot.dy - 78, p.label, p.kind === 'rain' ? '#62758C' : '#2E9E8F')
 }

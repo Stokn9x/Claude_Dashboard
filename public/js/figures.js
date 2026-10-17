@@ -7,9 +7,9 @@ const P = 3.5
 
 // Skin tones from light to deep, evenly spread so an office of six looks
 // like a real mix of people.
-const skins = ['#F7DCC4', '#EFC39C', '#E0A97A', '#C68A5C', '#A86F45', '#8A5634', '#6B3F25']
-const hairs = [['#3A2A22', '#5C4436'], ['#7A4B2A', '#9C6A43'], ['#D9B25C', '#F0D48A'], ['#2B2B33', '#4A4A57'], ['#B5523B', '#D27358'], ['#9AA0A8', '#C3C8CE']]
-const shirts = [['#3E7CC9', '#2F5F9C'], ['#2E9E8F', '#21776B'], ['#E07A4F', '#B85E38'], ['#8A6FD6', '#6A52AE'], ['#D6A23C', '#AD7F26'], ['#D45D7A', '#AC4560'], ['#4F9A5B', '#3A7644']]
+const skins = ['#F7DCC4', '#EFC39C', '#E0A97A', '#C68A5C', '#A86F45', '#8B5E3C', '#6B3F25']
+const hairs = [['#3A2A22', '#5C4436'], ['#7A4B2A', '#A86F45'], ['#D9B25C', '#F0D48A'], ['#2B2F36', '#3E4852'], ['#B5523B', '#D27358'], ['#9CA6B0', '#C9CED3']]
+const shirts = [['#3E7CC9', '#2F5F9C'], ['#2E9E8F', '#21776B'], ['#E07A4F', '#B85E38'], ['#8A6FD6', '#6A52AE'], ['#D6A23C', '#AD7F26'], ['#D45D7A', '#AC4560'], ['#4C9A60', '#357A4A']]
 
 export const lookFor = id => {
   const h = hashOf(id)
@@ -17,7 +17,7 @@ export const lookFor = id => {
   const [shirt, shirtShade] = shirts[stir(h, 2) % shirts.length]
   return { hair, hairLight, skin: skins[stir(h, 3) % skins.length], shirt, shirtShade }
 }
-export const claudeLook = { hair: '#C8643B', hairLight: '#E3875E', skin: '#F6D5B8', shirt: '#2F3A4A', shirtShade: '#222B37' }
+export const claudeLook = { hair: '#C8643B', hairLight: '#E3875E', skin: '#F7DCC4', shirt: '#2F3A4A', shirtShade: '#1B2433' }
 
 const BODY = ['..oooooo..', '.ohhhhhho.', 'ohhHhhhhho', 'ohssssssho', 'ohsessesho', '.osssssso.', '.otttttTo.', 'otttttttTo', 'otttttttTo', 'osttttttso']
 const BACK = ['..oooooo..', '.ohhhhhho.', 'ohhHhhhhho', 'ohhhhhhhho', 'ohhhhhhhho', '.ohhhhhho.', '.otttttTo.', 'otttttttTo', 'otttttttTo', 'osttttttso']

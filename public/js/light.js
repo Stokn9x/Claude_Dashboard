@@ -43,7 +43,7 @@ const darknessAt = h => {
   return NIGHT
 }
 export const isNightAt = h => h < 7 || h >= 19
-export const skyAt = h => (isNightAt(h) ? '#16233D' : h < 9 || h >= 17 ? '#F4B88A' : '#A9D8F5')
+export const skyAt = h => (isNightAt(h) ? '#1F2A44' : h < 9 || h >= 17 ? '#F4B88A' : '#A9D8F5')
 
 // The windows in side walls, where the rooms' walls are now: x of the
 // wall, y, height, and which way in. A window where an open door now joins

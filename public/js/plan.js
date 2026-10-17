@@ -225,14 +225,14 @@ export const PLAN = {
   // both are built), and the front door. Every room opens on the hall. A
   // closed door is a depot's, drawn while the depot stands.
   doors: [
-    { x: 124, y: 250, w: 40, h: 12, colour: '#D5DAD2', between: ['team2', 'hall'] },
+    { x: 124, y: 250, w: 40, h: 12, colour: '#D8D3C9', between: ['team2', 'hall'] },
     { x: 277, y: 250, w: 40, h: 12, colour: '#CDB892', between: ['claude', 'hall'] },
     { x: 444, y: 250, w: 40, h: 12, colour: '#C8A57F', between: ['meeting', 'hall'] },
     { x: 756, y: 250, w: 40, h: 12, colour: '#8C6B55', between: ['lounge', 'hall'] },
-    { x: 124, y: SOUTH - 12, w: 40, h: 12, colour: '#D5DAD2', between: ['team', 'hall'] },
-    { x: 277, y: SOUTH - 12, w: 40, h: 12, colour: '#E0DBD0', between: ['reception', 'hall'] },
-    { x: 444, y: SOUTH - 12, w: 40, h: 12, colour: '#C3CCD6', between: ['quiet', 'hall'] },
-    { x: 804, y: SOUTH - 12, w: 40, h: 12, colour: '#E4E8EB', between: ['kitchen', 'hall'] },
+    { x: 124, y: SOUTH - 12, w: 40, h: 12, colour: '#D8D3C9', between: ['team', 'hall'] },
+    { x: 277, y: SOUTH - 12, w: 40, h: 12, colour: '#D8D3C9', between: ['reception', 'hall'] },
+    { x: 444, y: SOUTH - 12, w: 40, h: 12, colour: '#C9CED3', between: ['quiet', 'hall'] },
+    { x: 804, y: SOUTH - 12, w: 40, h: 12, colour: '#E9EEF2', between: ['kitchen', 'hall'] },
     { x: 1042, y: SOUTH - 12, w: 36, h: 12, colour: '#D4E3E9', between: ['toilet', 'hall'] },
     // The front door, out to the path
     { x: 279, y: SOUTH + 250, w: 36, h: 6, colour: '#8C6B4A', isEntrance: true, between: ['reception'] },

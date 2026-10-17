@@ -6,35 +6,35 @@ import { hashOf, kr } from './util.js'
 import { at, firstRoom, isBuilt, typeOf } from './plan.js'
 import { L } from './i18n.js'
 
-const screens = { working: '#5E6B7A', reading: '#E9EEF2', editing: '#1F2A44', running: '#0F1418', browsing: '#D7E9FA', waiting: '#E5484D', idle: '#1B2433' }
+const screens = { working: '#5B6672', reading: '#E9EEF2', editing: '#1F2A44', running: '#111418', browsing: '#D7E9FA', waiting: '#E5484D', idle: '#1B2433' }
 
 export const chair = (cx, dy) => {
   shadow(cx + 2, dy + 4, 22, 5, 0.14)
   if (owns('chairs')) {
     // Ergonomic: a high back with a headrest, and armrests
     rounded(cx - 22, dy - 20, 44, 24, 6, OUTLINE)
-    rounded(cx - 20, dy - 18, 40, 20, 5, '#2E7D74')
+    rounded(cx - 20, dy - 18, 40, 20, 5, '#23857A')
     rounded(cx - 14, dy - 22, 28, 6, 3, OUTLINE)
-    rounded(cx - 12, dy - 21, 24, 4, 2, '#3AA597')
+    rounded(cx - 12, dy - 21, 24, 4, 2, '#2E9E8F')
     rect(cx - 22, dy - 4, 4, 8, OUTLINE)
     rect(cx + 18, dy - 4, 4, 8, OUTLINE)
     return
   }
   rounded(cx - 21, dy - 18, 42, 22, 5, OUTLINE)
-  rounded(cx - 19, dy - 16, 38, 18, 4, '#465566')
-  rounded(cx - 17, dy - 14, 34, 3, 1.5, '#5A6B7E')
+  rounded(cx - 19, dy - 16, 38, 18, 4, '#4A5868')
+  rounded(cx - 17, dy - 14, 34, 3, 1.5, '#62758C')
 }
 
 // What a screen shows: code, a terminal, a page of text, a browser.
 const screenArt = (x, y, state, t) => {
   if (state === 'editing') {
     const shift = Math.floor(t / 500) % 2
-    ;['#7FB4F0', '#E8A33D', '#9BD58B'].forEach((c, i) => rect(x + 2 + (i % 2) * 2, y + 2 + i * 3 - shift, 8 - i * 2, 1.5, c))
+    ;['#7FB4F0', '#F2A541', '#9BD58B'].forEach((c, i) => rect(x + 2 + (i % 2) * 2, y + 2 + i * 3 - shift, 8 - i * 2, 1.5, c))
   } else if (state === 'running') {
     rect(x + 2, y + 2, 7, 1.5, '#3DDC84')
     if (Math.floor(t / 400) % 2 === 0) rect(x + 2, y + 6, 2, 2, '#3DDC84')
   } else if (state === 'reading') {
-    ;[0, 1, 2].forEach(i => rect(x + 2, y + 2 + i * 3, 10 - (i % 2) * 3, 1.5, '#AEB8C2'))
+    ;[0, 1, 2].forEach(i => rect(x + 2, y + 2 + i * 3, 10 - (i % 2) * 3, 1.5, '#AEB6BF'))
   } else if (state === 'browsing') {
     rect(x, y, 14, 2.5, '#3E7CC9')
     rect(x + 2, y + 4, 6, 4, '#9CC4EC')
@@ -48,7 +48,7 @@ const monitor = (x, dy, state, t, isWide = false) => {
   const w = isWide ? 30 : 20
   const left = isWide ? x - 10 : x
   rect(left - 1, dy + 1, w + 2, 16, OUTLINE)
-  rect(left, dy + 2, w, 13, state ? screens[state] : '#141A22')
+  rect(left, dy + 2, w, 13, state ? screens[state] : '#111418')
   if (state) screenArt(left + 2, dy + 4, state, t)
   if (state && isWide) screenArt(left + 16, dy + 4, state, t + 333)
   rect(left + w / 2 - 2, dy + 17, 4, 3, OUTLINE)
@@ -59,11 +59,11 @@ export const desk = (cx, dy, w, state, t, monitors = 1) => {
   faint(0.13, () => rounded(left + 3, dy + 4, w, 28, 2, '#000000'))
   rounded(left - 1, dy - 1, w + 2, 30, 2, OUTLINE)
   rect(left, dy, w, 22, '#E4C79C')
-  rect(left, dy, w, 2, '#F1DBB8')
+  rect(left, dy, w, 2, '#F7DDBA')
   rect(left, dy + 22, w, 6, '#B98F5E')
   monitor(cx + w / 2 - 28, dy, state, t, monitors === 1 && owns('screens'))
   if (monitors > 1) monitor(cx - w / 2 + 8, dy, state, t)
-  rounded(cx - 12, dy + 12, 24, 7, 1, '#D3D8DD', OUTLINE, 1)
+  rounded(cx - 12, dy + 12, 24, 7, 1, '#C9CED3', OUTLINE, 1)
   rect(cx - 9, dy + 14, 18, 1, '#AEB6BF')
   rect(cx - 9, dy + 16, 18, 1, '#AEB6BF')
 }
@@ -202,14 +202,14 @@ export const clock = date => {
 // A green watering can in Claude's hand, tipped at the plant, with drops
 // falling `fall` units from the spout.
 export const wateringCan = (x, y, t, fall = 14) => {
-  rounded(x - 4, y - 4, 9, 7, 2, '#4F9A5B', OUTLINE, 1)
+  rounded(x - 4, y - 4, 9, 7, 2, '#4C9A60', OUTLINE, 1)
   ctx.strokeStyle = OUTLINE
   ctx.lineWidth = 1.6
   ctx.beginPath()
   ctx.moveTo(x + 4, y - 1)
   ctx.lineTo(x + 10, y - 5)
   ctx.stroke()
-  ctx.strokeStyle = '#4F9A5B'
+  ctx.strokeStyle = '#4C9A60'
   ctx.lineWidth = 0.8
   ctx.stroke()
   ctx.beginPath()
@@ -236,13 +236,13 @@ export const magnifier = (x, y) => {
   ctx.strokeStyle = '#8B5E3C'
   ctx.lineWidth = 1.6
   ctx.stroke()
-  circle(x, y, 3.6, '#CFE8F7', OUTLINE)
+  circle(x, y, 3.6, '#D7E9FA', OUTLINE)
   rect(x - 1.8, y - 1.8, 1.4, 1.4, '#FFFFFF')
 }
 
 // On a Plan helper's desk: a roll of plans, blue, half unrolled.
 export const blueprint = (x, y) => {
-  rounded(x - 7, y - 3, 12, 8, 1, '#3E6FB5', OUTLINE, 1)
+  rounded(x - 7, y - 3, 12, 8, 1, '#3D74B8', OUTLINE, 1)
   for (const dy of [-1, 1.5]) rect(x - 5, y + dy, 8, 0.6, '#BFD6F2')
   rect(x - 3, y - 2, 0.6, 6, '#BFD6F2')
   rounded(x + 4, y - 4, 4, 10, 2, '#5A8BD0', OUTLINE, 1)
@@ -255,8 +255,8 @@ export const blueprint = (x, y) => {
 export const coffeePot = (x, y, left) => {
   const k = left === null ? 1 : Math.max(0, Math.min(1, left))
   rounded(x - 1, y - 1, 10, 13, 2, OUTLINE)
-  rect(x, y, 8, 11, '#DDE7EE')
-  rect(x, y + 11 - 9 * k, 8, 9 * k, '#6E4426')
+  rect(x, y, 8, 11, '#D4E3E9')
+  rect(x, y + 11 - 9 * k, 8, 9 * k, '#6B3F25')
   rect(x, y, 8, 2, '#3E4852')
   rect(x + 8, y + 3, 2.5, 5, OUTLINE)
   rect(x + 1, y + 3, 1, 6, 'rgba(255, 255, 255, 0.6)')
@@ -265,7 +265,7 @@ export const deskPlant = (x, y, health) => {
   const k = health === null ? 1 : Math.max(0, Math.min(1, health))
   // Green when well, yellow, then brown; the leaves droop as it goes.
   const leaf = k > 0.5 ? '#3E8A55' : k > 0.25 ? '#B7A43A' : '#8B5E3C'
-  const light = k > 0.5 ? '#6CC082' : k > 0.25 ? '#D9C55A' : '#A97A52'
+  const light = k > 0.5 ? '#6CC082' : k > 0.25 ? '#D9C55A' : '#A47A55'
   const droop = (1 - k) * 5
   rect(x - 3, y + 5, 7, 6, '#B5683E')
   rect(x - 3, y + 5, 7, 1.5, '#9C5A34')
