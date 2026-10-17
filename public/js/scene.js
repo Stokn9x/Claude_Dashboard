@@ -6,7 +6,7 @@
 import { store, focused, owns } from './store.js'
 import { OUTLINE, bubble, canvas, circle, ctx, dashed, label, rect, rounded, say, setPixelsPerUnit, shadow, tag } from './gfx.js'
 import { hashOf, modelFamily } from './util.js'
-import { MAIN, MAIN_SPOT, ROOM_TYPES, at, coffeeSpot, desks, firstRoom, isBuilt, placeOf, shiftOf, typeOf } from './plan.js'
+import { MAIN, MAIN_SPOT, ROOM_TYPES, at, coffeeSpot, desks, firstRoom, isBuilt, placeOf, shiftOf, spotsIn, typeOf } from './plan.js'
 import { HOMEWARD_MS, WALKS, homewardPose, outAt, poseOf, route, sideBySide, walkAt, walkMs } from './routes.js'
 import { STAY, banterFor, breakNow, errandPose, meetingNow } from './breaks.js'
 import { bowl, cat, claudeLook, hands, lookFor, onTheFloor, sitting, sittingBack, standing } from './figures.js'
@@ -258,9 +258,10 @@ const drawClaude = ({ s, main, where, rest, meetingPose, claudeWalk, kitchenSpot
     else standing(p.x, p.y, claudeLook, p.facing, p.isWalking, t, 7)
     tag(p.x, p.y + 3, 'Claude', CLAUDE)
     hits.push({ kind: 'claude', id: 'claude', ...standingBox(p.x, p.y) })
-  } else if (where === 'plants' || where === 'cat' || where === 'walk') {
+  } else if (where === 'plants' || where === 'cat' || where === 'walk' || where === 'pingpong') {
     const { x, y, facing } = rest.spot
     standing(x, y, claudeLook, facing, false, t, 7)
+    if (where === 'pingpong') circle(x + 10, y - 18, 3.2, '#3E7CC9', OUTLINE)
     // Down onto the big plant in the corner
     if (where === 'plants') wateringCan(x + 12, y - 20, t, 36)
     tag(x, y + 3, 'Claude', CLAUDE)
@@ -492,7 +493,14 @@ export const draw = () => {
   const meetingPose = meeting?.withClaude && !isReceiving ? errandPose(MAIN_SPOT, { kind: 'meeting', start: meeting.start, stay: STAY.meeting, dest: meeting.head }, now) : null
   // On a pause Claude takes a coffee, waters its plants or strokes the cat
   // (cat.js), and the cat, called, comes to the armchair.
-  const rest = meetingPose || main.state !== 'idle' || isReceiving ? null : claudePause(now)
+  // Ping-pong with Claude: the table bought, nobody on a break at it, and
+  // someone off work to play (the first by id).
+  const lounge = firstRoom('lounge')
+  const tableEnds = owns('pingpong') ? spotsIn(lounge, typeOf(lounge).pingpong) : []
+  const isBreakAtTable = [...(pause?.errands.values() ?? [])].some(e => e.kind === 'pingpong')
+  const partner = tableEnds.length === 2 && !isBreakAtTable ? subs.filter(x => x.phase === 'idle').sort((a, b) => (a.id < b.id ? -1 : 1))[0] ?? null : null
+  const rest = meetingPose || main.state !== 'idle' || isReceiving ? null : claudePause(now, { table: partner ? tableEnds : null })
+  const playsWith = rest?.kind === 'pingpong' ? partner : null
   const claudeWhere = meetingPose ? 'meeting' : rest ? rest.kind : 'desk'
   const claudeWalk = unjumped(`${s?.key}|claude`, claudeWhere === 'meeting' ? meetingPose : rest ? rest.spot : MAIN_SPOT, now)
   const where = claudeWalk ? 'walking' : claudeWhere
@@ -502,7 +510,10 @@ export const draw = () => {
 
   // Off work, a helper keeps clear of the spots a break or the meeting uses.
   const taken = new Set([...(pause?.errands.values() ?? [])].map(e => `${e.dest.x},${e.dest.y}`).concat([...(meeting?.seats.values() ?? [])].map(p => `${p.x},${p.y}`)))
-  const plan = idlePlan(subs.filter(sub => sub.phase === 'idle'), now, taken)
+  if (playsWith) for (const p of tableEnds) taken.add(`${p.x},${p.y}`)
+  const plan = idlePlan(subs.filter(sub => sub.phase === 'idle' && sub !== playsWith), now, taken)
+  // Claude's partner goes to the other end of the table.
+  if (playsWith) plan.set(playsWith.id, { kind: 'pingpong', spot: rest.partnerSpot, index: 1, slot: rest.slot })
   const poses = new Map(
     subs.map(sub => [sub.id, sub.phase === 'idle' ? idlePose(sub, plan, now) : poseOf(sub, now, walks, sub.from === 'idle' ? lastIdle.get(sub.id) ?? GROUNDS.hangout[0] : null)]),
   )
@@ -552,6 +563,8 @@ export const draw = () => {
   sideBySide(walkers.map(w => w.pose))
   walkers.sort((a, b) => a.pose.y - b.pose.y)
   const players = walkers.filter(w => w.pose.isThere && w.pose.errand.kind === 'pingpong')
+  // Claude at the table, once there, is a player too.
+  if (where === 'pingpong') players.push({ pose: { x: rest.spot.x, y: rest.spot.y, facing: 'right' } })
   const sales = forSaleNow(list)
   const frame = { s, main, where, rest, catPose, meeting, meetingPose, claudeWalk, pause, kitchenSpot, list, seatedAt, subs, walkers, players, floorSitters, glowing, hits, t }
 

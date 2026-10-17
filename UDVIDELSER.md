@@ -28,6 +28,7 @@ Status: ✅ lavet · 🟡 delvist · ⬜ ikke lavet · ⏸️ parkeret · ➖ ik
 | 0.11.1 | Fejlrettelser: ingen går gennem væggene (døre forbinder rummene i rutegitteret, og der er fri vej ud af Claudes kontor), nyt toilet med døren ud til et frit område, ingen fliser i væggene; langsommere indtjening og højere priser, så kontoret bygges over uger |
 | 0.12.0 | En lækrere side rundt om kontoret: topbjælke med ikon, trivsel, saldo og forbindelsesprik; kort med pixel-portræt og statuspille i listen; venteboks med "Gå til"; butik med ikoner og fremdrift; kun mørkt tema |
 | 0.13.0 | Spillets fase 4: pynt og opgraderinger i butikken, 17 præstationer med belønning og notifikation, statistik i den nye fane Fremskridt |
+| 0.30.0 | Claude spiller bordtennis: når bordet er købt, ingen holder pause ved det, og en hjælper har fri, kan Claude i sin pause tage den ene ende, mens hjælperen går over til den anden, og bolden flyver. Kaldes hjælperen tilbage på arbejde, finder Claude noget andet at lave |
 | 0.29.0 | Indstillinger under ⚙: vejret kan slås fra (regn og sne; årstiderne bliver), og rundvisningen kan ses igen. Spillet kan ikke slås fra (besluttet). Claude går en tur ud til søen i nogle af sine pauser og ser på anden |
 | 0.28.0 | Klar til kollegerne: første gang kontoret åbnes, viser en kort rundvisning i fire trin, hvad det kan (figurerne, kroner og butik, de nyttige ting, kameraet), og ? i topbjælken viser den igen. Mangler Node.js eller er den for gammel, siger knappen "Åbn kontor" og `/kontor` det tydeligt og hvor man henter det, i stedet for intet. To sessioner i samme projekt har klokkeslættet for deres start på fanen. Afprøvet live: rigtige subagenter med type, model og svar i kontoret og i dagens opgaver |
 | 0.27.1 | En holdkammerat, der venter på en besked, har mærkatet "Ledig" i listen i stedet for "Pause". Agent teams er set i et testkontor: venter, afleverer, går tilbage og sætter sig, uden at springe |
@@ -157,7 +158,7 @@ Fundet ved en gennemgang af koden og det, vi har set undervejs. **P1** er fejl, 
 | # | Hvad | Str. | Status |
 |---|---|---|---|
 | 59 | **Personlighed i dialogen:** hver hjælper får et temperament ud fra navnet (kæk, tør, dramatisk, positiv), så replikkerne lyder forskelligt (rest fra fase 3). Lavet i 0.16.0, og temperamentet står på hjælperens kort. | S | ✅ |
-| 60 | **Claude laver noget i pauserne:** kaffe i køkkenet, vander planterne på sit kontor, klapper katten (0.21.0) og går en tur ud til søen (0.29.0). Mangler: bordtennis med en hjælper. | M | 🟡 |
+| 60 | **Claude laver noget i pauserne:** kaffe i køkkenet, vander planterne, klapper katten (0.21.0), går ud til søen (0.29.0) og spiller bordtennis med en hjælper, der har fri (0.30.0). | M | ✅ |
 | 61 | **Fase 5, vækst i ét plan:** teamrum 2 (seks skriveborde mere), en lounge og en reception. Lavet i 0.18.0. | L | ✅ |
 | 73 | **Et anneks til de andre sessioner:** en bygning på grunden, hvor dine andre sessioner sidder, så man kan klikke sig over til dem. Parkeret efter dit ønske. | M | ⏸️ |
 | 62 | **Daglig bonus og stribe:** en lille bonus for første arbejde på dagen og for dage i træk. Lavet i 0.16.0: 25 kr plus 10 kr pr. dag i træk, højst en uge; vises i Fremskridt og i loggen. | S | ✅ |

@@ -651,3 +651,16 @@ test('a teammate that handed in a task walks back from Claude to its desk', () =
   assert.ok(Math.hypot(start.x - hand.x, start.y - hand.y) < 3, 'it sets off from beside Claude')
   assert.equal(routes.poseOf(sub, routes.WALKS.arrive).seated, true, 'and sits down at its desk')
 })
+
+test('Claude plays ping-pong only with the table free and someone off work to play', () => {
+  owning(['claude', 'team', 'lounge', 'pingpong'], 0)
+  const lounge = plan.firstRoom('lounge')
+  const ends = plan.spotsIn(lounge, plan.typeOf(lounge).pingpong)
+  assert.equal(ends.length, 2)
+  const kinds = table => new Set(Array.from({ length: 300 }, (_, i) => cat.claudePause(i * cat.PAUSE_SLOT_MS, { table }).kind))
+  assert.ok(!kinds(null).has('pingpong'), 'not without a partner')
+  assert.ok(kinds(ends).has('pingpong'), 'with one, sometimes')
+  const game = Array.from({ length: 300 }, (_, i) => cat.claudePause(i * cat.PAUSE_SLOT_MS, { table: ends })).find(p => p.kind === 'pingpong')
+  assert.deepEqual([game.spot.x, game.partnerSpot.x], [ends[0].x, ends[1].x], 'Claude at one end, the partner at the other')
+  assert.deepEqual(routes.checkRoutes([['Claude to the table', plan.MAIN_SPOT, ends[0]], ['Claude back from the table', ends[0], plan.MAIN_SPOT]]).problems, [])
+})

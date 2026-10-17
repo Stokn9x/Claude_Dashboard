@@ -86,15 +86,17 @@ const STROKING = { x: 240, y: 224, facing: 'left' }
 export const pondSpot = () => ({ x: GROUNDS.pond.x + GROUNDS.pond.rx + 20, y: GROUNDS.pond.y - 4, facing: 'left' })
 
 // What Claude does on a pause right now: a coffee in the kitchen, the
-// plants, the cat, or a breath of air by the pond, by turns from the clock
-// among what there is.
-export const claudePause = now => {
+// plants, the cat, a breath of air by the pond, or, when `table` gives the
+// two ends of a free ping-pong table and someone off work to play, a game,
+// by turns from the clock among what there is.
+export const claudePause = (now, { table = null } = {}) => {
   const kitchen = coffeeSpot()
   const corner = firstRoom('corner')
-  const choices = [...(kitchen ? ['kitchen', 'kitchen'] : []), 'plants', 'walk', ...(owns('cat') ? ['cat'] : [])]
+  const choices = [...(kitchen ? ['kitchen', 'kitchen'] : []), 'plants', 'walk', ...(owns('cat') ? ['cat'] : []), ...(table ? ['pingpong', 'pingpong'] : [])]
   const slot = Math.floor(now / PAUSE_SLOT_MS)
   const kind = choices[stir(slot >>> 0, 29) % choices.length]
   if (kind === 'kitchen') return { kind, spot: { ...kitchen, facing: 'front' } }
+  if (kind === 'pingpong') return { kind, spot: { ...table[0], facing: 'right' }, partnerSpot: table[1], slot }
   if (kind === 'walk') return { kind, spot: pondSpot(), slot }
   return { kind, spot: at(corner, kind === 'plants' ? WATERING : STROKING), slot }
 }
