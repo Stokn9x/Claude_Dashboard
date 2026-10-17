@@ -58,22 +58,28 @@ export async function findAgents($: $) {
   if (JSON.stringify(agents) !== JSON.stringify(o.agents)) await update($, office, x => ({ ...x, agents }))
 }
 
-// Which regulars were taken off the staff on the office page. The server
-// keeps it in a small file of its own, so it is read here even while no
-// page is open.
+// A plugin's agent: `<plugin>:<name>`. Your own have no colon in their name.
+export const isPluginAgent = (agent: string) => agent.includes(':')
+
+// Which regulars were taken off the staff on the office page, and which
+// plugins' agents were put on it. The server keeps it in a small file of its
+// own, so it is read here even while no page is open.
+const strings = (x: unknown) => (Array.isArray(x) ? x.filter((y): y is string => typeof y === 'string') : [])
 export async function readCrew($: $) {
   const home = (await $.env.get('USERPROFILE')) ?? (await $.env.get('HOME'))
   if (!home) return
   const text = await $.fs.read(`${slashed(home)}/.claude/agent-kontor/crew.json`).catch(() => null)
   let removed: string[] = []
+  let added: string[] = []
   if (typeof text === 'string') {
     try {
-      const crew = JSON.parse(text) as { removed?: unknown }
-      if (Array.isArray(crew.removed)) removed = crew.removed.filter((x): x is string => typeof x === 'string')
+      const crew = JSON.parse(text) as { removed?: unknown; added?: unknown }
+      removed = strings(crew.removed)
+      added = strings(crew.added)
     } catch {
       return
     }
   }
   const o = await readOffice($)
-  if (JSON.stringify(removed) !== JSON.stringify(o.removed)) await update($, office, x => ({ ...x, removed }))
+  if (JSON.stringify([removed, added]) !== JSON.stringify([o.removed, o.added])) await update($, office, x => ({ ...x, removed, added }))
 }

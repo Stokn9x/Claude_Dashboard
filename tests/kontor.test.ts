@@ -940,3 +940,24 @@ test('a regular taken off the staff on the page goes home between jobs, and one 
   await clock.advance(10_000)
   expect(subs().map(s => s.id)).toEqual(['staff-qa-tester'])
 })
+
+test("a plugin's agent is no regular until it is put on the staff", async ($, on) => {
+  const clock = engine(on)
+  usageWith(on, ['code-reviewer', 'stripe:Company Researcher'])
+  let crew = ''
+  on('fs.read', (_, e) => ({ value: e.path.endsWith('crew.json') ? crew : '' }) as never)
+  const file = statusFile(on)
+  const subs = () => file.last()?.subs as unknown as Regular[]
+
+  await $.session.start(start())
+  await clock.advance(2000)
+  expect(subs().map(s => s.id)).toEqual(['staff-code-reviewer'])
+
+  crew = JSON.stringify({ added: ['stripe:Company Researcher'] })
+  await clock.advance(3500)
+  expect(subs().map(s => [s.id, s.seat])).toEqual([
+    ['staff-code-reviewer', 0],
+    ['staff-stripe:Company Researcher', 1],
+  ])
+  expect(subs()[1]).toMatchObject({ name: 'Company Researcher' })
+})

@@ -432,11 +432,13 @@ test('a regular can be named, taken off the staff and on again, and the change l
     assert.equal((await post({ agent: 'wiki-writer', isRemoved: true })).status, 200)
     assert.equal((await post({ agent: 'wiki-writer', isRemoved: false })).status, 200)
     assert.equal((await post({ agent: '../evil', name: 'x' })).status, 400)
+    // A plugin's agent, its name with a space, is put on the staff.
+    assert.equal((await post({ agent: 'stripe:Company Researcher', isAdded: true })).status, 200)
     // Without the page's token, nothing changes.
     const foreign = await fetch(`http://127.0.0.1:${PORT}/api/crew`, { method: 'POST', body: JSON.stringify({ agent: 'qa-tester', isRemoved: false }) })
     assert.equal(foreign.status, 403)
     const { crew } = JSON.parse((await get('/api/state')).body).game
-    assert.deepEqual(crew, { names: { 'code-reviewer': 'Rikke Reviewer' }, removed: ['qa-tester'] })
+    assert.deepEqual(crew, { names: { 'code-reviewer': 'Rikke Reviewer' }, removed: ['qa-tester'], added: ['stripe:Company Researcher'] })
     assert.deepEqual(JSON.parse(fs.readFileSync(crewFile, 'utf8')), crew)
     // An empty name gives it its own name back.
     await post({ agent: 'code-reviewer', name: '' })

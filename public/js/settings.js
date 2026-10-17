@@ -5,7 +5,7 @@
 // The game is always on: there is no switch for it (the user's decision).
 import { el, remember, remembered } from './util.js'
 import { showTour } from './welcome.js'
-import { changeCrew, crewOf, knownAgents, ownName } from './crew.js'
+import { crewOf, isOnStaff, knownAgents, ownName, pluginOf, setOnStaff } from './crew.js'
 
 export const settings = { weather: remembered('weather') !== 'off' }
 
@@ -27,21 +27,26 @@ const row = (name, title, about) => {
   return el('label', { className: 'setting' }, [input, el('span', {}, [el('strong', {}, [title]), el('small', {}, [about])])])
 }
 
-// Your own agents: on the staff they are in all day; off it, one comes in
-// as a helper when it has a task, and goes again.
+// Your own agents, and the plugins' (off until put on): on the staff they
+// are in all day; off it, one comes in as a helper when it has a task, and
+// goes again.
 const ON_STAFF = 'På kontoret hele dagen'
 const OFF_STAFF = 'Kommer kun, når den har en opgave'
 const crewSection = () => {
   const agents = knownAgents()
   const heading = el('h3', {}, ['Faste medarbejdere'])
   if (!agents.length) return [heading, el('p', { className: 'crew-empty' }, ['Dine egne agenter fra /agents i Claude Code møder ind her og er på kontoret hele dagen. Du har ingen endnu.'])]
-  const { names, removed } = crewOf()
+  const { names } = crewOf()
   const rows = agents.map(agent => {
-    const input = el('input', { type: 'checkbox', checked: !removed.includes(agent) })
-    const about = el('small', {}, [`${names[agent] ? `${ownName(agent)} · ` : ''}${input.checked ? ON_STAFF : OFF_STAFF}`])
+    const input = el('input', { type: 'checkbox', checked: isOnStaff(agent) })
+    // Where it comes from, when that is worth saying: its own name under a
+    // name given, its plugin.
+    const origin = [names[agent] ? ownName(agent) : null, pluginOf(agent) ? `fra pluginet ${pluginOf(agent)}` : null].filter(Boolean).join(', ')
+    const aboutText = () => `${origin ? `${origin} · ` : ''}${input.checked ? ON_STAFF : OFF_STAFF}`
+    const about = el('small', {}, [aboutText()])
     input.addEventListener('change', async () => {
-      if (!(await changeCrew({ agent, isRemoved: !input.checked }))) input.checked = !input.checked
-      about.textContent = `${names[agent] ? `${ownName(agent)} · ` : ''}${input.checked ? ON_STAFF : OFF_STAFF}`
+      if (!(await setOnStaff(agent, input.checked))) input.checked = !input.checked
+      about.textContent = aboutText()
     })
     return el('label', { className: 'setting' }, [input, el('span', {}, [el('strong', {}, [names[agent] ?? ownName(agent)]), about])])
   })

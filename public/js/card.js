@@ -8,7 +8,7 @@ import { freeArea, hitAt, pixelsPerUnit, toScreen, wasDrag } from './camera.js'
 import { phaseLabel, showPanel, choose } from './panel.js'
 import { buyItem } from './shop.js'
 import { TEMPER_TEXT, temperOf } from './voices.js'
-import { changeCrew, crewOf, ownName } from './crew.js'
+import { changeCrew, crewOf, ownName, setOnStaff } from './crew.js'
 
 const card = document.getElementById('card')
 
@@ -64,7 +64,7 @@ const crewControls = who => {
     }
   })
   const remove = async () => {
-    if (await changeCrew({ agent: who.staff, isRemoved: true })) select(null)
+    if (await setOnStaff(who.staff, false)) select(null)
   }
   return [
     el('div', { className: 'card-label' }, ['Navn']),

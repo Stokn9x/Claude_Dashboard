@@ -155,5 +155,5 @@ Hver fase kan bruges for sig og skal være færdig og testet, før den næste st
 | Trivsel | **Ja, i fase 3.** |
 | Valuta | **Kroner.** |
 | Etager | **Nej.** Kontoret vokser kun ud over grunden, i ét plan. |
-| Faste medarbejdere | **Gratis** (17.10.2026). Dine egne agenter er på kontoret hele dagen, men de skal ikke koste noget: man skal kunne arbejde som normalt. Et købt skrivebord går til en fast før en hjælper; uden skrivebord sidder den på gulvet og brokker sig. Alle er med fra start, uden loft, og hver kan fjernes og hentes tilbage. |
+| Faste medarbejdere | **Gratis** (17.10.2026). Dine egne agenter er på kontoret hele dagen, men de skal ikke koste noget: man skal kunne arbejde som normalt. Et købt skrivebord går til en fast før en hjælper; uden skrivebord sidder den på gulvet og brokker sig. Alle dine egne er med fra start, uden loft, og hver kan fjernes og hentes tilbage. Agenter fra plugins er ikke dine egne: de er kun faste, når man sætter dem på under ⚙ (17.10.2026). |
 | Kan spillet slås fra? | **Nej.** Det er altid med, også for kollegerne (17.10.2026). Vejret kan slås fra under ⚙. |

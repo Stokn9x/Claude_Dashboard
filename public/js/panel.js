@@ -110,14 +110,72 @@ const tabName = (x, sessions) => {
   if (sessions.filter(y => (y.project || 'Session') === name).length < 2 || !x.startedAt) return name
   return `${name} · ${new Date(x.startedAt).toLocaleTimeString('da-DK', { hour: '2-digit', minute: '2-digit' })}`
 }
+// Many sessions, or a narrow window: the tabs fold into the one in view and
+// a button with them all in a list. Built once; its text follows the count.
+const MAX_TABS = 4
+const allButton = el('button', { className: 'tab tab-all', type: 'button', ariaHasPopup: 'true', ariaExpanded: 'false' }, [])
+let picker = null
+const closePicker = () => {
+  picker?.remove()
+  picker = null
+  allButton.ariaExpanded = 'false'
+}
+const pickerItems = () => {
+  const s = focused()
+  const sessions = [...store.state.sessions].sort(byStart)
+  return sessions.map(x =>
+    el('button', { className: `session-item${x.main.state === 'waiting' ? ' is-waiting' : ''}`, type: 'button', ariaPressed: String(x === s), onclick: () => (closePicker(), choose(x.key)) }, [
+      dot(x.main.state),
+      el('span', {}, [el('strong', {}, [tabName(x, sessions)]), el('small', {}, [x.main.detail])]),
+    ]),
+  )
+}
+const openPicker = () => {
+  picker = el('div', { className: 'session-list', role: 'dialog', ariaLabel: 'Alle sessioner' }, pickerItems())
+  const r = allButton.getBoundingClientRect()
+  picker.style.left = `${Math.max(8, Math.min(r.left, window.innerWidth - 348))}px`
+  picker.style.top = `${r.bottom + 8}px`
+  document.body.append(picker)
+  allButton.ariaExpanded = 'true'
+  picker.querySelector('[aria-pressed="true"]')?.focus()
+}
+allButton.addEventListener('click', e => {
+  e.stopPropagation()
+  if (picker) closePicker()
+  else openPicker()
+})
+document.addEventListener('click', e => {
+  if (picker && !picker.contains(e.target)) closePicker()
+})
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && picker) closePicker()
+})
+// Folded when there are many, or when they do not fit side by side.
+const fold = () => {
+  const count = tabs.querySelectorAll('.tab:not(.tab-all)').length
+  tabs.classList.remove('is-folded')
+  const isFolded = count > MAX_TABS || (count > 1 && tabs.scrollWidth > tabs.clientWidth + 1)
+  tabs.classList.toggle('is-folded', isFolded)
+  if (!isFolded) closePicker()
+}
+window.addEventListener('resize', fold)
+
 const renderTabs = s => {
   const sessions = [...store.state.sessions].sort(byStart)
   const key = JSON.stringify([sessions.map(x => [x.key, x.project, x.main.state]), s?.key])
   if (key === tabsKey) return
   tabsKey = key
+  const waitingElsewhere = sessions.some(x => x !== s && x.main.state === 'waiting')
+  allButton.textContent = `▾ ${sessions.length}`
+  allButton.title = waitingElsewhere ? `Alle ${sessions.length} sessioner · en venter på dig` : `Alle ${sessions.length} sessioner`
+  allButton.ariaLabel = allButton.title
+  allButton.classList.toggle('is-waiting', waitingElsewhere)
   tabs.replaceChildren(
     ...sessions.map(x => el('button', { className: 'tab', type: 'button', onclick: () => choose(x.key), ariaPressed: String(x === s), title: x.main.detail }, [dot(x.main.state), tabName(x, sessions)])),
+    allButton,
   )
+  fold()
+  if (picker) picker.replaceChildren(...pickerItems())
 }
 
 // Waiting for you, in any session: a banner with a way there.

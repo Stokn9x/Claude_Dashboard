@@ -105,10 +105,13 @@ export type Office = {
   lastTurn: LastTurn | null
   // How full the context window is, in per cent, as the engine last said.
   context: number | null
-  // Your own agents this session can call on (their types), and the ones
-  // taken off the staff on the office page (the server's crew.json).
+  // The agents this session can call on (their types), the ones taken off
+  // the staff on the office page, and the plugins' agents put on it (the
+  // server's crew.json). A plugin's agent (`<plugin>:<name>`) is not one of
+  // your own: it is on the staff only when put on it.
   agents: string[]
   removed: string[]
+  added: string[]
 }
 
 export type GameSummary = { kroner: number; wellbeing: number; streak: number; unlocked: number; achievements: number }

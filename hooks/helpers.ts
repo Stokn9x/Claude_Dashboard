@@ -3,7 +3,7 @@ import type { Activity, AgentState, Office, Phase, Step, Sub } from '../types'
 import { emptyOffice, WALKS, pause, offWork, ready, readOffice, quietly, thinking } from './office'
 import type { $ } from './office'
 import { earn, PARTY_MS, celebrate } from './earnings'
-import { isOf, isAtWork } from './staff'
+import { isOf, isAtWork, isPluginAgent } from './staff'
 
 // The session's office in $.state: the engine wants the reference spelled
 // out in every file that reads or writes it, so each file makes its own.
@@ -32,11 +32,13 @@ export const freeSeat = (subs: Sub[], from = 0) => {
 }
 
 // ── The regulars ─────────────────────────────────────────────────────────
-// Your own agents, in name order, less those taken off the staff.
-// (An office saved by an older version has neither list.)
-export const staffWanted = (o: Pick<Office, 'agents' | 'removed'>) => {
+// Your own agents, in name order, less those taken off the staff, and the
+// plugins' agents put on it. (An office saved by an older version has none
+// of the lists.)
+export const staffWanted = (o: Pick<Office, 'agents' | 'removed' | 'added'>) => {
   const removed = o.removed ?? []
-  return [...new Set(o.agents ?? [])].filter(a => !removed.includes(a)).sort((a, b) => a.localeCompare(b))
+  const added = o.added ?? []
+  return [...new Set(o.agents ?? [])].filter(a => (isPluginAgent(a) ? added.includes(a) : !removed.includes(a))).sort((a, b) => a.localeCompare(b))
 }
 
 // A regular's first walk in: by the door, ready for work. Its id comes from

@@ -15,7 +15,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-const VERSION = '0.31.1'
+const VERSION = '0.32.0'
 const HOST = '127.0.0.1'
 const PORT = Number(process.env.AGENT_KONTOR_PORT || 4747)
 const HERE = path.dirname(fileURLToPath(import.meta.url))
@@ -573,20 +573,23 @@ const checkAchievements = now => {
 // ── The regulars ────────────────────────────────────────────────────────
 // Your own agents are in the office all day (the mod seats them). The page
 // can give one a name of its own, or take it off the staff, and take it on
-// again. Kept in a small file beside spil.json, which the mod reads too.
+// again; a plugin's agent (`<plugin>:<name>`) is on the staff only once put
+// on it (`added`). Kept in a small file beside spil.json, which the mod
+// reads too. An agent's name is any short text without slashes or control
+// characters (a plugin's may have spaces: "stripe:Company Researcher").
 const CREW = path.join(os.homedir(), '.claude', 'agent-kontor', 'crew.json')
-const AGENT = /^[\w.:@-]{1,100}$/
+const AGENT = /^[^/\\\u0000-\u001f]{1,100}$/
 const NAME_MAX = 24
 const CREW_MAX = 200
-let crew = { names: {}, removed: [] }
+let crew = { names: {}, removed: [], added: [] }
 const loadCrew = () => {
   try {
     const saved = JSON.parse(fs.readFileSync(CREW, 'utf8'))
     const names = Object.fromEntries(Object.entries(saved.names ?? {}).filter(([agent, name]) => AGENT.test(agent) && typeof name === 'string' && name.trim()).slice(0, CREW_MAX))
-    const removed = (Array.isArray(saved.removed) ? saved.removed : []).filter(agent => typeof agent === 'string' && AGENT.test(agent)).slice(0, CREW_MAX)
-    return { names, removed }
+    const agents = list => (Array.isArray(list) ? list : []).filter(agent => typeof agent === 'string' && AGENT.test(agent)).slice(0, CREW_MAX)
+    return { names, removed: agents(saved.removed), added: agents(saved.added) }
   } catch {
-    return { names: {}, removed: [] }
+    return { names: {}, removed: [], added: [] }
   }
 }
 const saveCrew = () => {
@@ -599,12 +602,15 @@ const saveCrew = () => {
   }
 }
 // {"agent":"code-reviewer","name":"Rikke"} names it ("" gives its own name
-// back); {"agent":"…","isRemoved":true} takes it off the staff, false on.
+// back); {"agent":"…","isRemoved":true} takes one of your own off the staff,
+// false on again; {"agent":"plugin:…","isAdded":true} puts a plugin's agent
+// on it, false off.
 const changeCrew = change => {
   const agent = change?.agent
   if (typeof agent !== 'string' || !AGENT.test(agent)) return { status: 400, error: 'Ukendt agent' }
   const names = { ...crew.names }
   let removed = [...crew.removed]
+  let added = [...crew.added]
   if (typeof change.name === 'string') {
     const name = change.name.replace(/\s+/g, ' ').trim().slice(0, NAME_MAX)
     if (name) names[agent] = name
@@ -614,8 +620,12 @@ const changeCrew = change => {
     removed = removed.filter(x => x !== agent)
     if (change.isRemoved) removed.push(agent)
   }
-  if (Object.keys(names).length > CREW_MAX || removed.length > CREW_MAX) return { status: 400, error: 'For mange' }
-  crew = { names, removed }
+  if (typeof change.isAdded === 'boolean') {
+    added = added.filter(x => x !== agent)
+    if (change.isAdded) added.push(agent)
+  }
+  if (Object.keys(names).length > CREW_MAX || removed.length > CREW_MAX || added.length > CREW_MAX) return { status: 400, error: 'For mange' }
+  crew = { names, removed, added }
   saveCrew()
   return { status: 200 }
 }
