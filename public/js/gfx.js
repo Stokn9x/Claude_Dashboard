@@ -12,6 +12,18 @@ export const OUTLINE = '#2B2230'
 export const FONT = "'Segoe UI', system-ui, -apple-system, sans-serif"
 export const stateColor = { working: '#8A94A0', reading: '#2BA39A', editing: '#3B8FE0', running: '#D9932B', browsing: '#7B6BDE', waiting: '#E5484D', idle: '#8A94A0' }
 
+// Things that stand still are drawn on the pixel grid (pixel.js); this
+// wraps a drawer of one, so its rectangles land on whole pixels too.
+export const still = paint => (...args) => {
+  const was = ctx.isSnapping
+  ctx.isSnapping = true
+  try {
+    return paint(...args)
+  } finally {
+    ctx.isSnapping = was
+  }
+}
+
 export const rect = (x, y, w, h, fill) => {
   ctx.fillStyle = fill
   ctx.fillRect(x, y, w, h)

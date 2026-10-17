@@ -140,7 +140,9 @@ export const drawBuilding = (project, hour, look = {}) => {
   const key = `${project}|${skyAt(hour)}|${background.width}x${background.height}|${view.x.toFixed(2)},${view.y.toFixed(2)},${view.zoom.toFixed(4)}|${owned}|${look.season}|${snow}|${look.isChristmas}`
   if (key === backgroundKey) return
   backgroundKey = key
+  // All of the background stands still: every rectangle on the grid.
   const g = pixelate(background.getContext('2d'))
+  g.isSnapping = true
   g.setTransform(1, 0, 0, 1, 0, 0)
   g.clearRect(0, 0, background.width, background.height)
   applyView(g)

@@ -67,8 +67,55 @@ const CORNERS = {
   ],
 }
 
+// A rectangle on the grid, for things that stand still (`isSnapping`):
+// its edges go to the nearest pixel, and a part thinner than a pixel (a seam,
+// a trim) becomes a whole pixel as faint as it covered, the way a picture is
+// scaled down to pixels. Moving things (people, cars, the cat) are left
+// where they are, or they would step instead of glide.
+const onGrid = (x, y, w, h) => {
+  const x0 = snap(Math.min(x, x + w))
+  const y0 = snap(Math.min(y, y + h))
+  let x1 = snap(Math.max(x, x + w))
+  let y1 = snap(Math.max(y, y + h))
+  let cover = 1
+  if (x1 <= x0) {
+    cover *= Math.min(1, Math.abs(w) / PIXEL)
+    x1 = x0 + PIXEL
+  }
+  if (y1 <= y0) {
+    cover *= Math.min(1, Math.abs(h) / PIXEL)
+    y1 = y0 + PIXEL
+  }
+  return [x0, y0, x1 - x0, y1 - y0, cover]
+}
+
 export const pixelate = context => {
   const line = context.lineTo
+  if (context.isPixelated) return context
+  context.isPixelated = true
+  context.isSnapping = false
+  const fillRect = context.fillRect
+  const strokeRect = context.strokeRect
+  const rect = context.rect
+  context.fillRect = function (x, y, w, h) {
+    if (!this.isSnapping) return fillRect.call(this, x, y, w, h)
+    const [sx, sy, sw, sh, cover] = onGrid(x, y, w, h)
+    if (cover >= 1) return fillRect.call(this, sx, sy, sw, sh)
+    const alpha = this.globalAlpha
+    this.globalAlpha = alpha * cover
+    fillRect.call(this, sx, sy, sw, sh)
+    this.globalAlpha = alpha
+  }
+  context.strokeRect = function (x, y, w, h) {
+    if (!this.isSnapping) return strokeRect.call(this, x, y, w, h)
+    const [sx, sy, sw, sh] = onGrid(x, y, w, h)
+    strokeRect.call(this, sx, sy, sw, sh)
+  }
+  context.rect = function (x, y, w, h) {
+    if (!this.isSnapping) return rect.call(this, x, y, w, h)
+    const [sx, sy, sw, sh] = onGrid(x, y, w, h)
+    rect.call(this, sx, sy, sw, sh)
+  }
   context.arc = function (x, y, r, a0, a1, ccw = false) {
     if (r < PIXEL) return dot(this, x, y, r, r)
     const [from, to] = sweep(a0, a1, ccw)

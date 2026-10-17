@@ -4,13 +4,13 @@
 // meetings, signs for what is for sale, building work and celebrations, and
 // what everyone says, on top.
 import { store, focused, owns } from './store.js'
-import { OUTLINE, bubble, canvas, circle, ctx, dashed, label, rect, rounded, say, setPixelsPerUnit, shadow, tag } from './gfx.js'
+import { OUTLINE, bubble, canvas, circle, ctx, dashed, label, rect, rounded, say, setPixelsPerUnit, shadow, still, tag } from './gfx.js'
 import { hashOf, modelFamily } from './util.js'
 import { MAIN, MAIN_SPOT, ROOM_TYPES, at, coffeeSpot, desks, firstRoom, isBuilt, placeOf, shiftOf, spotsIn, typeOf } from './plan.js'
 import { HOMEWARD_MS, WALKS, homewardPose, outAt, poseOf, route, sideBySide, walkAt, walkMs } from './routes.js'
 import { STAY, banterFor, breakNow, errandPose, meetingNow } from './breaks.js'
 import { bowl, cat, claudeLook, hands, lookFor, onTheFloor, sitting, sittingBack, standing } from './figures.js'
-import { blueprint, board, chair, clock, coffeePot, desk, deskPlant, deskThingsFor, magnifier, mug, steam, wateringCan } from './furniture.js'
+import * as furniture from './furniture.js'
 import { PAUSE_SLOT_MS, bowlOf, catNow, catPlaces, claudePause } from './cat.js'
 import { christmasLights, daylight, drawWeather, evening, timeOfDay, weatherNow } from './light.js'
 import { chatFor, grumbleAt } from './voices.js'
@@ -22,6 +22,13 @@ import { drawLife } from './outdoors.js'
 import { party } from './party.js'
 import { forSaleNow, drawSaleOutlines, drawSaleSigns, construction } from './sales.js'
 import { L, modText } from './i18n.js'
+
+// The furniture stands still, so it is drawn on the pixel grid; steam and
+// the watering can move, and glide.
+const { blueprint, board, chair, clock, coffeePot, desk, deskPlant, deskThingsFor, magnifier, mug } = Object.fromEntries(
+  ['blueprint', 'board', 'chair', 'clock', 'coffeePot', 'desk', 'deskPlant', 'deskThingsFor', 'magnifier', 'mug'].map(name => [name, still(furniture[name])]),
+)
+const { steam, wateringCan } = furniture
 
 // The longest a walk to a newly bought desk takes; most are shorter
 const MOVE_MS = 12_000
