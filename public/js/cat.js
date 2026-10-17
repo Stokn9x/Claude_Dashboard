@@ -4,8 +4,8 @@
 // kitchen, the lounge sofa and the lawn, as far as they are built. It picks
 // a place every forty seconds from the clock alone, walks there along
 // the routes everyone uses, and sits, sleeps or eats. Claude, on a pause,
-// takes a coffee, waters the plants in its office or comes to stroke the
-// cat. No DOM here, so it can be tested without a browser.
+// takes a coffee, waters the plants in its office, comes to stroke the cat
+// or goes out to the pond. No DOM here, so it can be tested without a browser.
 import { owns } from './store.js'
 import { GROUNDS, at, coffeeSpot, firstRoom, isBuilt, spotsIn, typeOf } from './plan.js'
 import { route, walkAt } from './routes.js'
@@ -82,14 +82,19 @@ export const PAUSE_SLOT_MS = 60_000
 const WATERING = { x: 376, y: 212, facing: 'right' }
 const STROKING = { x: 240, y: 224, facing: 'left' }
 
+// By the pond's east bank, looking out over the water (and the duck)
+export const pondSpot = () => ({ x: GROUNDS.pond.x + GROUNDS.pond.rx + 20, y: GROUNDS.pond.y - 4, facing: 'left' })
+
 // What Claude does on a pause right now: a coffee in the kitchen, the
-// plants, or the cat, by turns from the clock among what there is.
+// plants, the cat, or a breath of air by the pond, by turns from the clock
+// among what there is.
 export const claudePause = now => {
   const kitchen = coffeeSpot()
   const corner = firstRoom('corner')
-  const choices = [...(kitchen ? ['kitchen', 'kitchen'] : []), 'plants', ...(owns('cat') ? ['cat'] : [])]
+  const choices = [...(kitchen ? ['kitchen', 'kitchen'] : []), 'plants', 'walk', ...(owns('cat') ? ['cat'] : [])]
   const slot = Math.floor(now / PAUSE_SLOT_MS)
   const kind = choices[stir(slot >>> 0, 29) % choices.length]
   if (kind === 'kitchen') return { kind, spot: { ...kitchen, facing: 'front' } }
+  if (kind === 'walk') return { kind, spot: pondSpot(), slot }
   return { kind, spot: at(corner, kind === 'plants' ? WATERING : STROKING), slot }
 }

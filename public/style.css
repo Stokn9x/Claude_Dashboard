@@ -107,6 +107,16 @@ button.chip { cursor: pointer; }
 .card-steps time { color: var(--soft); font-variant-numeric: tabular-nums; margin-right: 8px; }
 
 /* The bottom-right corner: back to the whole office, and the minimap */
+/* ── Settings: a small panel under ⚙ ───────────────────────────────── */
+.settings { position: fixed; top: calc(var(--top) - 2px); right: var(--gap); z-index: 15; width: min(300px, calc(100vw - 2 * var(--gap))); display: grid; gap: 10px; padding: 14px; border-radius: 14px; background: var(--glass); border: 1px solid rgba(255, 255, 255, 0.08); box-shadow: var(--shadow); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+.settings h3 { margin: 0; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--faint); }
+.setting { display: grid; grid-template-columns: auto 1fr; gap: 10px; align-items: start; cursor: pointer; }
+.setting input { margin-top: 3px; accent-color: var(--accent); width: 16px; height: 16px; }
+.setting span { display: grid; gap: 2px; }
+.setting small { color: var(--soft); font-size: 12px; line-height: 1.4; }
+.settings-tour { justify-self: start; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-2); color: var(--soft); padding: 6px 12px; cursor: pointer; }
+.settings-tour:hover { color: var(--ink); border-color: var(--faint); }
+
 /* ── Welcome: the tour the first time ──────────────────────────────── */
 .welcome { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; padding: 16px; background: rgba(8, 11, 15, 0.55); backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); animation: welcome-in 0.2s ease-out; }
 .welcome-card { width: min(440px, 100%); display: grid; gap: 10px; padding: 22px 22px 18px; border-radius: 18px; background: var(--glass); border: 1px solid rgba(255, 255, 255, 0.08); box-shadow: var(--shadow); }

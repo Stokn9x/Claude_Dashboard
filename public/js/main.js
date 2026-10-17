@@ -16,6 +16,7 @@ import { settle } from './routes.js'
 import './tip.js'
 import './tv.js'
 import './welcome.js'
+import './settings.js'
 
 const conn = document.getElementById('conn')
 const lostBanner = document.getElementById('lost')

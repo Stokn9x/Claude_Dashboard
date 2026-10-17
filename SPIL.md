@@ -6,7 +6,7 @@ Status: **fase 0 til 5 er lavet (0.8.0 til 0.18.0), og kontoret har fået en ny 
 
 Arbejdet med Claude tjener penge. For pengene køber man kontoret op: pladser til hjælperne, nye rum og ting at lave i pauserne. En hjælper uden plads sidder på gulvet med en laptop og brokker sig. Kontoret vokser altså med det, man laver, og det bliver sjovere jo mere man bruger det.
 
-Spillet må aldrig stå i vejen for arbejdet. Det er kun pynt: intet i spillet kan stoppe eller forsinke Claude, og man kan slå det fra.
+Spillet må aldrig stå i vejen for arbejdet. Det er kun pynt: intet i spillet kan stoppe eller forsinke Claude. Det er altid med; det kan ikke slås fra (besluttet 17.10.2026).
 
 ## Økonomien
 
@@ -155,3 +155,4 @@ Hver fase kan bruges for sig og skal være færdig og testet, før den næste st
 | Trivsel | **Ja, i fase 3.** |
 | Valuta | **Kroner.** |
 | Etager | **Nej.** Kontoret vokser kun ud over grunden, i ét plan. |
+| Kan spillet slås fra? | **Nej.** Det er altid med, også for kollegerne (17.10.2026). Vejret kan slås fra under ⚙. |

@@ -258,7 +258,7 @@ const drawClaude = ({ s, main, where, rest, meetingPose, claudeWalk, kitchenSpot
     else standing(p.x, p.y, claudeLook, p.facing, p.isWalking, t, 7)
     tag(p.x, p.y + 3, 'Claude', CLAUDE)
     hits.push({ kind: 'claude', id: 'claude', ...standingBox(p.x, p.y) })
-  } else if (where === 'plants' || where === 'cat') {
+  } else if (where === 'plants' || where === 'cat' || where === 'walk') {
     const { x, y, facing } = rest.spot
     standing(x, y, claudeLook, facing, false, t, 7)
     // Down onto the big plant in the corner
@@ -363,7 +363,10 @@ const drawCat = ({ catPose, t }) => {
 const drawSpeech = frame => {
   const { s, main, where, rest, catPose, meeting, meetingPose, pause, kitchenSpot, list, seatedAt, subs, walkers, players, floorSitters, t } = frame
   const thanking = walkers.find(w => w.pose.handover)
-  if (where === 'plants' || where === 'cat') {
+  if (where === 'walk') {
+    const lines = ['Frisk luft', 'Se, anden er her', 'Godt med en pause', 'Nu tænker jeg klart']
+    if (t % 9000 < 6000) bubble(rest.spot.x, rest.spot.y - 52, lines[Math.floor(t / 9000) % lines.length], false, t)
+  } else if (where === 'plants' || where === 'cat') {
     const isCatHere = catPose && !catPose.isWalking && catPose.place.name === 'corner'
     const lines = where === 'plants' ? ['Lidt vand til jer', 'Så, så', 'I vokser jo'] : isCatHere ? ['Hvem er en god kat?', 'Hej, mis', 'Du spinder jo'] : ['Mis mis!']
     if (t % 9000 < 6000) bubble(rest.spot.x, rest.spot.y - 52, lines[Math.floor(t / 9000) % lines.length], false, t)

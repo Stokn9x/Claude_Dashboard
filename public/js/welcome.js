@@ -86,5 +86,8 @@ button.textContent = '?'
 button.title = 'Rundvisning: hvad kontoret kan'
 button.addEventListener('click', () => show(0))
 
+// For the settings panel: the tour once more.
+export const showTour = () => show(0)
+
 // The first visit gets the tour, once the office has drawn itself.
 if (remembered('welcomed') !== '1') setTimeout(() => show(0), 600)

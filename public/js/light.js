@@ -7,6 +7,7 @@ import { GROUNDS, PLAN, hasNow, isBuilt, isOpenDoor, rectOf, roomById, shiftOf, 
 import { visibleRect, visibleRooms } from './camera.js'
 import { stir } from './util.js'
 import { weatherAt } from './weather.js'
+import { settings } from './settings.js'
 
 // The time of day, in hours (14.5 is half past two). ?tid=21:30 in the
 // address shows the office at that time instead, to see the evening by day.
@@ -25,7 +26,12 @@ export const timeOfDay = () => {
 const params = new URLSearchParams(location.search)
 const WEATHER_WORDS = { klart: 'clear', skyet: 'cloudy', regn: 'rain', sne: 'snow' }
 const askedWeather = { kind: WEATHER_WORDS[params.get('vejr')], month: Number(params.get('maaned')) || undefined }
-export const weatherNow = () => weatherAt(Date.now(), askedWeather)
+// With the weather turned off in the settings, it is always clear; the
+// season and Christmas stay.
+export const weatherNow = () => {
+  const w = weatherAt(Date.now(), askedWeather)
+  return settings.weather || askedWeather.kind ? w : { ...w, kind: 'clear', intensity: 0, snowCover: 0 }
+}
 
 // How dark it is: none in the working day, deepening through the evening.
 const NIGHT = 0.55

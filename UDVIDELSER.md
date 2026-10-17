@@ -28,6 +28,7 @@ Status: ✅ lavet · 🟡 delvist · ⬜ ikke lavet · ⏸️ parkeret · ➖ ik
 | 0.11.1 | Fejlrettelser: ingen går gennem væggene (døre forbinder rummene i rutegitteret, og der er fri vej ud af Claudes kontor), nyt toilet med døren ud til et frit område, ingen fliser i væggene; langsommere indtjening og højere priser, så kontoret bygges over uger |
 | 0.12.0 | En lækrere side rundt om kontoret: topbjælke med ikon, trivsel, saldo og forbindelsesprik; kort med pixel-portræt og statuspille i listen; venteboks med "Gå til"; butik med ikoner og fremdrift; kun mørkt tema |
 | 0.13.0 | Spillets fase 4: pynt og opgraderinger i butikken, 17 præstationer med belønning og notifikation, statistik i den nye fane Fremskridt |
+| 0.29.0 | Indstillinger under ⚙: vejret kan slås fra (regn og sne; årstiderne bliver), og rundvisningen kan ses igen. Spillet kan ikke slås fra (besluttet). Claude går en tur ud til søen i nogle af sine pauser og ser på anden |
 | 0.28.0 | Klar til kollegerne: første gang kontoret åbnes, viser en kort rundvisning i fire trin, hvad det kan (figurerne, kroner og butik, de nyttige ting, kameraet), og ? i topbjælken viser den igen. Mangler Node.js eller er den for gammel, siger knappen "Åbn kontor" og `/kontor` det tydeligt og hvor man henter det, i stedet for intet. To sessioner i samme projekt har klokkeslættet for deres start på fanen. Afprøvet live: rigtige subagenter med type, model og svar i kontoret og i dagens opgaver |
 | 0.27.1 | En holdkammerat, der venter på en besked, har mærkatet "Ledig" i listen i stedet for "Pause". Agent teams er set i et testkontor: venter, afleverer, går tilbage og sætter sig, uden at springe |
 | 0.27.0 | Agent teams: en holdkammerat bliver ved sit skrivebord, så længe teamet lever, og venter dér på en besked mellem sine ture i stedet for at gå hjem. Løser den en opgave fra teamets liste, går den over til Claude med den (og tjener som en afleveret opgave) og tilbage til skrivebordet. Kortet viser dens navn i teamet. Desuden: en subagents eller holdkammerats tur gjorde før Claude til "Tænker"; nu er turen dens egen |
@@ -76,7 +77,7 @@ Status: ✅ lavet · 🟡 delvist · ⬜ ikke lavet · ⏸️ parkeret · ➖ ik
 | 10 | **Alle dine sessioner i ét kontor.** Nu med faner på siden. | M | ✅ |
 | 11 | **Klik på en figur for detaljer:** et kort med opgaven, hvad den laver nu, hvor længe den har været i gang, antal værktøjer, linjer og de seneste skridt. Klik på en anden session i projektrummet skifter til den. | M | ✅ |
 | 12 | **Aktivitetslog** under kontoret, fx "10:42 Freja læste api.ts", "10:43 Oskar afleverede". | S | ⬜ |
-| 13 | **Indstillinger:** lyd til/fra, gå-tempo, om knappen over chatboksen skal vises. | S | ⬜ |
+| 13 | **Indstillinger:** ⚙ i topbjælken med vejr til/fra og rundvisningen (0.29.0); lyd og beskeder har deres egne knapper. Spillet kan ikke slås fra. | S | ✅ |
 | 14 | **README med GIF** af kontoret i gang. | S | ⬜ |
 
 ## 🚀 Fede udvidelser
@@ -156,7 +157,7 @@ Fundet ved en gennemgang af koden og det, vi har set undervejs. **P1** er fejl, 
 | # | Hvad | Str. | Status |
 |---|---|---|---|
 | 59 | **Personlighed i dialogen:** hver hjælper får et temperament ud fra navnet (kæk, tør, dramatisk, positiv), så replikkerne lyder forskelligt (rest fra fase 3). Lavet i 0.16.0, og temperamentet står på hjælperens kort. | S | ✅ |
-| 60 | **Claude laver noget i pauserne:** kaffe i køkkenet, vander planterne på sit kontor eller klapper katten (0.21.0). Mangler: en tur udenfor og bordtennis med en hjælper. | M | 🟡 |
+| 60 | **Claude laver noget i pauserne:** kaffe i køkkenet, vander planterne på sit kontor, klapper katten (0.21.0) og går en tur ud til søen (0.29.0). Mangler: bordtennis med en hjælper. | M | 🟡 |
 | 61 | **Fase 5, vækst i ét plan:** teamrum 2 (seks skriveborde mere), en lounge og en reception. Lavet i 0.18.0. | L | ✅ |
 | 73 | **Et anneks til de andre sessioner:** en bygning på grunden, hvor dine andre sessioner sidder, så man kan klikke sig over til dem. Parkeret efter dit ønske. | M | ⏸️ |
 | 62 | **Daglig bonus og stribe:** en lille bonus for første arbejde på dagen og for dage i træk. Lavet i 0.16.0: 25 kr plus 10 kr pr. dag i træk, højst en uge; vises i Fremskridt og i loggen. | S | ✅ |

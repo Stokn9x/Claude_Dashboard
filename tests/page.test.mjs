@@ -493,6 +493,7 @@ test("the cat's places can all be reached from each other, and Claude's pause sp
     const { spot: watering } = cat.claudePause(0) // any slot: the spots are fixed
     pairs.push(['Claude to the plants', plan.MAIN_SPOT, plan.at(plan.firstRoom('corner'), { x: 376, y: 212 })])
     pairs.push(['Claude to the cat', plan.MAIN_SPOT, plan.at(plan.firstRoom('corner'), { x: 240, y: 224 })])
+    pairs.push(['Claude to the pond', plan.MAIN_SPOT, cat.pondSpot()], ['Claude back from the pond', cat.pondSpot(), plan.MAIN_SPOT])
     assert.ok(watering)
     assert.deepEqual(routes.checkRoutes(pairs).problems, [], rooms.join(','))
   }
@@ -519,9 +520,9 @@ test('the cat walks from place to place, settles in time, and is there only once
 test("Claude's pause: coffee only with a kitchen, the cat only once bought", () => {
   const kinds = () => new Set(Array.from({ length: 200 }, (_, i) => cat.claudePause(i * cat.PAUSE_SLOT_MS).kind))
   owning(['claude', 'team'], 0)
-  assert.deepEqual([...kinds()], ['plants'])
+  assert.deepEqual([...kinds()].sort(), ['plants', 'walk'])
   owning(['claude', 'team', 'kitchen', 'cat'], 0)
-  assert.deepEqual([...kinds()].sort(), ['cat', 'kitchen', 'plants'])
+  assert.deepEqual([...kinds()].sort(), ['cat', 'kitchen', 'plants', 'walk'])
 })
 
 // ── The day's summary ────────────────────────────────────────────────────
